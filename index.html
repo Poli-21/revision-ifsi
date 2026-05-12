@@ -538,5 +538,32 @@
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 </script>
+<script>
+// Binding direct des boutons header (contourne tout problème de scope)
+document.addEventListener('DOMContentLoaded', function() {
+  var btnSync = document.getElementById('sync-settings-btn');
+  if (btnSync) btnSync.addEventListener('click', function() {
+    var overlay = document.getElementById('sync-overlay');
+    if (!overlay) return;
+    var on = (window.App && App.Sync) ? App.Sync.isConfigured() : false;
+    document.getElementById('sync-setup-zone').style.display    = on ? 'none'  : 'block';
+    document.getElementById('sync-connected-zone').style.display = on ? 'block' : 'none';
+    document.getElementById('sync-connect-msg').textContent = '';
+    overlay.style.display = 'flex';
+    requestAnimationFrame(function(){ overlay.style.opacity = '1'; });
+  });
+
+  var btnQR = document.querySelector('button[onclick="showQRCode()"]');
+  if (btnQR) { btnQR.removeAttribute('onclick'); btnQR.addEventListener('click', function() {
+    var url = location.href.replace(/\/[^\/]*$/, '/').replace('github.io', 'github.io');
+    var overlay = document.getElementById('qr-overlay');
+    if (!overlay) return;
+    document.getElementById('qr-container').innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(location.href) + '&bgcolor=ffffff&color=1a1a2e&qzone=2" width="200" height="200" style="border-radius:8px">';
+    document.getElementById('qr-url').textContent = location.href;
+    overlay.style.display = 'flex';
+    requestAnimationFrame(function(){ overlay.style.opacity = '1'; });
+  }); }
+});
+</script>
 </body>
 </html>
