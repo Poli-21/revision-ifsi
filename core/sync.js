@@ -59,11 +59,10 @@ App.Sync = (() => {
     const data = await res.json();
     const fileInfo = data.files?.[FILENAME];
     if (!fileInfo) throw new Error('Fichier introuvable dans le Gist');
-    // Si le fichier dépasse 1 Mo, l'API le tronque → on récupère via raw_url
-    if (fileInfo.truncated && fileInfo.raw_url) {
-      const raw = await fetch(fileInfo.raw_url, { headers: _headers() });
-      if (!raw.ok) throw new Error(`Lecture raw Gist échouée (${raw.status})`);
-      return await raw.json();
+    // Si tronqué (ancien format lourd) → on écrase avec le nouveau format compact
+    if (fileInfo.truncated) {
+      await _updateGist();   // pousse le format léger
+      return { v: 2, progress: {}, studyLog: {}, catOrder: [] }; // repart de zéro côté merge
     }
     return JSON.parse(fileInfo.content);
   }
