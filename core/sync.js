@@ -57,9 +57,15 @@ App.Sync = (() => {
     const res = await fetch(`${API}/gists/${config.gistId}`, { headers: _headers() });
     if (!res.ok) throw new Error(`Lecture Gist échouée (${res.status})`);
     const data = await res.json();
-    const content = data.files?.[FILENAME]?.content;
-    if (!content) throw new Error('Fichier introuvable dans le Gist');
-    return JSON.parse(content);
+    const fileInfo = data.files?.[FILENAME];
+    if (!fileInfo) throw new Error('Fichier introuvable dans le Gist');
+    // Si le fichier dépasse 1 Mo, l'API le tronque → on récupère via raw_url
+    if (fileInfo.truncated && fileInfo.raw_url) {
+      const raw = await fetch(fileInfo.raw_url, { headers: _headers() });
+      if (!raw.ok) throw new Error(`Lecture raw Gist échouée (${raw.status})`);
+      return await raw.json();
+    }
+    return JSON.parse(fileInfo.content);
   }
 
   // ── Sérialisation ──────────────────────────────────────────────
