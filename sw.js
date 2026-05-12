@@ -1,5 +1,5 @@
 // Service Worker — cache offline
-const CACHE = 'ifsi-v3';
+const CACHE = 'ifsi-v4';
 const FILES = [
   './',
   './index.html',
