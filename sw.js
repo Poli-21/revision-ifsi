@@ -27,8 +27,10 @@ self.addEventListener('fetch', e => {
   const url = e.request.url;
   const isStatic = url.endsWith('.png') || url.endsWith('.jpg') || url.endsWith('.ico');
 
+  // Ne cache que les requêtes GET (pas POST/PATCH/PUT)
+  if (e.request.method !== 'GET') return;
+
   if (isStatic) {
-    // Cache-first pour les images
     e.respondWith(
       caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
         const clone = res.clone();
@@ -37,7 +39,6 @@ self.addEventListener('fetch', e => {
       }))
     );
   } else {
-    // Network-first pour HTML/JS/CSS : toujours la version fraîche si en ligne
     e.respondWith(
       fetch(e.request)
         .then(res => {
@@ -45,7 +46,7 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, clone));
           return res;
         })
-        .catch(() => caches.match(e.request)) // hors ligne → cache
+        .catch(() => caches.match(e.request))
     );
   }
 });

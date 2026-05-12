@@ -69,12 +69,15 @@ App.Sync = (() => {
   }
 
   // ── Sérialisation ──────────────────────────────────────────────
+  // On ne sync que les progrès SRS + log + ordre (pas le contenu des cartes)
   function _serialize() {
     const { state } = App.Store;
+    const progress = {};
+    state.cards.forEach(c => { if (c.progress) progress[c.id] = c.progress; });
     return JSON.stringify({
-      v: 1,
+      v: 2,
       updatedAt: new Date().toISOString(),
-      cards: state.cards,
+      progress,               // { cardId: progressObject }
       studyLog: state.studyLog,
       catOrder: state.catOrder
     }, null, 0);
@@ -82,7 +85,7 @@ App.Sync = (() => {
 
   function _deserialize(data) {
     return {
-      cards:    Array.isArray(data.cards)    ? data.cards    : [],
+      progress: data.progress && typeof data.progress === 'object' ? data.progress : {},
       studyLog: data.studyLog && typeof data.studyLog === 'object' ? data.studyLog : {},
       catOrder: Array.isArray(data.catOrder) ? data.catOrder : [],
       updatedAt: data.updatedAt || ''
@@ -153,50 +156,37 @@ App.Sync = (() => {
       prog(20, 'Récupération des données…');
       const remote = _deserialize(await _fetchGist());
       prog(50, 'Fusion des données…');
-      const local  = {
-        cards:    App.Store.state.cards,
-        studyLog: App.Store.state.studyLog,
-        catOrder: App.Store.state.catOrder
-      };
 
-      // Fusionne : garde le plus grand nombre de cartes,
-      // merge les logs (union des dates)
-      const remoteIds = new Set(remote.cards.map(c => c.id));
-      const localIds  = new Set(local.cards.map(c => c.id));
-
-      // Cartes : union (remote + local nouvelles)
-      const merged = [...remote.cards];
-      local.cards.forEach(c => { if (!remoteIds.has(c.id)) merged.push(c); });
-      // Progress : prend le plus récent pour les cartes en commun
-      merged.forEach(card => {
-        const localCard = local.cards.find(c => c.id === card.id);
-        if (localCard?.progress && card.progress) {
-          if ((localCard.progress.lastReview || '') > (card.progress.lastReview || ''))
-            card.progress = localCard.progress;
-        } else if (localCard?.progress && !card.progress) {
-          card.progress = localCard.progress;
+      // Applique les progrès distants sur les cartes locales
+      // (le contenu des cartes reste celui de l'app)
+      App.Store.state.cards.forEach(card => {
+        const remoteP = remote.progress[card.id];
+        const localP  = card.progress;
+        if (remoteP && localP) {
+          // Garde le plus récent
+          if ((remoteP.lastReview || '') > (localP.lastReview || ''))
+            card.progress = remoteP;
+        } else if (remoteP && !localP) {
+          card.progress = remoteP;
         }
       });
 
-      // Log : union des jours
+      // Merge log (union des jours, max des valeurs)
       const mergedLog = { ...remote.studyLog };
-      Object.entries(local.studyLog).forEach(([date, entry]) => {
+      Object.entries(App.Store.state.studyLog).forEach(([date, entry]) => {
         if (!mergedLog[date]) mergedLog[date] = entry;
-        else {
-          // Garde le max pour chaque champ
-          mergedLog[date] = {
-            reviewed: Math.max(mergedLog[date].reviewed||0, entry.reviewed||0),
-            ok:       Math.max(mergedLog[date].ok||0,       entry.ok||0),
-            hard:     Math.max(mergedLog[date].hard||0,     entry.hard||0),
-            nope:     Math.max(mergedLog[date].nope||0,     entry.nope||0),
-            seconds:  Math.max(mergedLog[date].seconds||0,  entry.seconds||0),
-          };
-        }
+        else mergedLog[date] = {
+          reviewed: Math.max(mergedLog[date].reviewed||0, entry.reviewed||0),
+          ok:       Math.max(mergedLog[date].ok||0,       entry.ok||0),
+          hard:     Math.max(mergedLog[date].hard||0,     entry.hard||0),
+          nope:     Math.max(mergedLog[date].nope||0,     entry.nope||0),
+          seconds:  Math.max(mergedLog[date].seconds||0,  entry.seconds||0),
+        };
       });
 
-      App.Store.state.cards    = merged;
       App.Store.state.studyLog = mergedLog;
-      if (remote.catOrder.length > 0) App.Store.state.catOrder = remote.catOrder;
+      if (remote.catOrder && remote.catOrder.length > 0)
+        App.Store.state.catOrder = remote.catOrder;
 
       prog(80, 'Sauvegarde…');
       App.Store.save();
