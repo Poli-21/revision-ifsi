@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Révision IFSI">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Révision IFSI</title>
+<link rel="stylesheet" href="styles/app.css">
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════════ -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<header>
+  <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+  <div>
+    <h1>🩺 Révision IFSI</h1>
+  </div>
+  <span class="kbd-hint" title="Raccourcis clavier">Espace=retourner · 1/2/3/4=répondre · N=nouvelle carte · /=rechercher · Échap=quitter</span>
+  <div class="header-right">
+    <span id="storage-indicator" style="display:none;font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:99px;cursor:default"></span>
+    <button class="btn btn-ghost btn-sm" id="sync-settings-btn" onclick="openSyncModal()" title="Synchronisation entre appareils">☁️ Sync</button>
+    <button class="btn btn-ghost btn-sm" onclick="showQRCode()" title="Accès tablette / téléphone">📱 Tablette</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📊 CSV</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportJSON()">💾 JSON</button>
+    <button class="btn btn-ghost btn-sm" onclick="importJSON()">📂 Importer</button>
+    <button class="btn btn-primary" onclick="openAddModal()">+ Carte</button>
+  </div>
+</header>
+
+<!-- ══ LAYOUT ═══════════════════════════════════════════════════ -->
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <h3>Aujourd'hui</h3>
+      <div class="stat-row"><span class="label">À réviser</span><span class="value" id="stat-due">—</span></div>
+      <div class="stat-row"><span class="label">Nouvelles</span><span class="value" id="stat-new">—</span></div>
+      <div class="stat-row"><span class="label">Total</span><span class="value" id="stat-total">—</span></div>
+      <div class="stat-row"><span class="label">Série</span><span class="value" id="stat-streak">—</span></div>
+      <div class="stat-row"><span class="label">⏱ Temps</span><span class="value" id="stat-time">—</span></div>
+      <div class="stat-row"><span class="label">🎯 Estimation</span><span class="value" id="stat-est" style="color:var(--primary)">—</span></div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Matières</h3>
+      <div class="cat-list" id="cat-list"></div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Niveaux</h3>
+      <div id="level-bars"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('home')"   id="tab-home">🏠 Tableau de bord</button>
+      <button class="tab"        onclick="switchTab('browse')" id="tab-browse">📚 Toutes les cartes</button>
+      <button class="tab"        onclick="switchTab('stats')"  id="tab-stats">📊 Statistiques</button>
+      <button class="tab"        onclick="switchTab('ortho')"  id="tab-ortho">✏️ Orthographe</button>
+      <button class="tab"        onclick="switchTab('games')"  id="tab-games">🎯 Entraînement</button>
+    </div>
+
+    <!-- ── HOME ──────────────────────────────────────────────── -->
+    <div id="home-view">
+      <div class="due-alert" id="due-alert">
+        <div>
+          <div class="big" id="due-count">0</div>
+          <div class="label">cartes à réviser maintenant</div>
+          <div class="cat-due-chips" id="cat-due-chips"></div>
+        </div>
+        <button class="btn btn-start" onclick="startSession()" style="align-self:flex-start">Tout réviser →</button>
+      </div>
+      <p class="section-title">Prochaines révisions</p>
+      <div class="card-grid" id="upcoming-grid"></div>
+    </div>
+
+    <!-- ── BROWSE ────────────────────────────────────────────── -->
+    <div id="browse-view" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+        <input id="search-input" type="text" placeholder="🔍 Rechercher…" style="flex:1;min-width:150px;padding:8px 13px;border:1px solid var(--gray-300);border-radius:8px;font-size:.88rem;font-family:inherit" oninput="renderBrowse()">
+        <select id="filter-cat" onchange="renderBrowse()" style="padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.83rem;font-family:inherit"><option value="">Toutes les matières</option></select>
+        <select id="filter-level" onchange="renderBrowse()" style="padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.83rem;font-family:inherit">
+          <option value="">Tous les niveaux</option>
+          <option value="0">Nouveau</option><option value="1">J+1</option><option value="2">J+6</option>
+          <option value="3">J+14</option><option value="4">J+30</option><option value="5">J+60</option>
+          <option value="6">J+90</option><option value="7">Maîtrisé</option>
+        </select>
+        <label style="font-size:.82rem;color:var(--gray-600);display:flex;align-items:center;gap:5px;white-space:nowrap;">
+          <input type="checkbox" id="filter-suspended" onchange="renderBrowse()"> Voir suspendus
+        </label>
+        <button id="select-mode-btn" class="btn btn-ghost btn-sm" onclick="toggleSelectMode()" title="Sélection multiple">☑ Sélectionner</button>
+      </div>
+      <div class="card-grid" id="browse-grid"></div>
+    </div>
+
+    <!-- ── BARRE SÉLECTION MULTIPLE ────────────────────────────── -->
+    <div id="bulk-bar" style="display:none">
+      <span id="bulk-count" style="font-weight:700"></span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select id="bulk-cat-select" style="padding:7px 11px;border:1px solid rgba(255,255,255,.4);border-radius:8px;font-size:.84rem;background:rgba(255,255,255,.15);color:white;font-family:inherit">
+          <option value="">— Changer de matière —</option>
+        </select>
+        <button class="btn" style="background:white;color:#4f46e5;font-weight:700" onclick="bulkChangeCat()">Appliquer</button>
+        <button class="btn" style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3)" onclick="bulkSelectAll()">Tout sélectionner</button>
+        <button class="btn" style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3)" onclick="toggleSelectMode()">✕ Annuler</button>
+      </div>
+    </div>
+
+    <!-- ── STATS ─────────────────────────────────────────────── -->
+    <div id="stats-view" style="display:none">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-n" id="stats-total">—</div><div class="stat-l">Total cartes</div></div>
+        <div class="stat-card"><div class="stat-n" id="stats-due">—</div><div class="stat-l">À réviser</div></div>
+        <div class="stat-card"><div class="stat-n" id="stats-mastered">—</div><div class="stat-l">Maîtrisées</div></div>
+        <div class="stat-card"><div class="stat-n" id="stats-avg-ef">—</div><div class="stat-l">Ease Factor moy.</div></div>
+      </div>
+      <div class="forecast-wrap">
+        <h3>📅 Prévision des révisions (14 jours)</h3>
+        <div class="forecast-chart" id="forecast-bars"></div>
+      </div>
+      <div class="hardest-wrap">
+        <h3>🔴 Cartes les plus difficiles (EF &lt; 2.0)</h3>
+        <div id="hardest-cards"></div>
+      </div>
+
+      <!-- YPT — Temps de révision -->
+      <div class="ypt-card">
+        <div class="ypt-card-title">⏱ Temps de révision par jour</div>
+        <div id="ypt-heatmap"></div>
+      </div>
+    </div>
+
+    <!-- ── ORTHOGRAPHE ────────────────────────────────────────── -->
+    <div id="ortho-view" style="display:none">
+
+      <!-- Écran de sélection -->
+      <div id="ortho-setup" class="ortho-setup-screen">
+        <div class="ortho-setup-icon">✏️</div>
+        <h2 class="ortho-setup-title">Entraînement à l'orthographe</h2>
+        <p class="ortho-setup-desc">Apprends à écrire les termes médicaux par cœur en 5 étapes : examiner, épeler, copier, mémoriser et vérifier.</p>
+        <div class="ortho-setup-row">
+          <select id="ortho-cat-select" class="ortho-cat-select">
+            <option value="">Toutes les matières</option>
+          </select>
+          <button class="btn btn-primary" onclick="App.Ortho.start()">Commencer →</button>
+        </div>
+      </div>
+
+      <!-- Pratique -->
+      <div id="ortho-practice" style="display:none">
+        <!-- Barre de progression -->
+        <div class="ortho-topbar">
+          <button class="btn btn-ghost btn-sm" onclick="App.Ortho.reset()">← Quitter</button>
+          <div class="ortho-prog-wrap">
+            <div class="ortho-prog-bar"><div class="ortho-prog-fill" id="ortho-progress-fill" style="width:0%"></div></div>
+            <span class="ortho-word-count" id="ortho-word-count">1 / —</span>
+          </div>
+        </div>
+
+        <!-- Indicateur d'étapes -->
+        <div class="ortho-steps-row">
+          <div class="ortho-dot active" id="ortho-dot1" title="Examiner">1</div>
+          <div class="ortho-step-line"></div>
+          <div class="ortho-dot" id="ortho-dot2" title="Épeler">2</div>
+          <div class="ortho-step-line"></div>
+          <div class="ortho-dot" id="ortho-dot3" title="Copier">3</div>
+          <div class="ortho-step-line"></div>
+          <div class="ortho-dot" id="ortho-dot4" title="Mémoriser">4</div>
+          <div class="ortho-step-line"></div>
+          <div class="ortho-dot" id="ortho-dot5" title="Vérifier">5</div>
+        </div>
+
+        <!-- Étape 1 : Examiner -->
+        <div id="ortho-step1" class="ortho-card">
+          <div class="ortho-step-label">Étape 1 · Examine précieusement le mot</div>
+          <div class="ortho-cat-tag" id="ortho-cat-display"></div>
+          <div class="ortho-big-word" id="ortho-word-display"></div>
+          <div class="ortho-def-box" id="ortho-def-display"></div>
+          <div class="ortho-actions">
+            <button class="btn btn-primary" onclick="App.Ortho.showStep(2)">J'ai bien regardé →</button>
+          </div>
+        </div>
+
+        <!-- Étape 2 : Épeler -->
+        <div id="ortho-step2" class="ortho-card" style="display:none">
+          <div class="ortho-step-label">Étape 2 · Épelle le mot lettre par lettre</div>
+          <div class="ortho-spell-dir" id="ortho-spell-dir">→ Avant</div>
+          <div class="ortho-spell-letters" id="ortho-spell-letters"></div>
+          <div class="ortho-actions">
+            <button class="btn btn-primary" id="ortho-spell-continue" style="display:none" onclick="App.Ortho.showStep(3)">Continuer →</button>
+          </div>
+        </div>
+
+        <!-- Étape 3 : Copier -->
+        <div id="ortho-step3" class="ortho-card" style="display:none">
+          <div class="ortho-step-label">Étape 3 · Copie le mot exactement</div>
+          <div class="ortho-copy-ref" id="ortho-copy-ref"></div>
+          <div class="ortho-copy-feedback" id="ortho-copy-feedback"></div>
+          <input class="ortho-input" id="ortho-copy-input" type="text" placeholder="Tape le mot ici…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <div class="ortho-actions">
+            <button class="btn btn-primary" id="ortho-copy-next" style="display:none" onclick="App.Ortho.showStep(4)">J'ai copié →</button>
+          </div>
+        </div>
+
+        <!-- Étape 4 : Écrire de mémoire -->
+        <div id="ortho-step4" class="ortho-card" style="display:none">
+          <div class="ortho-step-label">Étape 4 · Écris le mot de mémoire (mot caché)</div>
+          <div class="ortho-memory-hint-row">
+            <span class="ortho-memory-blanks" id="ortho-memory-blanks"></span>
+            <span class="ortho-memory-hint" id="ortho-memory-hint"></span>
+          </div>
+          <input class="ortho-input" id="ortho-memory-input" type="text" placeholder="Écris le mot sans regarder…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <div class="ortho-actions">
+            <button class="btn btn-primary" onclick="App.Ortho.verify()">Vérifier →</button>
+          </div>
+        </div>
+
+        <!-- Étape 5 : Résultat -->
+        <div id="ortho-step5" class="ortho-card" style="display:none">
+          <div class="ortho-step-label">Étape 5 · Résultat</div>
+          <div id="ortho-result" class="ortho-result-block"></div>
+          <div class="ortho-actions" style="gap:12px">
+            <button class="btn btn-primary" id="ortho-next-btn" onclick="App.Ortho.nextWord()">Mot suivant →</button>
+            <button class="btn btn-ghost"   id="ortho-retry-btn" style="display:none" onclick="App.Ortho.retry()">🔁 Recommencer ce mot</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fin de session -->
+      <div id="ortho-done" class="ortho-done-screen" style="display:none">
+        <div class="ortho-done-icon">🏆</div>
+        <h2>Bravo !</h2>
+        <p>Tu as entraîné l'orthographe de <strong id="ortho-done-count">0</strong> mot(s).</p>
+        <button class="btn btn-primary" onclick="App.Ortho.reset()">Recommencer une série</button>
+      </div>
+
+    </div>
+
+    <!-- ── ENTRAÎNEMENT ───────────────────────────────────────── -->
+    <div id="games-view" style="display:none">
+
+      <!-- Écran de sélection -->
+      <div id="games-setup" class="games-setup-screen">
+        <h2 class="games-setup-title">🎯 Modes d'entraînement</h2>
+        <p class="games-setup-desc">Choisis un mode pour renforcer ta mémorisation autrement que par les flashcards.</p>
+
+        <div class="games-mode-grid">
+          <button class="game-mode-card selected" id="gm-tf" onclick="App.Games.selectMode('tf')">
+            <span class="gm-icon">⚡</span>
+            <span class="gm-name">Vrai / Faux</span>
+            <span class="gm-desc">Une définition s'affiche — est-elle correcte pour ce terme ?</span>
+          </button>
+          <button class="game-mode-card" id="gm-blanks" onclick="App.Games.selectMode('blanks')">
+            <span class="gm-icon">📝</span>
+            <span class="gm-name">Mécanisme à trous</span>
+            <span class="gm-desc">Complète les mots manquants dans les définitions</span>
+          </button>
+          <button class="game-mode-card" id="gm-match" onclick="App.Games.selectMode('match')">
+            <span class="gm-icon">🔗</span>
+            <span class="gm-name">Association</span>
+            <span class="gm-desc">Relie chaque terme à sa bonne définition</span>
+          </button>
+          <button class="game-mode-card" id="gm-tryhard" onclick="App.Games.selectMode('tryhard')">
+            <span class="gm-icon">💪</span>
+            <span class="gm-name">Tryhard</span>
+            <span class="gm-desc">Cycles de 10 cartes · tu dois écrire la bonne réponse pour passer</span>
+          </button>
+        </div>
+
+        <div class="games-setup-row">
+          <select id="games-cat-select" class="ortho-cat-select">
+            <option value="">Toutes les matières</option>
+          </select>
+          <button class="btn btn-primary" onclick="App.Games.start()">Commencer →</button>
+        </div>
+      </div>
+
+      <!-- Zone de pratique -->
+      <div id="games-practice" style="display:none">
+        <div class="ortho-topbar">
+          <button class="btn btn-ghost btn-sm" onclick="App.Games.reset()">← Quitter</button>
+          <div class="ortho-prog-wrap">
+            <div class="ortho-prog-bar"><div class="ortho-prog-fill" id="games-progress-fill" style="width:0%"></div></div>
+            <span class="ortho-word-count" id="games-count">1 / —</span>
+          </div>
+          <div class="games-score-badge" id="games-score-badge">0 ✓</div>
+        </div>
+
+        <!-- Mécanisme à trous -->
+        <div id="game-blanks-zone" class="game-card" style="display:none"></div>
+
+        <!-- Vrai / Faux -->
+        <div id="game-tf-zone" class="game-card" style="display:none"></div>
+
+        <!-- Association -->
+        <div id="game-match-zone" class="game-card" style="display:none"></div>
+
+        <!-- Tryhard -->
+        <div id="game-tryhard-zone" class="game-card" style="display:none"></div>
+      </div>
+
+      <!-- Écran fin -->
+      <div id="games-done" class="games-done-screen" style="display:none">
+        <div style="font-size:3rem;margin-bottom:14px">🏆</div>
+        <h2>Session terminée !</h2>
+        <div class="games-done-mode" id="games-done-mode"></div>
+        <div class="games-done-score-row">
+          <span class="games-done-score" id="games-done-score">—</span>
+          <span class="games-done-pct"   id="games-done-pct">—</span>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px">
+          <button class="btn btn-primary" onclick="App.Games.start()">Rejouer</button>
+          <button class="btn btn-ghost"   onclick="App.Games.reset()">Changer de mode</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── SESSION ───────────────────────────────────────────── -->
+    <div id="session-view" style="display:none">
+      <!-- Bannière AFK -->
+      <div id="afk-banner" style="display:none">
+        <span>⏸ Temps en pause — tu es absent depuis +10 min</span>
+        <button onclick="App.Session.resumeAfk()">↩ Je suis de retour</button>
+      </div>
+
+      <div class="session-header">
+        <button class="btn btn-ghost btn-sm" onclick="endSession()">← Quitter</button>
+        <div class="session-progress-bar"><div class="session-progress-fill" id="session-progress-fill" style="width:0%"></div></div>
+        <div class="session-count" id="session-count"></div>
+        <div class="mode-toggle">
+          <button class="mode-btn active" id="mode-flip"  onclick="setSessionMode('flip')" title="Flip [F]">🔄 Flip</button>
+          <button class="mode-btn"        id="mode-write" onclick="setSessionMode('write')" title="Écriture">✏️ Écrire</button>
+          <button class="mode-btn"        id="mode-qcm"   onclick="setSessionMode('qcm')" title="QCM">🎯 QCM</button>
+        </div>
+      </div>
+
+      <!-- Mode Flip -->
+      <div class="flashcard-wrap" id="card-container">
+        <div class="flashcard" id="flashcard" onclick="flipCard()">
+          <div class="card-face card-front" id="card-front-face">
+            <div class="cat-tag" id="card-cat"></div>
+            <div class="card-image" id="card-img-front" style="display:none"></div>
+            <div class="term-big" id="card-term"></div>
+            <div class="hint" id="card-hint">👆 Cliquer ou <kbd class="kbd-pill">Espace</kbd> pour révéler</div>
+          </div>
+          <div class="card-face card-back" id="card-back-face">
+            <div class="cat-tag" id="card-cat-back"></div>
+            <div class="card-image" id="card-img-back" style="display:none"></div>
+            <div class="definition" id="card-def"></div>
+            <div class="example" id="card-example" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+      <div class="answer-btns" id="answer-btns" style="display:none">
+        <button class="btn-answer btn-nope" onclick="answer(0)">✗ Raté<span class="interval" id="int-nope"></span><span class="shortcut">1 / ←</span></button>
+        <button class="btn-answer btn-hard" onclick="answer(3)">≈ Difficile<span class="interval" id="int-hard"></span><span class="shortcut">2</span></button>
+        <button class="btn-answer btn-ok"   onclick="answer(4)">✓ Su !<span class="interval" id="int-ok"></span><span class="shortcut">3 / →</span></button>
+        <button class="btn-answer btn-easy" onclick="answer(5)">⚡ Facile<span class="interval" id="int-easy"></span><span class="shortcut">4</span></button>
+      </div>
+
+      <!-- Mode Écriture -->
+      <div id="write-zone" style="display:none">
+        <div class="write-card">
+          <div class="wcat" id="wcat"></div>
+          <div class="wimage" id="wimage" style="display:none"></div>
+          <div class="wterm" id="wterm"></div>
+          <textarea id="write-input" placeholder="Écris ta réponse ici… (Ctrl+Entrée pour valider)"></textarea>
+          <button class="write-verify-btn" onclick="verifyWrite()">Vérifier ma réponse →</button>
+          <div id="write-reveal" style="display:none">
+            <div class="write-your-answer"><strong>Ta réponse :</strong> <span id="write-user-ans"></span></div>
+            <div class="write-correct">
+              <strong>✅ Réponse correcte</strong>
+              <span id="write-correct-def"></span>
+              <div class="wex" id="write-correct-ex" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+        <div class="answer-btns" id="write-answer-btns" style="display:none;margin-top:14px">
+          <button class="btn-answer btn-nope" onclick="answer(0)">✗ Raté<span class="interval" id="wint-nope"></span><span class="shortcut">1</span></button>
+          <button class="btn-answer btn-hard" onclick="answer(3)">≈ Difficile<span class="interval" id="wint-hard"></span><span class="shortcut">2</span></button>
+          <button class="btn-answer btn-ok"   onclick="answer(4)">✓ Su !<span class="interval" id="wint-ok"></span><span class="shortcut">3</span></button>
+          <button class="btn-answer btn-easy" onclick="answer(5)">⚡ Facile<span class="interval" id="wint-easy"></span><span class="shortcut">4</span></button>
+        </div>
+      </div>
+
+      <!-- Mode QCM -->
+      <div id="qcm-zone" style="display:none">
+        <div class="qcm-card">
+          <div class="qcm-cat-tag" id="qcm-cat"></div>
+          <div class="qcm-img" id="qcm-image" style="display:none"></div>
+          <div class="qcm-question" id="qcm-question"></div>
+        </div>
+        <div class="qcm-choices" id="qcm-choices"></div>
+      </div>
+
+      <!-- Fin de session -->
+      <div class="session-done" id="session-done">
+        <div class="emoji">🎉</div>
+        <h2>Session terminée !</h2>
+        <p>Beau travail. Continue comme ça.</p>
+        <div class="done-stats">
+          <div class="done-stat"><div class="n" id="done-ok"       style="color:var(--success)">0</div><div class="l">Sus</div></div>
+          <div class="done-stat"><div class="n" id="done-hard"     style="color:var(--warning)">0</div><div class="l">Difficiles</div></div>
+          <div class="done-stat"><div class="n" id="done-nope"     style="color:var(--danger)">0</div><div class="l">Ratés</div></div>
+          <div class="done-stat"><div class="n" id="done-accuracy" style="color:var(--primary)">—</div><div class="l">Précision</div></div>
+          <div class="done-stat"><div class="n" id="done-time"     style="color:var(--gray-600)">—</div><div class="l">Durée</div></div>
+        </div>
+        <button class="btn btn-primary" onclick="endSession()" style="margin-right:8px">Tableau de bord</button>
+        <button class="btn btn-ghost"   onclick="startSession(App.Session.getCurrentCat())">Recommencer</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ MODAL AJOUT ══════════════════════════════════════════════ -->
+<div class="overlay" id="modal-overlay">
+  <div class="modal">
+    <h2>➕ Ajouter une carte</h2>
+    <div class="form-group"><label>Terme *</label><input type="text" id="new-term" placeholder="ex : Valve mitrale"></div>
+    <div class="form-group"><label>Définition *</label><textarea id="new-def" placeholder="Définition…"></textarea></div>
+    <div class="form-group"><label>Exemple / contexte clinique (optionnel)</label><input type="text" id="new-example" placeholder="ex : Elle sépare l'oreillette gauche du ventricule gauche"></div>
+    <div class="form-group">
+      <label>Photo / Image (optionnel)</label>
+      <div id="img-upload-zone" onclick="document.getElementById('new-img-input').click()" style="border:2px dashed var(--gray-300);border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:border-color .15s;background:var(--gray-50)">
+        <div id="img-placeholder" style="color:var(--gray-400);font-size:.85rem">📷 Cliquer pour choisir une image<br><span style="font-size:.73rem">JPG, PNG, WEBP — max 8 Mo (compressé auto)</span></div>
+        <img id="img-preview" style="display:none;max-height:140px;max-width:100%;border-radius:6px;object-fit:contain">
+        <div id="img-remove-btn" style="display:none;margin-top:7px"><button type="button" class="btn btn-ghost btn-sm" onclick="removeImg(event)">✕ Supprimer</button></div>
+      </div>
+      <input type="file" id="new-img-input" accept="image/*" style="display:none" onchange="handleImgSelect(event)">
+    </div>
+    <div class="form-group">
+      <label>Matière</label>
+      <select id="new-cat" onchange="toggleNewCat()"></select>
+      <input type="text" id="new-cat-custom" placeholder="Nom de la nouvelle matière…" style="display:none;margin-top:5px;width:100%;padding:8px 11px;border:1px solid var(--primary);border-radius:8px;font-size:.88rem;font-family:inherit;box-shadow:0 0 0 3px var(--primary-light)">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-ghost btn-add-continue" onclick="addCard(true)" style="border-color:var(--primary);color:var(--primary)">+ Ajouter et continuer</button>
+      <button class="btn btn-primary" onclick="addCard(false)">Ajouter et fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL DÉTAIL ═════════════════════════════════════════════ -->
+<div class="overlay" id="detail-overlay">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0">📋 Détail de la carte</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeDetail()">✕ Fermer</button>
+    </div>
+    <div id="detail-modal-body"></div>
+  </div>
+</div>
+
+<input type="file" id="import-input" accept=".json" style="display:none" onchange="handleImport(event)">
+
+<!-- ══ MODAL SYNC ═══════════════════════════════════════════════ -->
+<div class="overlay" id="sync-overlay" onclick="if(event.target===this)closeSyncModal()" style="display:none;opacity:0;transition:opacity .2s">
+  <div class="modal" style="max-width:420px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="margin:0">☁️ Synchronisation</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeSyncModal()">✕</button>
+    </div>
+
+    <!-- État actuel -->
+    <div id="sync-indicator" style="font-size:.85rem;font-weight:600;margin-bottom:18px;padding:8px 12px;background:var(--gray-100);border-radius:8px">☁️ Non sync.</div>
+
+    <!-- Non configuré -->
+    <div id="sync-setup-zone">
+      <p style="font-size:.84rem;color:var(--gray-600);margin-bottom:14px">
+        La synchronisation utilise un <strong>GitHub Gist privé</strong> pour stocker tes données de révision. Tes données ne sont jamais partagées publiquement.
+      </p>
+      <ol style="font-size:.82rem;color:var(--gray-600);margin-bottom:16px;padding-left:18px;line-height:1.7">
+        <li>Va sur <strong>github.com → Settings → Developer settings → Tokens</strong></li>
+        <li>Crée un <em>Fine-grained token</em> avec la permission <strong>Gists → Read &amp; Write</strong></li>
+        <li>Colle le token ci-dessous et clique Connecter</li>
+      </ol>
+      <div class="form-group" style="margin-bottom:10px">
+        <label style="font-size:.82rem;color:var(--gray-600)">Token GitHub</label>
+        <input type="text" id="sync-token-input" placeholder="github_pat_…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.78rem;font-family:monospace;box-sizing:border-box">
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="doSyncConnect()">Connecter →</button>
+      <div id="sync-connect-msg" style="font-size:.8rem;margin-top:8px;color:var(--gray-500)"></div>
+    </div>
+
+    <!-- Configuré -->
+    <div id="sync-connected-zone" style="display:none">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" style="flex:1" onclick="doSyncPull()">⬇️ Récupérer les données distantes</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="doSyncPush()">⬆️ Envoyer vers le cloud</button>
+      </div>
+      <button class="btn btn-ghost" style="width:100%;margin-top:10px;color:#dc2626;border-color:#dc2626" onclick="doSyncDisconnect()">Déconnecter ce compte</button>
+      <p style="font-size:.75rem;color:var(--gray-400);margin-top:12px;text-align:center">
+        💡 La sync s'effectue automatiquement après chaque révision.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL QR CODE ════════════════════════════════════════════ -->
+<div class="overlay" id="qr-overlay" onclick="if(event.target===this)closeQR()" style="display:none;opacity:0;transition:opacity .2s">
+  <div class="modal" style="max-width:360px;text-align:center">
+    <h2 style="margin-bottom:6px">📱 Accès tablette</h2>
+    <p style="font-size:.84rem;color:var(--gray-500);margin-bottom:18px">Scanne ce QR code depuis ta tablette<br>(même réseau WiFi requis)</p>
+    <div id="qr-container" style="display:flex;justify-content:center;margin-bottom:16px"></div>
+    <div id="qr-url" style="font-size:.78rem;color:var(--gray-500);word-break:break-all;margin-bottom:6px"></div>
+    <p style="font-size:.75rem;color:var(--gray-400);margin-bottom:18px">⚠️ Lance d'abord <strong>serveur.bat</strong> sur ton PC</p>
+    <button class="btn btn-ghost" onclick="closeQR()">Fermer</button>
+  </div>
+</div>
+
+<!-- ══ SCRIPTS ══════════════════════════════════════════════════ -->
+<script src="data/cards.js"></script>
+<script src="ui/svgs.js"></script>
+<script src="core/srs.js"></script>
+<script src="core/store.js"></script>
+<script src="core/distractor.js"></script>
+<script src="core/sync.js"></script>
+<script src="core/session.js"></script>
+<script src="ui/render.js"></script>
+<script src="ui/modal.js"></script>
+<script src="core/ortho.js"></script>
+<script src="core/games.js"></script>
+<script src="core/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>

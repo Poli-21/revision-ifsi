@@ -1,0 +1,32 @@
+[
+  {
+    "id": "carte_001",
+    "term": "Hyperplasie bénigne de la prostate (HBP)",
+    "def": "Augmentation non cancéreuse du volume de la prostate, fréquente chez l'homme de plus de 50 ans, pouvant entraîner des troubles urinaires.",
+    "example": "Symptômes : dysurie, pollakiurie, nycturie, jet faible.",
+    "cat": "Urologie",
+    "image": null,
+    "customImage": null,
+    "suspended": false
+  },
+  {
+    "id": "carte_002",
+    "term": "Dyspnée",
+    "def": "Sensation subjective de manque d'air ou de difficulté à respirer.",
+    "example": "La dyspnée de repos est plus grave que la dyspnée d'effort.",
+    "cat": "Pneumologie",
+    "image": null,
+    "customImage": null,
+    "suspended": false
+  },
+  {
+    "id": "carte_003",
+    "term": "Glycémie à jeun normale",
+    "def": "Entre 0,70 g/L et 1,10 g/L (soit 3,9 – 6,1 mmol/L).",
+    "example": "",
+    "cat": "Endocrinologie",
+    "image": null,
+    "customImage": null,
+    "suspended": false
+  }
+]
