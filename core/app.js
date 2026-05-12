@@ -522,8 +522,29 @@ async function doSyncConnect() {
 }
 
 async function doSyncPull() {
-  const ok = await App.Sync.pullRemote();
-  if (ok) { closeSyncModal(); }
+  _syncProgress(10, 'Connexion au Gist…');
+  const ok = await App.Sync.pullRemote(_syncProgress);
+  if (ok) {
+    _syncProgress(100, 'Synchronisé ! Rechargement…');
+    setTimeout(() => location.reload(), 800);
+  } else {
+    _syncProgressHide();
+  }
+}
+
+function _syncProgress(pct, label) {
+  const wrap = document.getElementById('sync-progress-wrap');
+  const bar  = document.getElementById('sync-progress-bar');
+  const lbl  = document.getElementById('sync-progress-label');
+  if (!wrap) return;
+  wrap.style.display = 'block';
+  if (bar) bar.style.width = pct + '%';
+  if (lbl && label) lbl.textContent = label;
+}
+
+function _syncProgressHide() {
+  const wrap = document.getElementById('sync-progress-wrap');
+  if (wrap) wrap.style.display = 'none';
 }
 
 async function doSyncPush() {

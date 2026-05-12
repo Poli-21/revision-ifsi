@@ -474,7 +474,14 @@
     </div>
 
     <!-- État actuel -->
-    <div id="sync-indicator" style="font-size:.85rem;font-weight:600;margin-bottom:18px;padding:8px 12px;background:var(--gray-100);border-radius:8px">☁️ Non sync.</div>
+    <div id="sync-indicator" style="font-size:.85rem;font-weight:600;margin-bottom:10px;padding:8px 12px;background:var(--gray-100);border-radius:8px">☁️ Non sync.</div>
+    <!-- Barre de progression -->
+    <div id="sync-progress-wrap" style="display:none;margin-bottom:14px">
+      <div style="height:6px;background:var(--gray-200);border-radius:99px;overflow:hidden">
+        <div id="sync-progress-bar" style="height:100%;width:0%;background:var(--primary);border-radius:99px;transition:width .4s ease"></div>
+      </div>
+      <div id="sync-progress-label" style="font-size:.78rem;color:var(--gray-500);margin-top:5px;text-align:center">Connexion…</div>
+    </div>
 
     <!-- Non configuré -->
     <div id="sync-setup-zone">

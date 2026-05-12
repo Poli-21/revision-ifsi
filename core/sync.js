@@ -145,11 +145,14 @@ App.Sync = (() => {
   }
 
   // ── Réception (pull) ──────────────────────────────────────────
-  async function pullRemote() {
+  async function pullRemote(onProgress) {
+    const prog = onProgress || (() => {});
     if (!isConfigured()) return false;
     _setStatus('syncing');
     try {
+      prog(20, 'Récupération des données…');
       const remote = _deserialize(await _fetchGist());
+      prog(50, 'Fusion des données…');
       const local  = {
         cards:    App.Store.state.cards,
         studyLog: App.Store.state.studyLog,
@@ -195,10 +198,12 @@ App.Sync = (() => {
       App.Store.state.studyLog = mergedLog;
       if (remote.catOrder.length > 0) App.Store.state.catOrder = remote.catOrder;
 
+      prog(80, 'Sauvegarde…');
       App.Store.save();
       App.Store.saveLog();
       App.Store.saveOrder();
       App.Render.all();
+      prog(100, 'Synchronisé !');
       _setStatus('ok');
       return true;
     } catch(e) {
