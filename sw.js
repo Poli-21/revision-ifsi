@@ -1,31 +1,18 @@
-// Service Worker — cache offline
+// Service Worker — cache offline + mises à jour automatiques
 const CACHE = 'ifsi-v4';
-const FILES = [
-  './',
-  './index.html',
-  './manifest.json',
-  './styles/app.css',
-  './data/cards.js',
-  './ui/svgs.js',
-  './core/srs.js',
-  './core/store.js',
-  './core/distractor.js',
-  './core/sync.js',
-  './core/session.js',
-  './core/ortho.js',
-  './core/games.js',
-  './ui/render.js',
-  './ui/modal.js',
-  './core/app.js',
+const STATIC = [
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './manifest.json'
 ];
 
+// À l'installation : met en cache uniquement les icônes/manifest
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
   self.skipWaiting();
 });
 
+// À l'activation : supprime les anciens caches
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
     Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
@@ -33,9 +20,32 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Cache-first : si pas de réseau, utilise le cache
+// Stratégie :
+// - HTML/JS/CSS → Network-first (toujours la version à jour)
+// - Icônes/images → Cache-first (statique, ne change pas)
 self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
-  );
+  const url = e.request.url;
+  const isStatic = url.endsWith('.png') || url.endsWith('.jpg') || url.endsWith('.ico');
+
+  if (isStatic) {
+    // Cache-first pour les images
+    e.respondWith(
+      caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      }))
+    );
+  } else {
+    // Network-first pour HTML/JS/CSS : toujours la version fraîche si en ligne
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(e.request)) // hors ligne → cache
+    );
+  }
 });
