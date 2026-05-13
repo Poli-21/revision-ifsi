@@ -559,4 +559,23 @@ function doSyncDisconnect() {
   document.getElementById('sync-settings-btn').textContent    = '☁️ Sync';
 }
 
+// ── Text-to-Speech ─────────────────────────────────────────────
+function speakTerm() {
+  if (!window.speechSynthesis) return;
+  const term = document.getElementById('card-term')?.textContent?.trim();
+  if (!term) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(term);
+  utt.lang = 'fr-FR';
+  utt.rate = 0.85;   // légèrement plus lent pour bien entendre
+  // Cherche une voix française si dispo
+  const voices = window.speechSynthesis.getVoices();
+  const frVoice = voices.find(v => v.lang.startsWith('fr'));
+  if (frVoice) utt.voice = frVoice;
+  window.speechSynthesis.speak(utt);
+  // Animation du bouton
+  const btn = document.getElementById('tts-btn');
+  if (btn) { btn.textContent = '🔊'; btn.style.opacity = '0.5'; setTimeout(() => btn.style.opacity = '1', 800); }
+}
+
 document.addEventListener('DOMContentLoaded', App.init);

@@ -914,3 +914,15 @@ textarea#write-input:focus{outline:none;border-color:var(--primary);box-shadow:0
 .games-done-score-row { display: flex; align-items: baseline; justify-content: center; gap: 14px; }
 .games-done-score { font-size: 2.4rem; font-weight: 800; color: var(--gray-900); }
 .games-done-pct   { font-size: 1.5rem; font-weight: 700; }
+
+/* ── Bouton TTS ── */
+.tts-btn {
+  position: absolute; bottom: 12px; right: 14px;
+  background: var(--gray-100); border: 1px solid var(--gray-200);
+  border-radius: 50%; width: 38px; height: 38px;
+  font-size: 1.1rem; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  transition: background .15s, transform .15s;
+  z-index: 2;
+}
+.tts-btn:hover { background: var(--primary-light); transform: scale(1.1); }
