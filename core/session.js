@@ -77,10 +77,19 @@ App.Session = (() => {
       sessionLabel = targetCat || '';
     }
     if (!cards.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
+
+    // Tri : J+1 en premier → autres révisions → nouvelles cartes
+    function _cardPriority(c) {
+      if (!c.progress) return 3;                    // nouvelle carte
+      if (c.progress.repetitions <= 1) return 2;   // en apprentissage
+      return 1;                                     // révision (J+x)
+    }
+    // Mélange à l'intérieur de chaque groupe, puis trie par priorité
     for (let i = cards.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [cards[i], cards[j]] = [cards[j], cards[i]];
     }
+    cards.sort((a, b) => _cardPriority(a) - _cardPriority(b));
     current = { queue: [...cards], idx: 0, stats: { ok: 0, hard: 0, nope: 0, again: 0 }, startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: sessionLabel };
     App.UI.showView('session');
     _initAfkListeners();
