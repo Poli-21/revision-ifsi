@@ -190,12 +190,14 @@
           </div>
         </div>
 
-        <!-- Étape 2 : Épeler -->
+        <!-- Étape 2 : Épeler (vocal) -->
         <div id="ortho-step2" class="ortho-card" style="display:none">
-          <div class="ortho-step-label">Étape 2 · Épelle le mot lettre par lettre</div>
-          <div class="ortho-spell-dir" id="ortho-spell-dir">→ Avant</div>
-          <div class="ortho-spell-letters" id="ortho-spell-letters"></div>
-          <div class="ortho-actions">
+          <div class="ortho-step-label">Étape 2 · Épelle le mot lettre par lettre à voix haute</div>
+          <div class="ortho-big-word" id="ortho-spell-word" style="margin-bottom:16px"></div>
+          <div class="ortho-spell-dots" id="ortho-spell-dots" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px"></div>
+          <div id="ortho-spell-feedback" style="font-size:1.1rem;font-weight:700;min-height:28px;text-align:center;margin-bottom:16px"></div>
+          <div class="ortho-actions" style="flex-direction:column;gap:10px">
+            <button class="ortho-mic-btn" id="ortho-mic-btn" onclick="App.Ortho.toggleMic()">🎤 Commencer à épeler</button>
             <button class="btn btn-primary" id="ortho-spell-continue" style="display:none" onclick="App.Ortho.showStep(3)">Continuer →</button>
           </div>
         </div>

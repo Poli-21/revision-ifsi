@@ -560,22 +560,30 @@ function doSyncDisconnect() {
 }
 
 // ── Text-to-Speech ─────────────────────────────────────────────
-function speakTerm() {
-  if (!window.speechSynthesis) return;
-  const def = document.getElementById('card-def')?.textContent?.trim();
-  if (!def) return;
-  window.speechSynthesis.cancel();
-  const utt = new SpeechSynthesisUtterance(def);
-  utt.lang = 'fr-FR';
-  utt.rate = 0.85;   // légèrement plus lent pour bien entendre
-  // Cherche une voix française si dispo
+// ── Text-to-Speech ─────────────────────────────────────────────
+function _getfrVoice() {
   const voices = window.speechSynthesis.getVoices();
-  const frVoice = voices.find(v => v.lang.startsWith('fr'));
-  if (frVoice) utt.voice = frVoice;
+  return voices.find(v => v.lang === 'fr-FR' && !v.name.includes('Google'))
+      || voices.find(v => v.lang.startsWith('fr'))
+      || null;
+}
+
+function speakText(text, btn) {
+  if (!window.speechSynthesis || !text) return;
+  window.speechSynthesis.cancel();
+  const utt  = new SpeechSynthesisUtterance(text);
+  utt.lang   = 'fr-FR';
+  utt.rate   = 1.0;
+  utt.pitch  = 1.0;
+  const voice = _getfrVoice();
+  if (voice) utt.voice = voice;
   window.speechSynthesis.speak(utt);
-  // Animation du bouton
-  const btn = document.getElementById('tts-btn');
-  if (btn) { btn.textContent = '🔊'; btn.style.opacity = '0.5'; setTimeout(() => btn.style.opacity = '1', 800); }
+  if (btn) { btn.style.opacity = '.45'; utt.onend = () => btn.style.opacity = '1'; }
+}
+
+function speakTerm() {
+  const def = document.getElementById('card-def')?.textContent?.trim();
+  speakText(def, document.getElementById('tts-btn'));
 }
 
 document.addEventListener('DOMContentLoaded', App.init);

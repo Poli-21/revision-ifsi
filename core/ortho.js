@@ -8,6 +8,35 @@ App.Ortho = (() => {
   let step       = 1;
   let spellTimer = null;
 
+  // ── Reconnaissance vocale ──────────────────────────────────────
+  let _recognition   = null;
+  let _spellIdx      = 0;   // lettre attendue
+  let _spellLetters  = [];
+  let _spellDots     = [];  // 'pending' | 'ok' | 'err'
+  let _micActive     = false;
+
+  // Correspondance lettre → ce qu'on dit en français
+  const LETTER_NAMES = {
+    a:['a'],b:['bé','be','b'],c:['cé','ce','c','k'],d:['dé','de','d'],
+    e:['e','euh','eu'],f:['effe','ef','f'],g:['gé','ge','g'],h:['ache','h'],
+    i:['i'],j:['ji','j'],k:['ka','k'],l:['elle','el','l'],m:['emme','em','m'],
+    n:['enne','en','n'],o:['o','oh'],p:['pé','pe','p'],q:['ku','cu','q'],
+    r:['erre','er','r'],s:['esse','es','s'],t:['té','te','t'],u:['u'],
+    v:['vé','ve','v'],w:['double vé','double-vé','doublevé','w'],
+    x:['ixe','ix','x'],y:['i grec','igrec','y'],z:['zède','zed','z']
+  };
+
+  function _baseChar(ch) {
+    return ch.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  }
+
+  function _matchLetter(spoken, expected) {
+    const base    = _baseChar(expected);
+    const names   = LETTER_NAMES[base] || [base];
+    const spokenN = spoken.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    return names.some(n => spokenN === n || spokenN === _baseChar(expected));
+  }
+
   // ── Démarrage ──────────────────────────────────────────────────
   function populateCatSelect() {
     const sel = document.getElementById('ortho-cat-select');
@@ -56,48 +85,101 @@ App.Ortho = (() => {
     _el('ortho-cat-display').textContent  = w.cat;
   }
 
-  // ── Étape 2 : Épeler ───────────────────────────────────────────
+  // ── Étape 2 : Épeler (vocal) ───────────────────────────────────
   function _showSpell(w) {
     if (spellTimer) { clearInterval(spellTimer); spellTimer = null; }
+    _stopMic();
+    _spellLetters = w.term.split('');
+    _spellIdx     = 0;
+    _spellDots    = _spellLetters.map(() => 'pending');
+
+    _el('ortho-spell-word').textContent    = w.term;
     _el('ortho-spell-continue').style.display = 'none';
-    _el('ortho-spell-dir').textContent = '→ Avant';
-    _animateSpell(w.term);
+    _el('ortho-spell-feedback').textContent   = '';
+    _renderSpellDots();
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      _el('ortho-mic-btn').style.display = 'none';
+      _el('ortho-spell-feedback').textContent = '⚠️ Micro non disponible sur ce navigateur';
+      _el('ortho-spell-continue').style.display = 'inline-flex';
+      return;
+    }
+    _el('ortho-mic-btn').style.display = 'inline-flex';
+    _el('ortho-mic-btn').textContent   = '🎤 Commencer à épeler';
+    _el('ortho-mic-btn').className     = 'ortho-mic-btn';
   }
 
-  function _animateSpell(term) {
-    const lettersEl = _el('ortho-spell-letters');
-    const dirEl     = _el('ortho-spell-dir');
-    const fwd = term.split('');
-    const bwd = [...fwd].reverse();
-    let fi = 0;
+  function _renderSpellDots() {
+    const el = _el('ortho-spell-dots');
+    if (!el) return;
+    el.innerHTML = _spellLetters.map((ch, i) => {
+      const st = _spellDots[i];
+      const cls = st === 'ok' ? 'spell-dot ok' : st === 'err' ? 'spell-dot err' : 'spell-dot';
+      return `<span class="${cls}">${st === 'pending' ? '·' : st === 'ok' ? '✓' : '✗'}</span>`;
+    }).join('');
+  }
 
-    // Phase avant
-    spellTimer = setInterval(() => {
-      lettersEl.innerHTML = fwd.slice(0, fi + 1).map((l, i) =>
-        `<span class="spell-letter${i === fi ? ' spell-new' : ''}">${l}</span>`
-      ).join('');
-      fi++;
-      if (fi >= fwd.length) {
-        clearInterval(spellTimer);
-        spellTimer = null;
-        // Pause avant de passer à l'arrière
-        setTimeout(() => {
-          dirEl.textContent = '← Arrière';
-          let bi = 0;
-          spellTimer = setInterval(() => {
-            lettersEl.innerHTML = bwd.slice(0, bi + 1).map((l, i) =>
-              `<span class="spell-letter${i === bi ? ' spell-new' : ''}">${l}</span>`
-            ).join('');
-            bi++;
-            if (bi >= bwd.length) {
-              clearInterval(spellTimer);
-              spellTimer = null;
-              _el('ortho-spell-continue').style.display = 'inline-flex';
-            }
-          }, 340);
-        }, 900);
+  function toggleMic() {
+    if (_micActive) { _stopMic(); return; }
+    _startMic();
+  }
+
+  function _startMic() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    _recognition = new SR();
+    _recognition.lang            = 'fr-FR';
+    _recognition.continuous      = false;
+    _recognition.interimResults  = false;
+    _recognition.maxAlternatives = 5;
+
+    _recognition.onstart = () => {
+      _micActive = true;
+      const btn = _el('ortho-mic-btn');
+      if (btn) { btn.textContent = '🔴 En écoute…'; btn.className = 'ortho-mic-btn listening'; }
+    };
+
+    _recognition.onresult = (e) => {
+      const results = Array.from(e.results[0]).map(r => r.transcript);
+      const expected = _spellLetters[_spellIdx];
+      const matched  = results.some(r => _matchLetter(r, expected));
+
+      if (matched) {
+        _spellDots[_spellIdx] = 'ok';
+        _spellIdx++;
+        _el('ortho-spell-feedback').textContent = '✅ ' + expected.toUpperCase();
+        _el('ortho-spell-feedback').style.color = '#16a34a';
+      } else {
+        _spellDots[_spellIdx] = 'err';
+        _spellIdx++;
+        _el('ortho-spell-feedback').textContent = '❌ Attendu : ' + expected.toUpperCase();
+        _el('ortho-spell-feedback').style.color = '#dc2626';
       }
-    }, 340);
+      _renderSpellDots();
+
+      if (_spellIdx >= _spellLetters.length) {
+        _stopMic();
+        const allOk = _spellDots.every(d => d === 'ok');
+        _el('ortho-spell-feedback').textContent = allOk ? '🎉 Parfait !' : '🔁 Quelques erreurs — regarde les croix';
+        _el('ortho-spell-feedback').style.color = allOk ? '#16a34a' : '#d97706';
+        _el('ortho-spell-continue').style.display = 'inline-flex';
+        return;
+      }
+      // Relance l'écoute pour la lettre suivante
+      setTimeout(_startMic, 400);
+    };
+
+    _recognition.onerror = () => { _stopMic(); };
+    _recognition.onend   = () => { _micActive = false; };
+    _recognition.start();
+  }
+
+  function _stopMic() {
+    if (_recognition) { try { _recognition.stop(); } catch(e) {} _recognition = null; }
+    _micActive = false;
+    const btn = _el('ortho-mic-btn');
+    if (btn) { btn.textContent = '🎤 Commencer à épeler'; btn.className = 'ortho-mic-btn'; }
   }
 
   // ── Étape 3 : Copier ───────────────────────────────────────────
@@ -237,5 +319,5 @@ App.Ortho = (() => {
   function _el(id)  { return document.getElementById(id); }
   function _esc(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  return { start, showStep, verify, nextWord, retry, reset, populateCatSelect };
+  return { start, showStep, verify, nextWord, retry, reset, populateCatSelect, toggleMic };
 })();

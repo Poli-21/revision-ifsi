@@ -926,3 +926,19 @@ textarea#write-input:focus{outline:none;border-color:var(--primary);box-shadow:0
   z-index: 2;
 }
 .tts-btn:hover { background: var(--primary-light); transform: scale(1.1); }
+
+/* ── Bouton micro orthographe ── */
+.ortho-mic-btn {
+  padding: 12px 28px; border-radius: 99px; border: 2px solid var(--primary);
+  background: var(--primary); color: white; font-size: 1rem; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+}
+.ortho-mic-btn:hover { background: #1d4ed8; }
+.ortho-mic-btn.listening {
+  background: #dc2626; border-color: #dc2626;
+  animation: mic-pulse 1s ease-in-out infinite;
+}
+.spell-dot { display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--gray-200);font-size:.8rem;font-weight:700; }
+.spell-dot.ok  { background:var(--success-light);color:var(--success); }
+.spell-dot.err { background:var(--danger-light);color:var(--danger); }
+@keyframes mic-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
