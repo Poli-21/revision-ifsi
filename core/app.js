@@ -562,10 +562,10 @@ function doSyncDisconnect() {
 // ── Text-to-Speech ─────────────────────────────────────────────
 function speakTerm() {
   if (!window.speechSynthesis) return;
-  const term = document.getElementById('card-term')?.textContent?.trim();
-  if (!term) return;
+  const def = document.getElementById('card-def')?.textContent?.trim();
+  if (!def) return;
   window.speechSynthesis.cancel();
-  const utt = new SpeechSynthesisUtterance(term);
+  const utt = new SpeechSynthesisUtterance(def);
   utt.lang = 'fr-FR';
   utt.rate = 0.85;   // légèrement plus lent pour bien entendre
   // Cherche une voix française si dispo
