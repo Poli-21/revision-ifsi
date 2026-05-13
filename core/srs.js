@@ -46,14 +46,16 @@ App.SRS = (() => {
       switch (quality) {
         case 0: // Raté
           lapses++;
+          // Si jamais validée (reps=0) → reste à J+0 (due aujourd'hui)
+          // Si déjà vue une fois (reps=1) → retour à J+1
+          interval    = repetitions === 0 ? 0 : STEPS[0];
           repetitions = 0;
-          interval    = STEPS[0];            // 1 jour
           easeFactor  = Math.max(EF_MIN, easeFactor - 0.20);
           break;
 
         case 3: // Difficile
           // Reste à la même étape, sans pénalité EF en apprentissage
-          interval = STEPS[0];               // 1 jour
+          interval = repetitions === 0 ? 0 : STEPS[0];
           break;
 
         case 4: // Su
