@@ -198,6 +198,7 @@ App.init = async function () {
   App.UI.switchTab('home');
   _initKeyboard();
   App.Store.save();         // déclenche l'indicateur de stockage
+  try { initNotifications(); } catch(e) {}  // Notifications + Discord
 };
 
 function _initKeyboard() {
@@ -415,7 +416,8 @@ function closeSidebar() {
 
 // ── QR Code accès tablette ─────────────────────────────────────
 function showQRCode() {
-  const url = `http://${location.hostname || window.location.hostname}:8080`;
+  // Utilise l'URL GitHub Pages (ou l'URL locale si en développement)
+  const url = window.location.href.split('?')[0].split('#')[0].replace(/\/$/, '') + '/';
   const overlay = document.getElementById('qr-overlay');
   const container = document.getElementById('qr-container');
   const urlEl = document.getElementById('qr-url');
@@ -495,6 +497,7 @@ function openSyncModal() {
   document.getElementById('sync-connect-msg').textContent = '';
   overlay.style.display = 'flex';
   requestAnimationFrame(() => overlay.style.opacity = '1');
+  try { _updateNotifUI(); } catch(e) {}
 }
 
 function closeSyncModal() {
@@ -592,6 +595,182 @@ function speakText(text, btn) {
 function speakTerm() {
   const def = document.getElementById('card-def')?.textContent?.trim();
   speakText(def, document.getElementById('tts-btn'));
+}
+
+// ── Notifications navigateur ───────────────────────────────────
+function initNotifications() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    setTimeout(_checkAndNotifyToday, 2000); // Attend que les données soient chargées
+  }
+  _checkDiscordRecap();
+  _updateNotifUI();
+}
+
+async function enableNotifications() {
+  if (!('Notification' in window)) {
+    alert('Notifications non supportées sur ce navigateur.');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    localStorage.setItem('ifsi_notif_enabled', '1');
+    _checkAndNotifyToday();
+    _updateNotifUI();
+  } else {
+    alert('❌ Notifications bloquées. Active-les dans les paramètres de ton navigateur.');
+  }
+}
+
+function _checkAndNotifyToday() {
+  if (Notification.permission !== 'granted') return;
+  const today = new Date().toISOString().slice(0, 10);
+  if (localStorage.getItem('ifsi_last_notif') === today) return;
+
+  const { state } = App.Store;
+  const due = state.cards.filter(c => {
+    if (c.suspended) return false;
+    if (!c.progress)  return true;
+    return (c.progress.nextReview || today) <= today;
+  }).length;
+
+  if (due === 0) return;
+  localStorage.setItem('ifsi_last_notif', today);
+  try {
+    new Notification('🩺 Révision IFSI', {
+      body: `${due} carte${due > 1 ? 's' : ''} à réviser aujourd'hui !`,
+      icon: './icons/icon-192.png',
+      tag: 'ifsi-daily'
+    });
+  } catch(e) {}
+}
+
+// ── Discord webhook ────────────────────────────────────────────
+const DISCORD_KEY = 'ifsi_discord_webhook';
+
+function saveDiscordWebhook() {
+  const inp = document.getElementById('discord-webhook-input');
+  const url = inp?.value.trim() || '';
+  if (url && !url.startsWith('https://discord.com/api/webhooks/')) {
+    alert('URL invalide. Elle doit commencer par https://discord.com/api/webhooks/');
+    return;
+  }
+  localStorage.setItem(DISCORD_KEY, url);
+  _updateNotifUI();
+  if (url) {
+    _sendDiscordMsg('✅ Webhook connecté ! Tu recevras un récap chaque **dimanche**.').catch(() => {});
+    alert('✅ Discord connecté ! Un récap arrivera chaque dimanche.');
+  } else {
+    alert('Discord déconnecté.');
+  }
+}
+
+async function sendDiscordRecapNow() {
+  const ok = await _buildAndSendRecap();
+  alert(ok ? '✅ Récap envoyé sur Discord !' : '❌ Erreur. Vérifie l\'URL webhook et réessaie.');
+}
+
+async function _checkDiscordRecap() {
+  const webhook = localStorage.getItem(DISCORD_KEY);
+  if (!webhook) return;
+  const today = new Date();
+  if (today.getDay() !== 0) return; // Dimanche seulement
+  const weekKey = `ifsi_discord_${_weekKey()}`;
+  if (localStorage.getItem(weekKey)) return;
+  const ok = await _buildAndSendRecap();
+  if (ok) localStorage.setItem(weekKey, '1');
+}
+
+function _weekKey() {
+  const d = new Date();
+  const jan1 = new Date(d.getFullYear(), 0, 1);
+  const w = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+  return `${d.getFullYear()}-W${String(w).padStart(2,'0')}`;
+}
+
+async function _buildAndSendRecap() {
+  const webhook = localStorage.getItem(DISCORD_KEY);
+  if (!webhook) return false;
+
+  const { state } = App.Store;
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  // 7 derniers jours
+  const weekDays = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    weekDays.push(d.toISOString().slice(0, 10));
+  }
+
+  let reviewed = 0, ok = 0, hard = 0, nope = 0;
+  weekDays.forEach(day => {
+    const e = state.studyLog[day];
+    if (e) { reviewed += e.reviewed||0; ok += e.ok||0; hard += e.hard||0; nope += e.nope||0; }
+  });
+
+  const accuracy  = reviewed > 0 ? Math.round(ok / reviewed * 100) : 0;
+  const daysDone  = weekDays.filter(d => (state.studyLog[d]?.reviewed||0) > 0).length;
+  const streak    = _streakCount(state.studyLog);
+  const dueNow    = state.cards.filter(c => !c.suspended && (!c.progress || (c.progress.nextReview||todayStr) <= todayStr)).length;
+
+  const lines = [
+    `📚 **Bilan semaine — Révision IFSI**`,
+    `📅 ${weekDays[0]} → ${weekDays[6]}`,
+    ``,
+    `🗂️ Cartes révisées : **${reviewed}**`,
+    `✅ Réussies : **${ok}** · ⚠️ Difficiles : **${hard}** · ❌ Ratées : **${nope}**`,
+    `🎯 Précision : **${accuracy}%**`,
+    `📆 Jours d'étude : **${daysDone}/7**`,
+    `🔥 Série : **${streak} jour${streak !== 1 ? 's' : ''}**`,
+    ``,
+    dueNow > 0
+      ? `⚠️ **${dueNow} carte${dueNow > 1 ? 's' : ''} en attente aujourd'hui !**`
+      : `✨ Aucune carte en retard — parfait !`,
+    ``,
+    `▶️ https://poli-21.github.io/revision-ifsi/`
+  ];
+
+  return _sendDiscordMsg(lines.join('\n'));
+}
+
+function _sendDiscordMsg(content) {
+  const webhook = localStorage.getItem(DISCORD_KEY);
+  if (!webhook) return Promise.resolve(false);
+  return fetch(webhook, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, username: '🩺 Révision IFSI' })
+  }).then(r => r.ok).catch(() => false);
+}
+
+function _streakCount(studyLog) {
+  let streak = 0;
+  const today = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    if ((studyLog[key]?.reviewed||0) > 0) streak++;
+    else if (i > 0) break;
+  }
+  return streak;
+}
+
+function _updateNotifUI() {
+  const btn = document.getElementById('notif-enable-btn');
+  if (btn) {
+    const granted = 'Notification' in window && Notification.permission === 'granted';
+    btn.textContent = granted ? '✅ Notifications activées' : '🔔 Activer les notifications';
+    btn.disabled    = granted;
+    btn.style.opacity = granted ? '.6' : '1';
+  }
+  const inp   = document.getElementById('discord-webhook-input');
+  const saved = document.getElementById('discord-webhook-saved');
+  const wh    = localStorage.getItem(DISCORD_KEY) || '';
+  if (inp && !inp.value) inp.value = wh;
+  if (saved) saved.style.display = wh ? 'block' : 'none';
 }
 
 document.addEventListener('DOMContentLoaded', App.init);

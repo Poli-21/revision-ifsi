@@ -517,6 +517,32 @@
         💡 La sync s'effectue automatiquement après chaque révision.
       </p>
     </div>
+
+    <!-- Séparateur Notifications -->
+    <hr style="border:none;border-top:1px solid var(--gray-200);margin:20px 0">
+    <h3 style="margin:0 0 14px;font-size:.95rem">🔔 Rappels &amp; Discord</h3>
+
+    <!-- Notif navigateur -->
+    <div style="margin-bottom:14px">
+      <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:8px">Reçois une notification dès que tu as des cartes à réviser.</p>
+      <button id="notif-enable-btn" class="btn btn-ghost" style="width:100%" onclick="enableNotifications()">🔔 Activer les notifications</button>
+    </div>
+
+    <!-- Discord webhook -->
+    <div>
+      <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:8px">Récap hebdomadaire chaque dimanche sur Discord.</p>
+      <div class="form-group" style="margin-bottom:8px">
+        <label style="font-size:.82rem;color:var(--gray-600)">URL Webhook Discord</label>
+        <input type="text" id="discord-webhook-input" placeholder="https://discord.com/api/webhooks/…"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          style="width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.78rem;font-family:monospace;box-sizing:border-box">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="saveDiscordWebhook()">Enregistrer</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="sendDiscordRecapNow()">Envoyer un test</button>
+      </div>
+      <p id="discord-webhook-saved" style="display:none;font-size:.75rem;color:#16a34a;margin-top:6px">✅ Discord connecté — récap chaque dimanche !</p>
+    </div>
   </div>
 </div>
 
@@ -524,10 +550,9 @@
 <div class="overlay" id="qr-overlay" onclick="if(event.target===this)closeQR()" style="display:none;opacity:0;transition:opacity .2s">
   <div class="modal" style="max-width:360px;text-align:center">
     <h2 style="margin-bottom:6px">📱 Accès tablette</h2>
-    <p style="font-size:.84rem;color:var(--gray-500);margin-bottom:18px">Scanne ce QR code depuis ta tablette<br>(même réseau WiFi requis)</p>
+    <p style="font-size:.84rem;color:var(--gray-500);margin-bottom:18px">Scanne ce QR code depuis ta tablette<br>ou téléphone — fonctionne partout !</p>
     <div id="qr-container" style="display:flex;justify-content:center;margin-bottom:16px"></div>
-    <div id="qr-url" style="font-size:.78rem;color:var(--gray-500);word-break:break-all;margin-bottom:6px"></div>
-    <p style="font-size:.75rem;color:var(--gray-400);margin-bottom:18px">⚠️ Lance d'abord <strong>serveur.bat</strong> sur ton PC</p>
+    <div id="qr-url" style="font-size:.78rem;color:var(--gray-500);word-break:break-all;margin-bottom:18px"></div>
     <button class="btn btn-ghost" onclick="closeQR()">Fermer</button>
   </div>
 </div>
