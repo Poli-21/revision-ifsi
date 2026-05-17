@@ -601,9 +601,10 @@ function speakTerm() {
 function initNotifications() {
   if (!('Notification' in window)) return;
   if (Notification.permission === 'granted') {
-    setTimeout(_checkAndNotifyToday, 2000); // Attend que les données soient chargées
+    setTimeout(_checkAndNotifyToday, 2000);
   }
-  _checkDiscordRecap();
+  _checkDiscordRecap();   // Récap dimanche
+  _initDailyReportTimer(); // Rapport quotidien 17h30
   _updateNotifUI();
 }
 
@@ -658,8 +659,8 @@ function saveDiscordWebhook() {
   localStorage.setItem(DISCORD_KEY, url);
   _updateNotifUI();
   if (url) {
-    _sendDiscordMsg('✅ Webhook connecté ! Tu recevras un récap chaque **dimanche**.').catch(() => {});
-    alert('✅ Discord connecté ! Un récap arrivera chaque dimanche.');
+    _sendDiscordMsg('✅ Webhook connecté ! Tu recevras un rapport détaillé chaque jour à **17h30** et un bilan chaque **dimanche**.').catch(() => {});
+    alert('✅ Discord connecté !');
   } else {
     alert('Discord déconnecté.');
   }
@@ -670,11 +671,148 @@ async function sendDiscordRecapNow() {
   alert(ok ? '✅ Récap envoyé sur Discord !' : '❌ Erreur. Vérifie l\'URL webhook et réessaie.');
 }
 
+// ── Timer rapport quotidien 17h30 ──────────────────────────────
+function _initDailyReportTimer() {
+  if (!localStorage.getItem(DISCORD_KEY)) return;
+  // Vérifie toutes les 60 secondes
+  setInterval(_maybeSendDailyReport, 60000);
+  setTimeout(_maybeSendDailyReport, 3000); // check au démarrage aussi
+}
+
+function _maybeSendDailyReport() {
+  if (!localStorage.getItem(DISCORD_KEY)) return;
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  // Fenêtre 17:30 → 17:35
+  if (h !== 17 || m < 30 || m > 35) return;
+  const sentKey = `ifsi_daily_report_${now.toISOString().slice(0,10)}`;
+  if (localStorage.getItem(sentKey)) return;
+  localStorage.setItem(sentKey, '1');
+  _sendDailyReport();
+}
+
+// ── Calcul stats par matière ───────────────────────────────────
+function _getCatStats(days) {
+  const { state } = App.Store;
+  const today = new Date().toISOString().slice(0, 10);
+  const since = days ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) : null;
+  const cats = {};
+
+  state.cards.forEach(c => {
+    if (c.suspended) return;
+    const cat = c.cat || 'Général';
+    if (!cats[cat]) cats[cat] = { total: 0, due: 0, notStarted: 0, efSum: 0, efCount: 0, lapses: 0, reviewedRecently: 0 };
+    const s = cats[cat];
+    s.total++;
+    if (!c.progress) { s.notStarted++; s.due++; return; }
+    const nr = c.progress.nextReview || today;
+    if (nr <= today) s.due++;
+    s.efSum    += c.progress.easeFactor || 2.5;
+    s.efCount++;
+    s.lapses   += c.progress.lapses || 0;
+    if (since && c.progress.lastReview >= since) s.reviewedRecently++;
+  });
+
+  return cats;
+}
+
+// ── Rapport quotidien détaillé ─────────────────────────────────
+async function _sendDailyReport() {
+  const webhook = localStorage.getItem(DISCORD_KEY);
+  if (!webhook) return false;
+
+  const { state } = App.Store;
+  const today = new Date().toISOString().slice(0, 10);
+  const todayLog = state.studyLog[today] || {};
+  const reviewed = todayLog.reviewed || 0;
+  const ok       = todayLog.ok       || 0;
+  const hard     = todayLog.hard     || 0;
+  const nope     = todayLog.nope     || 0;
+  const accuracy = reviewed > 0 ? Math.round(ok / reviewed * 100) : null;
+  const streak   = _streakCount(state.studyLog);
+
+  const cats = _getCatStats(7);
+  const sorted = Object.entries(cats).sort((a, b) => b[1].due - a[1].due);
+  const totalDue = sorted.reduce((s, [, v]) => s + v.due, 0);
+
+  const lines = [];
+  lines.push(`# 📋 Rapport du ${_frDate(new Date())}`);
+  lines.push(``);
+
+  // ── Bilan du jour ──
+  lines.push(`## 📊 Bilan du jour`);
+  if (reviewed > 0) {
+    lines.push(`Tu as révisé **${reviewed} cartes** aujourd'hui.`);
+    lines.push(`✅ Réussies : **${ok}** · ⚠️ Difficiles : **${hard}** · ❌ Ratées : **${nope}** · 🎯 **${accuracy}%**`);
+    if (accuracy >= 85)      lines.push(`> Excellente session ! Ta mémoire est au top. 🌟`);
+    else if (accuracy >= 65) lines.push(`> Bonne session dans l'ensemble. Continue sur ta lancée. 👍`);
+    else                     lines.push(`> Session difficile — c'est normal, ça fait partie de l'apprentissage. Reviens demain ! 💪`);
+  } else {
+    lines.push(`> Aucune révision aujourd'hui encore. Il reste du temps ! 🕔`);
+  }
+  lines.push(`🔥 Série actuelle : **${streak} jour${streak !== 1 ? 's' : ''}**`);
+  lines.push(``);
+
+  // ── Cartes en attente par matière ──
+  if (totalDue > 0) {
+    lines.push(`## 📚 À réviser ce soir (${totalDue} cartes)`);
+    sorted.forEach(([cat, s]) => {
+      if (s.due === 0) return;
+      const ef  = s.efCount > 0 ? s.efSum / s.efCount : 2.5;
+      const dot = ef >= 2.8 ? '🟢' : ef >= 2.0 ? '🟡' : '🔴';
+      const note = s.notStarted > 0 ? ` _(dont ${s.notStarted} nouvelles)_` : '';
+      lines.push(`${dot} **${cat}** — ${s.due} carte${s.due > 1 ? 's' : ''}${note}`);
+    });
+    lines.push(``);
+  } else {
+    lines.push(`## ✨ Aucune carte en retard — journée parfaite !`);
+    lines.push(``);
+  }
+
+  // ── Tableau de maîtrise ──
+  lines.push(`## 📈 Niveau de maîtrise par matière`);
+  sorted.forEach(([cat, s]) => {
+    if (s.efCount === 0) {
+      lines.push(`⚪ **${cat}** — Non commencé (${s.total} cartes)`);
+      return;
+    }
+    const ef  = s.efSum / s.efCount;
+    const pct = Math.round(Math.min(100, Math.max(0, (ef - 1.3) / (3.5 - 1.3) * 100)));
+    const bar = _progressBar(pct);
+    const tag = pct >= 75 ? '🟢 Maîtrisé' : pct >= 45 ? '🟡 En cours' : '🔴 À renforcer';
+    lines.push(`${tag} **${cat}** ${bar} ${pct}%`);
+  });
+  lines.push(``);
+
+  // ── Conseil du prof ──
+  lines.push(`## 💡 Conseil`);
+  const weak     = sorted.filter(([, s]) => s.efCount > 0 && (s.efSum / s.efCount) < 2.0);
+  const priority = sorted.filter(([, s]) => s.due >= 5);
+  const lapsy    = sorted.filter(([, s]) => s.lapses > s.total * 0.3 && s.efCount > 0);
+
+  if (weak.length > 0) {
+    lines.push(`**${weak[0][0]}** est ta matière la plus fragile en ce moment. Consacre-lui une session dédiée ce soir — des révisions régulières sur les points difficiles sont la clé du progrès en IFSI.`);
+  } else if (lapsy.length > 0) {
+    lines.push(`Plusieurs cartes en **${lapsy[0][0]}** ont été ratées plusieurs fois. C'est souvent le signe qu'il faut revoir la notion dans le cours, pas juste les cartes.`);
+  } else if (priority.length > 0) {
+    lines.push(`**${priority[0][0]}** accumule du retard (${priority[0][1].due} cartes dues). Commence par cette matière ce soir pour ne pas te retrouver débordé(e).`);
+  } else if (totalDue === 0) {
+    lines.push(`Toutes tes matières sont à jour — bravo ! C'est le bon moment pour ajouter de nouvelles cartes sur des notions pas encore couvertes.`);
+  } else {
+    lines.push(`Bonne régularité ! Veille à ne pas laisser de matières sans révision plusieurs jours d'affilée — la répétition espacée ne fonctionne que si tu es assidu(e).`);
+  }
+  lines.push(``);
+  lines.push(`▶️ https://poli-21.github.io/revision-ifsi/`);
+
+  return _sendDiscordMsg(lines.join('\n'));
+}
+
+// ── Récap hebdomadaire (dimanche) ──────────────────────────────
 async function _checkDiscordRecap() {
   const webhook = localStorage.getItem(DISCORD_KEY);
   if (!webhook) return;
   const today = new Date();
-  if (today.getDay() !== 0) return; // Dimanche seulement
+  if (today.getDay() !== 0) return;
   const weekKey = `ifsi_discord_${_weekKey()}`;
   if (localStorage.getItem(weekKey)) return;
   const ok = await _buildAndSendRecap();
@@ -696,43 +834,92 @@ async function _buildAndSendRecap() {
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
-  // 7 derniers jours
   const weekDays = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
+    const d = new Date(today); d.setDate(d.getDate() - i);
     weekDays.push(d.toISOString().slice(0, 10));
   }
 
-  let reviewed = 0, ok = 0, hard = 0, nope = 0;
+  let wReviewed = 0, wOk = 0, wHard = 0, wNope = 0;
   weekDays.forEach(day => {
     const e = state.studyLog[day];
-    if (e) { reviewed += e.reviewed||0; ok += e.ok||0; hard += e.hard||0; nope += e.nope||0; }
+    if (e) { wReviewed += e.reviewed||0; wOk += e.ok||0; wHard += e.hard||0; wNope += e.nope||0; }
   });
 
-  const accuracy  = reviewed > 0 ? Math.round(ok / reviewed * 100) : 0;
-  const daysDone  = weekDays.filter(d => (state.studyLog[d]?.reviewed||0) > 0).length;
-  const streak    = _streakCount(state.studyLog);
-  const dueNow    = state.cards.filter(c => !c.suspended && (!c.progress || (c.progress.nextReview||todayStr) <= todayStr)).length;
+  const accuracy = wReviewed > 0 ? Math.round(wOk / wReviewed * 100) : 0;
+  const daysDone = weekDays.filter(d => (state.studyLog[d]?.reviewed||0) > 0).length;
+  const streak   = _streakCount(state.studyLog);
+  const dueNow   = state.cards.filter(c => !c.suspended && (!c.progress || (c.progress.nextReview||todayStr) <= todayStr)).length;
+  const cats     = _getCatStats(7);
+  const sorted   = Object.entries(cats).sort((a, b) => {
+    const efA = a[1].efCount > 0 ? a[1].efSum / a[1].efCount : 2.5;
+    const efB = b[1].efCount > 0 ? b[1].efSum / b[1].efCount : 2.5;
+    return efA - efB; // matières les plus faibles en premier
+  });
 
-  const lines = [
-    `📚 **Bilan semaine — Révision IFSI**`,
-    `📅 ${weekDays[0]} → ${weekDays[6]}`,
-    ``,
-    `🗂️ Cartes révisées : **${reviewed}**`,
-    `✅ Réussies : **${ok}** · ⚠️ Difficiles : **${hard}** · ❌ Ratées : **${nope}**`,
-    `🎯 Précision : **${accuracy}%**`,
-    `📆 Jours d'étude : **${daysDone}/7**`,
-    `🔥 Série : **${streak} jour${streak !== 1 ? 's' : ''}**`,
-    ``,
-    dueNow > 0
-      ? `⚠️ **${dueNow} carte${dueNow > 1 ? 's' : ''} en attente aujourd'hui !**`
-      : `✨ Aucune carte en retard — parfait !`,
-    ``,
-    `▶️ https://poli-21.github.io/revision-ifsi/`
-  ];
+  const lines = [];
+  lines.push(`# 📅 Bilan de la semaine — ${weekDays[0]} → ${weekDays[6]}`);
+  lines.push(``);
+
+  // Stats globales
+  lines.push(`## 📊 Résultats globaux`);
+  lines.push(`🗂️ Cartes révisées : **${wReviewed}** · 📆 Jours actifs : **${daysDone}/7** · 🔥 Série : **${streak} jours**`);
+  lines.push(`✅ **${wOk}** réussies · ⚠️ **${wHard}** difficiles · ❌ **${wNope}** ratées · 🎯 **${accuracy}%**`);
+  lines.push(``);
+
+  // Note de la semaine
+  const note = daysDone >= 6 ? '🏆 Semaine exemplaire !' : daysDone >= 4 ? '👍 Bonne semaine !' : daysDone >= 2 ? '📈 Semaine correcte — vise 5 jours+' : '⚠️ Semaine creuse — la régularité est la clé';
+  lines.push(`> ${note}`);
+  lines.push(``);
+
+  // Bilan par matière
+  lines.push(`## 📚 Bilan par matière`);
+  sorted.forEach(([cat, s]) => {
+    if (s.efCount === 0) { lines.push(`⚪ **${cat}** — Non commencé (${s.total} cartes au total)`); return; }
+    const ef  = s.efSum / s.efCount;
+    const pct = Math.round(Math.min(100, Math.max(0, (ef - 1.3) / (3.5 - 1.3) * 100)));
+    const tag = pct >= 75 ? '🟢' : pct >= 45 ? '🟡' : '🔴';
+    const lapsRate = s.lapses / s.efCount;
+    const note2 = pct >= 75 ? 'Maîtrisé' : pct >= 45 ? 'En progression' : 'À renforcer';
+    const lapsNote = lapsRate > 0.5 ? ` _(${s.lapses} erreurs répétées)_` : '';
+    lines.push(`${tag} **${cat}** — ${note2}, ${pct}% maîtrise · ${s.due} carte${s.due !== 1 ? 's' : ''} en attente${lapsNote}`);
+  });
+  lines.push(``);
+
+  // Analyse et conseils
+  lines.push(`## 💡 Analyse & Conseils`);
+  const weak  = sorted.filter(([, s]) => s.efCount > 0 && (s.efSum / s.efCount) < 2.0);
+  const good  = sorted.filter(([, s]) => s.efCount > 0 && (s.efSum / s.efCount) >= 2.8);
+  const notStarted = sorted.filter(([, s]) => s.notStarted > 0);
+
+  if (weak.length > 0) {
+    lines.push(`🔴 **Points faibles :** ${weak.map(([c]) => c).join(', ')}. Ces matières nécessitent plus d'attention la semaine prochaine. Envisage de relire tes cours en parallèle des cartes.`);
+  }
+  if (good.length > 0) {
+    lines.push(`🟢 **Points forts :** ${good.map(([c]) => c).join(', ')}. Continue à les entretenir sans te reposer sur tes acquis.`);
+  }
+  if (dueNow > 0) {
+    lines.push(`⚠️ **${dueNow} cartes en retard** à ce jour — attaque-les dès demain en priorité.`);
+  } else {
+    lines.push(`✨ **Aucun retard** — tu es à jour sur toutes les matières, excellent travail !`);
+  }
+  if (notStarted.length > 0 && wReviewed > 20) {
+    lines.push(`💡 Tu as des cartes non commencées en ${notStarted.slice(0,2).map(([c]) => c).join(' et ')} — pense à les intégrer à ta prochaine session.`);
+  }
+  lines.push(``);
+  lines.push(`▶️ https://poli-21.github.io/revision-ifsi/`);
 
   return _sendDiscordMsg(lines.join('\n'));
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function _progressBar(pct) {
+  const filled = Math.round(pct / 10);
+  return '█'.repeat(filled) + '░'.repeat(10 - filled);
+}
+
+function _frDate(d) {
+  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function _sendDiscordMsg(content) {
@@ -749,8 +936,7 @@ function _streakCount(studyLog) {
   let streak = 0;
   const today = new Date();
   for (let i = 0; i < 365; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
+    const d = new Date(today); d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
     if ((studyLog[key]?.reviewed||0) > 0) streak++;
     else if (i > 0) break;
