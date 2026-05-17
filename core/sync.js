@@ -143,7 +143,30 @@ App.Sync = (() => {
   function pushDebounced() {
     if (!isConfigured()) return;
     clearTimeout(_pushTimer);
-    _pushTimer = setTimeout(push, 1500);
+    _pushTimer = setTimeout(push, 2000);
+  }
+
+  // ── Diagnostic ────────────────────────────────────────────────
+  async function diagnose() {
+    const out = [];
+    if (!config.token)  { out.push('❌ Pas de token'); return out.join('\n'); }
+    if (!config.gistId) { out.push('❌ Pas de Gist ID'); return out.join('\n'); }
+    out.push('🔑 Token : ' + config.token.slice(0,12) + '…');
+    out.push('📋 Gist ID : ' + config.gistId);
+    try {
+      const me = await fetch(`${API}/user`, { headers: _headers() });
+      if (!me.ok) { out.push(`❌ Token invalide (${me.status})`); return out.join('\n'); }
+      const u = await me.json();
+      out.push('✅ Compte : ' + u.login);
+    } catch(e) { out.push('❌ Réseau : ' + e.message); return out.join('\n'); }
+    try {
+      const g = await fetch(`${API}/gists/${config.gistId}`, { headers: _headers() });
+      if (!g.ok) { out.push(`❌ Gist introuvable (${g.status}) — Déconnecte et reconnecte`); return out.join('\n'); }
+      const gd = await g.json();
+      const f  = gd.files?.[FILENAME];
+      out.push(f ? `✅ Fichier Gist OK (${(f.size/1024).toFixed(1)} Ko)` : `⚠️ Fichier ${FILENAME} absent du Gist`);
+    } catch(e) { out.push('❌ Lecture Gist : ' + e.message); }
+    return out.join('\n');
   }
 
   // ── Réception (pull) ──────────────────────────────────────────
@@ -241,5 +264,5 @@ App.Sync = (() => {
     }
   }
 
-  return { init, connect, disconnect, push, pushDebounced, pullRemote, isConfigured, loadConfig };
+  return { init, connect, disconnect, push, pushDebounced, pullRemote, isConfigured, loadConfig, diagnose };
 })();

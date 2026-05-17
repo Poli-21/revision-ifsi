@@ -551,6 +551,14 @@ async function doSyncPush() {
   await App.Sync.push();
 }
 
+async function doSyncDiagnose() {
+  const diagEl = document.getElementById('sync-diag');
+  if (!diagEl) return;
+  diagEl.style.display = 'block';
+  diagEl.textContent   = '⏳ Diagnostic en cours…';
+  diagEl.textContent   = await App.Sync.diagnose();
+}
+
 function doSyncDisconnect() {
   if (!confirm('Déconnecter la synchronisation ? Les données locales sont conservées.')) return;
   App.Sync.disconnect();

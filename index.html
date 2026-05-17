@@ -507,11 +507,13 @@
     <!-- Configuré -->
     <div id="sync-connected-zone" style="display:none">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-primary" style="flex:1" onclick="doSyncPull()">⬇️ Récupérer les données distantes</button>
-        <button class="btn btn-ghost" style="flex:1" onclick="doSyncPush()">⬆️ Envoyer vers le cloud</button>
+        <button class="btn btn-primary" style="flex:1" onclick="doSyncPull()">⬇️ Récupérer</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="doSyncPush()">⬆️ Envoyer</button>
       </div>
-      <button class="btn btn-ghost" style="width:100%;margin-top:10px;color:#dc2626;border-color:#dc2626" onclick="doSyncDisconnect()">Déconnecter ce compte</button>
-      <p style="font-size:.75rem;color:var(--gray-400);margin-top:12px;text-align:center">
+      <button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="doSyncDiagnose()">🔍 Diagnostiquer</button>
+      <pre id="sync-diag" style="display:none;font-size:.72rem;background:var(--gray-100);padding:10px;border-radius:8px;margin-top:8px;white-space:pre-wrap;line-height:1.6"></pre>
+      <button class="btn btn-ghost" style="width:100%;margin-top:8px;color:#dc2626;border-color:#dc2626" onclick="doSyncDisconnect()">Déconnecter ce compte</button>
+      <p style="font-size:.75rem;color:var(--gray-400);margin-top:10px;text-align:center">
         💡 La sync s'effectue automatiquement après chaque révision.
       </p>
     </div>
