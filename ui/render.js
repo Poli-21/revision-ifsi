@@ -700,7 +700,7 @@ App.Render = (() => {
           let pool = state.cards.filter(c => !c.suspended);
           if (exam.cats?.length) pool = pool.filter(c => exam.cats.includes(c.cat));
           const total  = pool.length;
-          const atRisk = pool.filter(c => !c.progress || (c.progress.nextReview||todayStr) > exam.date).length;
+          const atRisk = pool.filter(c => !c.progress || (c.progress.nextReview||todayStr) <= exam.date).length;
           const pct    = total > 0 ? Math.round((total-atRisk)/total*100) : 100;
           const col    = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
 
@@ -737,7 +737,7 @@ App.Render = (() => {
       homeEl.innerHTML = alerts.map(exam => {
         let pool = state.cards.filter(c => !c.suspended);
         if (exam.cats?.length) pool = pool.filter(c => exam.cats.includes(c.cat));
-        const atRisk = pool.filter(c => !c.progress || (c.progress.nextReview||todayStr) > exam.date).length;
+        const atRisk = pool.filter(c => !c.progress || (c.progress.nextReview||todayStr) <= exam.date).length;
         const txt = exam.diffDays === 0 ? "C'est aujourd'hui !" : `dans ${exam.diffDays}j`;
         return `<div style="font-size:.78rem;background:rgba(0,0,0,.18);border-radius:8px;padding:5px 10px;color:rgba(255,255,255,.9);display:flex;justify-content:space-between;align-items:center;gap:8px">
           <span>🎓 <strong>${_esc(exam.name)}</strong> ${txt}${atRisk > 0 ? ` · <strong>${atRisk} cartes à risque</strong>` : ' · ✓ prêt(e)'}</span>

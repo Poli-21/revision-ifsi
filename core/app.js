@@ -1105,10 +1105,10 @@ function startExamPrep(id) {
   let pool = state.cards.filter(c => !c.suspended);
   if (exam.cats?.length) pool = pool.filter(c => exam.cats.includes(c.cat));
 
-  // Cartes à risque : nextReview > date exam, ou jamais révisées
+  // Cartes à risque : nextReview <= date exam (mémoire expirée avant l'exam), ou jamais révisées
   const atRisk = pool.filter(c => {
     if (!c.progress) return true; // jamais révisée
-    return (c.progress.nextReview || today) > exam.date;
+    return (c.progress.nextReview || today) <= exam.date;
   });
 
   if (atRisk.length === 0) {
@@ -1131,7 +1131,7 @@ function _renderExamFormStats(exam) {
   if (exam.cats?.length) pool = pool.filter(c => exam.cats.includes(c.cat));
 
   const total   = pool.length;
-  const atRisk  = pool.filter(c => !c.progress || (c.progress.nextReview || today) > exam.date).length;
+  const atRisk  = pool.filter(c => !c.progress || (c.progress.nextReview || today) <= exam.date).length;
   const ready   = total - atRisk;
   const pct     = total > 0 ? Math.round(ready / total * 100) : 0;
   const diffDays = Math.round((new Date(exam.date + 'T00:00:00') - new Date()) / 86400000);

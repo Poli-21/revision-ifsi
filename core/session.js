@@ -83,7 +83,7 @@ App.Session = (() => {
     const todayStr2 = new Date().toISOString().slice(0,10);
     const nextExam  = exams.filter(e => e.date >= todayStr2).sort((a,b) => a.date.localeCompare(b.date))[0];
     function _cardPriority(c) {
-      if (nextExam && c.progress?.nextReview && c.progress.nextReview > nextExam.date) return 0;
+      if (nextExam && (!c.progress || (c.progress?.nextReview || todayStr2) <= nextExam.date)) return 0;
       if (!c.progress) return 3;
       if (c.progress.repetitions <= 1) return 2;
       return 1;
@@ -260,14 +260,23 @@ App.Session = (() => {
   function answer(quality) {
     if (!current) return;
     const c = current.queue[current.idx];
-    const newProgress = App.SRS.update(c, quality);
-    const inState = App.Store.state.cards.find(x => x.id === c.id);
-    if (inState) inState.progress = newProgress;
-    App.Store.save();
-    App.Store.logReview(quality);
-    if      (quality >= 4)  current.stats.ok++;
-    else if (quality === 3) { current.stats.hard++;  current.queue.push({ ...c }); }  // Difficile → repasse en fin de session
-    else                  { current.stats.nope++; current.stats.again++; current.queue.push({ ...c }); } // Raté → idem
+
+    if (current.isPractice) {
+      // Mode pratique (prép exam) : pas de mise à jour SRS, juste le score
+      if      (quality >= 4)  current.stats.ok++;
+      else if (quality === 3) { current.stats.hard++;  current.queue.push({ ...c }); }
+      else                    { current.stats.nope++; current.stats.again++; current.queue.push({ ...c }); }
+    } else {
+      // Mode normal : mise à jour SRS complète
+      const newProgress = App.SRS.update(c, quality);
+      const inState = App.Store.state.cards.find(x => x.id === c.id);
+      if (inState) inState.progress = newProgress;
+      App.Store.save();
+      App.Store.logReview(quality);
+      if      (quality >= 4)  current.stats.ok++;
+      else if (quality === 3) { current.stats.hard++;  current.queue.push({ ...c }); }
+      else                    { current.stats.nope++; current.stats.again++; current.queue.push({ ...c }); }
+    }
     current.idx++;
     show();
   }
@@ -343,7 +352,8 @@ App.Session = (() => {
       queue: cards, idx: 0,
       stats: { ok: 0, hard: 0, nope: 0, again: 0 },
       startTime: Date.now(), afkPausedMs: 0, afkStart: null,
-      cat: label || 'Préparation exam'
+      cat: label || 'Préparation exam',
+      isPractice: true   // pas de mise à jour SRS — évite d'accélérer les intervalles
     };
     App.UI.showView('session');
     _initAfkListeners();
