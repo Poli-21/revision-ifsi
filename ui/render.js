@@ -131,8 +131,8 @@ App.Render = (() => {
       }
     }
 
-    // ── Exam date ──────────────────────────────────────────────
-    _renderExamDate(state, due);
+    // ── Examens ────────────────────────────────────────────────
+    _renderExamDate(state);
 
     // Bandeau du jour
     _setText('due-count', due.length);
@@ -670,84 +670,83 @@ App.Render = (() => {
     });
   }
 
-  // ── Exam date ──────────────────────────────────────────────────
-  function _renderExamDate(state, due) {
-    const examDate = localStorage.getItem('ifsi_exam_date');
-    const cdEl     = document.getElementById('exam-countdown');
-    const riskEl   = document.getElementById('exam-atrisk');
-    const alertEl  = document.getElementById('exam-alert-home');
-    const inp      = document.getElementById('exam-date-input');
+  // ── Examens (multi) ────────────────────────────────────────────
+  function _renderExamDate(state) {
+    const exams = (() => {
+      try { return JSON.parse(localStorage.getItem('ifsi_exams_v2') || '[]'); } catch(e) { return []; }
+    })();
 
-    // Pré-remplit l'input si date stockée
-    if (inp && examDate && !inp.value) inp.value = examDate;
+    const sidebarEl = document.getElementById('exam-sidebar-list');
+    const homeEl    = document.getElementById('exam-alerts-home');
+    const today     = new Date(); today.setHours(0,0,0,0);
+    const todayStr  = today.toISOString().slice(0,10);
 
-    if (!examDate) {
-      if (cdEl)    cdEl.style.display    = 'none';
-      if (riskEl)  riskEl.style.display  = 'none';
-      if (alertEl) alertEl.style.display = 'none';
-      return;
-    }
+    // Filtre les examens futurs ou aujourd'hui, trie par date
+    const upcoming = exams
+      .map(e => ({ ...e, diffDays: Math.round((new Date(e.date+'T00:00:00') - today) / 86400000) }))
+      .filter(e => e.diffDays >= 0)
+      .sort((a,b) => a.diffDays - b.diffDays);
 
-    const today    = new Date(); today.setHours(0,0,0,0);
-    const exam     = new Date(examDate + 'T00:00:00');
-    const diffMs   = exam - today;
-    const diffDays = Math.round(diffMs / 86400000);
+    const past = exams.filter(e => Math.round((new Date(e.date+'T00:00:00') - today) / 86400000) < 0);
 
-    // Countdown sidebar
-    if (cdEl) {
-      cdEl.style.display = 'block';
-      if (diffDays < 0) {
-        cdEl.innerHTML = `<span style="font-size:.8rem;color:var(--gray-400)">Examen passé</span>`;
-      } else if (diffDays === 0) {
-        cdEl.innerHTML = `<span style="font-weight:700;color:var(--danger)">🎓 C'est aujourd'hui !</span>`;
+    // ── Sidebar ──
+    if (sidebarEl) {
+      if (exams.length === 0) {
+        sidebarEl.innerHTML = `<div style="font-size:.78rem;color:var(--gray-400);text-align:center;padding:8px 0">Aucun examen planifié</div>`;
       } else {
-        const col = diffDays <= 7 ? 'var(--danger)' : diffDays <= 14 ? 'var(--warning)' : 'var(--success)';
-        cdEl.innerHTML = `<span style="font-size:1.4rem;font-weight:800;color:${col}">${diffDays}</span><span style="font-size:.78rem;color:var(--gray-500);margin-left:5px">jours restants</span>`;
+        sidebarEl.innerHTML = [...upcoming, ...past].map(exam => {
+          const diffDays = Math.round((new Date(exam.date+'T00:00:00') - today) / 86400000);
+
+          let pool = state.cards.filter(c => !c.suspended);
+          if (exam.cats?.length) pool = pool.filter(c => exam.cats.includes(c.cat));
+          const total  = pool.length;
+          const atRisk = pool.filter(c => !c.progress || (c.progress.nextReview||todayStr) > exam.date).length;
+          const pct    = total > 0 ? Math.round((total-atRisk)/total*100) : 100;
+          const col    = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+
+          let badge;
+          if (diffDays < 0)       badge = `<span style="font-size:.7rem;color:var(--gray-400)">Passé</span>`;
+          else if (diffDays === 0) badge = `<span style="font-size:.72rem;font-weight:700;color:var(--danger)">Aujourd'hui !</span>`;
+          else {
+            const bc = diffDays <= 7 ? 'var(--danger)' : diffDays <= 14 ? 'var(--warning)' : 'var(--gray-500)';
+            badge = `<span style="font-size:.72rem;font-weight:700;color:${bc}">J-${diffDays}</span>`;
+          }
+
+          return `<div class="exam-sidebar-item" onclick="openExamModal('${exam.id}')">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+              <span style="font-size:.82rem;font-weight:600;color:var(--gray-700);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(exam.name)}</span>
+              ${badge}
+            </div>
+            <div style="margin:5px 0 2px;height:5px;background:var(--gray-200);border-radius:99px;overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:${col};border-radius:99px"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--gray-400)">
+              <span style="color:${col};font-weight:600">${pct}% prêt</span>
+              ${atRisk > 0 ? `<span style="color:var(--danger)">⚠ ${atRisk} à risque</span>` : `<span style="color:var(--success)">✓ OK</span>`}
+            </div>
+            ${diffDays >= 0 && atRisk > 0 ? `<button class="btn btn-primary btn-sm" style="width:100%;margin-top:6px;font-size:.75rem" onclick="event.stopPropagation();startExamPrep('${exam.id}')">🎯 Préparer →</button>` : ''}
+          </div>`;
+        }).join('');
       }
     }
 
-    if (diffDays < 0) {
-      if (riskEl)  riskEl.style.display  = 'none';
-      if (alertEl) alertEl.style.display = 'none';
-      return;
-    }
-
-    // Cartes à risque : nextReview après la date d'exam
-    const atRisk = state.cards.filter(c => {
-      if (c.suspended || !c.progress) return false;
-      const nr = c.progress.nextReview;
-      return nr && nr > examDate;
-    });
-
-    // Cartes pas encore commencées (nouvelles) — à risque aussi si peu de jours
-    const newCards = state.cards.filter(c => !c.suspended && !c.progress);
-
-    const totalRisk = atRisk.length + (diffDays <= 7 ? newCards.length : 0);
-
-    if (riskEl) {
-      if (totalRisk > 0) {
-        const byCat = {};
-        atRisk.forEach(c => { byCat[c.cat] = (byCat[c.cat] || 0) + 1; });
-        const topCats = Object.entries(byCat).sort((a,b) => b[1]-a[1]).slice(0,3).map(([c,n]) => `${c} (${n})`).join(', ');
-        riskEl.style.display = 'block';
-        riskEl.innerHTML = `⚠️ <strong>${totalRisk} carte${totalRisk>1?'s':''}</strong> risquent d'être oubliées avant l'exam${topCats ? `<br><span style="opacity:.8">${topCats}</span>` : ''}`;
-      } else {
-        riskEl.style.display = 'none';
-      }
-    }
-
-    if (alertEl) {
-      if (totalRisk > 0 && diffDays <= 14) {
-        alertEl.style.display = 'block';
-        alertEl.textContent = `🎓 Exam dans ${diffDays}j · ${totalRisk} carte${totalRisk>1?'s':''} à risque`;
-      } else if (diffDays <= 7) {
-        alertEl.style.display = 'block';
-        alertEl.textContent = `🎓 Exam dans ${diffDays} jour${diffDays>1?'s':''} — continue !`;
-      } else {
-        alertEl.style.display = 'none';
-      }
+    // ── Alertes home (exam dans ≤ 14 jours) ──
+    if (homeEl) {
+      const alerts = upcoming.filter(e => e.diffDays <= 14);
+      if (alerts.length === 0) { homeEl.innerHTML = ''; return; }
+      homeEl.innerHTML = alerts.map(exam => {
+        let pool = state.cards.filter(c => !c.suspended);
+        if (exam.cats?.length) pool = pool.filter(c => exam.cats.includes(c.cat));
+        const atRisk = pool.filter(c => !c.progress || (c.progress.nextReview||todayStr) > exam.date).length;
+        const txt = exam.diffDays === 0 ? "C'est aujourd'hui !" : `dans ${exam.diffDays}j`;
+        return `<div style="font-size:.78rem;background:rgba(0,0,0,.18);border-radius:8px;padding:5px 10px;color:rgba(255,255,255,.9);display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span>🎓 <strong>${_esc(exam.name)}</strong> ${txt}${atRisk > 0 ? ` · <strong>${atRisk} cartes à risque</strong>` : ' · ✓ prêt(e)'}</span>
+        </div>`;
+      }).join('');
     }
   }
+
+  function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   return { all, browse, browseDebounced, stats, heatmap, cardItemHTML, orderedCats };
 })();

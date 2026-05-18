@@ -1040,6 +1040,22 @@ body.dark #sync-connected-zone p { color: var(--gray-600) !important; }
 /* Bouton dark mode toggle */
 #dark-toggle { font-size: 1.1rem; line-height:1; padding: 5px 9px; }
 
+/* ── Examens sidebar ── */
+.exam-sidebar-item {
+  padding: 8px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  margin-bottom: 7px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+  background: #fff;
+}
+.exam-sidebar-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(37,99,235,.1);
+}
+body.dark .exam-sidebar-item { background: var(--gray-100); }
+
 /* ── Sidebar desktop collapse ── */
 .sidebar { transition: width .22s ease, min-width .22s ease, padding .22s ease; }
 .sidebar-close-btn {

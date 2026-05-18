@@ -78,14 +78,15 @@ App.Session = (() => {
     }
     if (!cards.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
 
-    // Tri : cartes à risque exam → J+1 → apprentissage → nouvelles
-    const examDate = localStorage.getItem('ifsi_exam_date');
+    // Tri : cartes à risque exam → révisions → apprentissage → nouvelles
+    const exams = (() => { try { return JSON.parse(localStorage.getItem('ifsi_exams_v2')||'[]'); } catch(e){return[];} })();
+    const todayStr2 = new Date().toISOString().slice(0,10);
+    const nextExam  = exams.filter(e => e.date >= todayStr2).sort((a,b) => a.date.localeCompare(b.date))[0];
     function _cardPriority(c) {
-      // Carte dont la prochaine révision dépasse la date d'exam → priorité max
-      if (examDate && c.progress?.nextReview && c.progress.nextReview > examDate) return 0;
-      if (!c.progress) return 3;                    // nouvelle carte
-      if (c.progress.repetitions <= 1) return 2;   // en apprentissage
-      return 1;                                     // révision (J+x)
+      if (nextExam && c.progress?.nextReview && c.progress.nextReview > nextExam.date) return 0;
+      if (!c.progress) return 3;
+      if (c.progress.repetitions <= 1) return 2;
+      return 1;
     }
     // Mélange à l'intérieur de chaque groupe, puis trie par priorité
     for (let i = cards.length - 1; i > 0; i--) {
@@ -329,5 +330,26 @@ App.Session = (() => {
 
   function resumeAfk() { _resetAfkTimer(); }
 
-  return { start, setMode, show, flip, verifyWrite, answer, end, resumeAfk, getCurrentCat: () => current?.cat };
+  // ── Session avec liste de cartes imposée (prép exam) ──────────
+  function startWithCards(cards, label) {
+    if (!cards.length) { alert('Aucune carte à travailler !'); return; }
+    // Tri : cartes jamais vues d'abord, puis les plus fragiles (EF bas)
+    cards = [...cards].sort((a, b) => {
+      const efA = a.progress?.easeFactor ?? 0;
+      const efB = b.progress?.easeFactor ?? 0;
+      return efA - efB;
+    });
+    current = {
+      queue: cards, idx: 0,
+      stats: { ok: 0, hard: 0, nope: 0, again: 0 },
+      startTime: Date.now(), afkPausedMs: 0, afkStart: null,
+      cat: label || 'Préparation exam'
+    };
+    App.UI.showView('session');
+    _initAfkListeners();
+    _resetAfkTimer();
+    show();
+  }
+
+  return { start, startWithCards, setMode, show, flip, verifyWrite, answer, end, resumeAfk, getCurrentCat: () => current?.cat };
 })();

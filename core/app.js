@@ -983,12 +983,206 @@ function _initSidebarState() {
   }
 }
 
-// ── Date d'examen ─────────────────────────────────────────────
+// ── Gestion des examens ────────────────────────────────────────
+const EXAMS_KEY = 'ifsi_exams_v2';
+let _editingExamId = null;
+
+function _loadExams() {
+  try { return JSON.parse(localStorage.getItem(EXAMS_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+function _saveExams(exams) {
+  localStorage.setItem(EXAMS_KEY, JSON.stringify(exams));
+}
+function _examId() {
+  return Math.random().toString(36).slice(2,10);
+}
+
+// ── Ouvrir modal (nouveau ou édition) ─────────────────────────
+function openExamModal(id) {
+  _editingExamId = id || null;
+  const overlay = document.getElementById('exam-overlay');
+  if (!overlay) return;
+
+  const cats = App.Render.orderedCats();
+  const catsEl = document.getElementById('exam-form-cats');
+  if (catsEl) {
+    catsEl.innerHTML = cats.map(c =>
+      `<label style="display:flex;align-items:center;gap:5px;font-size:.82rem;padding:4px 8px;border:1px solid var(--gray-200);border-radius:6px;cursor:pointer;white-space:nowrap">
+        <input type="checkbox" name="exam-cat" value="${_esc(c)}"> ${_esc(c)}
+      </label>`
+    ).join('');
+  }
+
+  const nameEl  = document.getElementById('exam-form-name');
+  const dateEl  = document.getElementById('exam-form-date');
+  const titleEl = document.getElementById('exam-modal-title');
+  const delBtn  = document.getElementById('exam-form-delete-btn');
+  const prepBtn = document.getElementById('exam-form-prep-btn');
+  const statsEl = document.getElementById('exam-form-stats');
+
+  if (id) {
+    // Mode édition
+    const exam = _loadExams().find(e => e.id === id);
+    if (!exam) return;
+    if (nameEl)  nameEl.value  = exam.name;
+    if (dateEl)  dateEl.value  = exam.date;
+    if (titleEl) titleEl.textContent = '🎓 Modifier l\'examen';
+    if (delBtn)  delBtn.style.display = 'block';
+    if (prepBtn) prepBtn.style.display = 'inline-flex';
+    // Coche les matières
+    if (catsEl && exam.cats?.length) {
+      catsEl.querySelectorAll('input[name="exam-cat"]').forEach(cb => {
+        cb.checked = exam.cats.includes(cb.value);
+      });
+    }
+    // Affiche les stats
+    _renderExamFormStats(exam);
+    if (statsEl) statsEl.style.display = 'block';
+  } else {
+    // Mode nouveau
+    if (nameEl)  nameEl.value  = '';
+    if (dateEl)  dateEl.value  = '';
+    if (titleEl) titleEl.textContent = '🎓 Nouvel examen';
+    if (delBtn)  delBtn.style.display = 'none';
+    if (prepBtn) prepBtn.style.display = 'none';
+    if (statsEl) statsEl.style.display = 'none';
+  }
+
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => overlay.style.opacity = '1');
+  setTimeout(() => nameEl?.focus(), 100);
+}
+
+function closeExamModal() {
+  const overlay = document.getElementById('exam-overlay');
+  if (!overlay) return;
+  overlay.style.opacity = '0';
+  setTimeout(() => overlay.style.display = 'none', 200);
+  _editingExamId = null;
+}
+
+function saveExamForm() {
+  const name = document.getElementById('exam-form-name')?.value.trim();
+  const date = document.getElementById('exam-form-date')?.value;
+  if (!name) { document.getElementById('exam-form-name')?.focus(); return; }
+  if (!date) { document.getElementById('exam-form-date')?.focus(); return; }
+
+  const cats = [...document.querySelectorAll('input[name="exam-cat"]:checked')].map(cb => cb.value);
+  const exams = _loadExams();
+
+  if (_editingExamId) {
+    const idx = exams.findIndex(e => e.id === _editingExamId);
+    if (idx !== -1) exams[idx] = { ...exams[idx], name, date, cats };
+  } else {
+    exams.push({ id: _examId(), name, date, cats });
+  }
+
+  _saveExams(exams);
+  closeExamModal();
+  App.Render.all();
+}
+
+function deleteExamForm() {
+  if (!_editingExamId) return;
+  if (!confirm('Supprimer cet examen ?')) return;
+  const exams = _loadExams().filter(e => e.id !== _editingExamId);
+  _saveExams(exams);
+  closeExamModal();
+  App.Render.all();
+}
+
+function startExamPrep(id) {
+  const examId = id || _editingExamId;
+  if (!examId) return;
+  const exam = _loadExams().find(e => e.id === examId);
+  if (!exam) return;
+  closeExamModal();
+
+  // Lance une session avec les cartes à risque pour cet exam
+  const { state } = App.Store;
+  const today = new Date().toISOString().slice(0, 10);
+  let pool = state.cards.filter(c => !c.suspended);
+  if (exam.cats?.length) pool = pool.filter(c => exam.cats.includes(c.cat));
+
+  // Cartes à risque : nextReview > date exam, ou jamais révisées
+  const atRisk = pool.filter(c => {
+    if (!c.progress) return true; // jamais révisée
+    return (c.progress.nextReview || today) > exam.date;
+  });
+
+  if (atRisk.length === 0) {
+    alert(`✅ Aucune carte à risque pour "${exam.name}" — tu es prêt(e) !`);
+    return;
+  }
+
+  // Démarre la session avec ces cartes (en forçant la queue)
+  App.Session.startWithCards(atRisk, `🎓 Prép. ${exam.name}`);
+}
+
+// ── Stats pour le formulaire ───────────────────────────────────
+function _renderExamFormStats(exam) {
+  const el = document.getElementById('exam-form-stats-content');
+  if (!el) return;
+  const { state } = App.Store;
+  const today = new Date().toISOString().slice(0, 10);
+
+  let pool = state.cards.filter(c => !c.suspended);
+  if (exam.cats?.length) pool = pool.filter(c => exam.cats.includes(c.cat));
+
+  const total   = pool.length;
+  const atRisk  = pool.filter(c => !c.progress || (c.progress.nextReview || today) > exam.date).length;
+  const ready   = total - atRisk;
+  const pct     = total > 0 ? Math.round(ready / total * 100) : 0;
+  const diffDays = Math.round((new Date(exam.date + 'T00:00:00') - new Date()) / 86400000);
+  const col     = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+
+  // Par matière
+  const byCat = {};
+  pool.forEach(c => {
+    const cat = c.cat || 'Général';
+    if (!byCat[cat]) byCat[cat] = { total: 0, risk: 0 };
+    byCat[cat].total++;
+    if (!c.progress || (c.progress.nextReview || today) > exam.date) byCat[cat].risk++;
+  });
+
+  const catRows = Object.entries(byCat).map(([cat, s]) => {
+    const cp  = Math.round((s.total - s.risk) / s.total * 100);
+    const cc  = cp >= 80 ? 'var(--success)' : cp >= 50 ? 'var(--warning)' : 'var(--danger)';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:.78rem">
+      <span style="color:var(--gray-700);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(cat)}</span>
+      <span>
+        <span style="color:${cc};font-weight:700">${cp}%</span>
+        ${s.risk > 0 ? `<span style="color:var(--danger);margin-left:6px">⚠ ${s.risk} à risque</span>` : `<span style="color:var(--success);margin-left:6px">✓</span>`}
+      </span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <div style="text-align:center">
+        <div style="font-size:2rem;font-weight:800;color:${col}">${pct}%</div>
+        <div style="font-size:.7rem;color:var(--gray-500)">prêt(e)</div>
+      </div>
+      <div style="flex:1">
+        <div style="height:8px;background:var(--gray-200);border-radius:99px;overflow:hidden;margin-bottom:5px">
+          <div style="height:100%;width:${pct}%;background:${col};border-radius:99px;transition:width .4s"></div>
+        </div>
+        <div style="font-size:.78rem;color:var(--gray-600)">${ready} / ${total} cartes maîtrisées · <strong style="color:var(--danger)">${atRisk} à risque</strong></div>
+        <div style="font-size:.75rem;color:var(--gray-400);margin-top:2px">${diffDays > 0 ? `${diffDays} jour${diffDays > 1 ? 's' : ''} restant${diffDays > 1 ? 's' : ''}` : diffDays === 0 ? "C'est aujourd'hui !" : 'Examen passé'}</div>
+      </div>
+    </div>
+    ${catRows ? `<div style="border-top:1px solid var(--gray-200);padding-top:8px">${catRows}</div>` : ''}`;
+}
+
+// ── Compat ancienne clé unique ─────────────────────────────────
 function saveExamDate(val) {
   if (val) localStorage.setItem('ifsi_exam_date', val);
   else     localStorage.removeItem('ifsi_exam_date');
   App.Render.all();
 }
+
+function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ── Dark Mode ──────────────────────────────────────────────────
 function toggleDarkMode() {

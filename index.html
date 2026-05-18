@@ -60,10 +60,11 @@
       <div id="level-bars"></div>
     </div>
     <div class="sidebar-section">
-      <h3>🎓 Examen</h3>
-      <div id="exam-countdown" style="display:none;margin-bottom:8px"></div>
-      <input type="date" id="exam-date-input" style="width:100%;padding:6px 10px;border:1px solid var(--gray-300);border-radius:8px;font-size:.83rem;font-family:inherit;color:var(--gray-700);background:var(--gray-50)" onchange="saveExamDate(this.value)">
-      <div id="exam-atrisk" style="display:none;margin-top:8px;font-size:.78rem;padding:7px 10px;background:var(--warning-light);color:var(--warning);border-radius:8px;line-height:1.4"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h3 style="margin:0">🎓 Examens</h3>
+        <button class="btn btn-ghost btn-sm" onclick="openExamModal()" style="font-size:.75rem;padding:3px 8px">+ Ajouter</button>
+      </div>
+      <div id="exam-sidebar-list"></div>
     </div>
   </aside>
 
@@ -87,7 +88,7 @@
             <span id="due-est-inline" style="font-size:.9rem;font-weight:600;color:rgba(255,255,255,.75);display:none"></span>
           </div>
           <div class="label">cartes à réviser maintenant</div>
-          <div id="exam-alert-home" style="display:none;margin-top:6px;font-size:.78rem;background:rgba(0,0,0,.18);border-radius:8px;padding:5px 10px;color:rgba(255,255,255,.9)"></div>
+          <div id="exam-alerts-home" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
           <div class="cat-due-chips" id="cat-due-chips"></div>
         </div>
         <button class="btn btn-start" onclick="startSession()" style="align-self:flex-start">Tout réviser →</button>
@@ -565,6 +566,43 @@
       <div style="font-size:.8rem;color:var(--gray-400)">Chargement…</div>
     </div>
     <button class="btn btn-ghost" style="width:100%" onclick="createBackupNow()">💾 Créer une sauvegarde maintenant</button>
+  </div>
+</div>
+
+<!-- ══ MODAL EXAMENS ════════════════════════════════════════════ -->
+<div class="overlay" id="exam-overlay" onclick="if(event.target===this)closeExamModal()" style="display:none;opacity:0;transition:opacity .2s">
+  <div class="modal" style="max-width:460px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="margin:0" id="exam-modal-title">🎓 Nouvel examen</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeExamModal()">✕</button>
+    </div>
+
+    <!-- Formulaire -->
+    <div class="form-group" style="margin-bottom:12px">
+      <label style="font-size:.82rem;color:var(--gray-600);display:block;margin-bottom:4px">Nom de l'examen</label>
+      <input type="text" id="exam-form-name" placeholder="Ex : Anatomie Semestre 1" maxlength="60"
+        style="width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.9rem;font-family:inherit;box-sizing:border-box">
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label style="font-size:.82rem;color:var(--gray-600);display:block;margin-bottom:4px">Date de l'examen</label>
+      <input type="date" id="exam-form-date"
+        style="width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.9rem;font-family:inherit;box-sizing:border-box">
+    </div>
+    <div class="form-group" style="margin-bottom:16px">
+      <label style="font-size:.82rem;color:var(--gray-600);display:block;margin-bottom:6px">Matières concernées <span style="color:var(--gray-400)">(laisser vide = toutes)</span></label>
+      <div id="exam-form-cats" style="display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow-y:auto;padding:2px"></div>
+    </div>
+
+    <!-- Stats (mode édition) -->
+    <div id="exam-form-stats" style="display:none;background:var(--gray-100);border-radius:10px;padding:12px;margin-bottom:14px">
+      <div id="exam-form-stats-content"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" style="flex:1" onclick="saveExamForm()">Enregistrer</button>
+      <button class="btn btn-ghost" style="flex:1" id="exam-form-prep-btn" onclick="startExamPrep()" style="display:none">🎯 Préparer →</button>
+    </div>
+    <button id="exam-form-delete-btn" class="btn btn-ghost" style="display:none;width:100%;margin-top:8px;color:var(--danger);border-color:var(--danger)" onclick="deleteExamForm()">🗑 Supprimer cet examen</button>
   </div>
 </div>
 
