@@ -67,7 +67,6 @@
       <button class="tab"        onclick="switchTab('stats')"  id="tab-stats">📊 Statistiques</button>
       <button class="tab"        onclick="switchTab('ortho')"  id="tab-ortho">✏️ Orthographe</button>
       <button class="tab"        onclick="switchTab('games')"  id="tab-games">🎯 Entraînement</button>
-      <button class="tab"        onclick="switchTab('schema')" id="tab-schema">🖼️ Schémas</button>
     </div>
 
     <!-- ── HOME ──────────────────────────────────────────────── -->
@@ -328,77 +327,6 @@
 
     </div>
 
-    <!-- ── SCHÉMAS ───────────────────────────────────────────── -->
-    <div id="schema-view" style="display:none">
-
-      <!-- Galerie -->
-      <div id="schema-gallery">
-        <div class="ortho-header">
-          <h2>🖼️ Entraînement par schéma</h2>
-          <p class="ortho-sub">Choisis un schéma pour t'entraîner sur ses éléments un par un — le schéma reste toujours visible en haut.</p>
-        </div>
-        <div id="schema-grid" class="schema-grid"></div>
-      </div>
-
-      <!-- Session -->
-      <div id="schema-session" style="display:none">
-        <!-- Barre de progression -->
-        <div class="ortho-topbar">
-          <button class="btn btn-ghost btn-sm" onclick="App.Schema.showGallery()">← Changer de schéma</button>
-          <div class="ortho-prog-wrap">
-            <div class="ortho-prog-bar"><div class="ortho-prog-fill" id="schema-prog-fill" style="width:0%"></div></div>
-            <span class="ortho-word-count" id="schema-card-count-display">1 / —</span>
-          </div>
-        </div>
-
-        <!-- Image du schéma (sticky) -->
-        <div id="schema-img-wrap" class="schema-img-wrap" onclick="App.Schema.toggleZoom()">
-          <img id="schema-big-img" class="schema-big-img" alt="Schéma" title="Clique pour zoomer">
-          <span class="schema-zoom-hint">🔍 Clique pour zoomer</span>
-        </div>
-
-        <!-- Flashcard -->
-        <div class="schema-card-area">
-          <div class="schema-flashcard" id="schema-flashcard" onclick="App.Schema.flip()">
-            <!-- Face avant : terme -->
-            <div class="schema-face schema-front">
-              <div class="sc-cat" id="sc-front-cat"></div>
-              <div class="sc-term" id="sc-front-term"></div>
-              <div class="sc-hint" id="sc-front-hint">👆 Touche ou clique pour voir la définition</div>
-            </div>
-            <!-- Face arrière : définition -->
-            <div class="schema-face schema-back">
-              <div class="sc-cat" id="sc-back-cat"></div>
-              <div class="sc-term-small" id="sc-back-term"></div>
-              <div class="sc-def" id="sc-back-def"></div>
-            </div>
-          </div>
-
-          <!-- Boutons réponse -->
-          <div class="schema-answer-btns" id="schema-answer-btns" style="display:none">
-            <button class="btn-answer btn-nope" onclick="App.Schema.answer(false)">✗ À revoir</button>
-            <button class="btn-answer btn-ok"   onclick="App.Schema.answer(true)">✓ Su !</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Fin de session -->
-      <div id="schema-done" style="display:none;text-align:center;padding:40px 20px">
-        <div style="font-size:3rem;margin-bottom:16px">🎉</div>
-        <h2>Schéma terminé !</h2>
-        <div class="games-done-score-row" style="justify-content:center;gap:32px;margin:20px 0">
-          <div><div class="games-done-score" id="schema-done-ok" style="color:var(--success)">0</div><div style="font-size:.8rem;color:var(--gray-500)">Sus</div></div>
-          <div><div class="games-done-score" id="schema-done-review" style="color:var(--danger)">0</div><div style="font-size:.8rem;color:var(--gray-500)">À revoir</div></div>
-          <div><div class="games-done-score" id="schema-done-pct" style="color:var(--primary)">—</div><div style="font-size:.8rem;color:var(--gray-500)">Réussite</div></div>
-        </div>
-        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="App.Schema.replay()">🔁 Rejouer ce schéma</button>
-          <button class="btn btn-ghost"   onclick="App.Schema.showGallery()">← Choisir un autre schéma</button>
-        </div>
-      </div>
-
-    </div>
-
     <!-- ── SESSION ───────────────────────────────────────────── -->
     <div id="session-view" style="display:none">
       <!-- Bannière AFK -->
@@ -641,7 +569,6 @@
 <script src="ui/modal.js"></script>
 <script src="core/ortho.js"></script>
 <script src="core/games.js"></script>
-<script src="core/schema.js"></script>
 <script src="core/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
