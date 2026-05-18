@@ -25,6 +25,7 @@
   <span class="kbd-hint" title="Raccourcis clavier">Espace=retourner · 1/2/3/4=répondre · N=nouvelle carte · /=rechercher · Échap=quitter</span>
   <div class="header-right">
     <span id="storage-indicator" style="display:none;font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:99px;cursor:default"></span>
+    <button class="btn btn-ghost btn-sm" id="dark-toggle" onclick="toggleDarkMode()" title="Mode nuit">🌙</button>
     <button class="btn btn-ghost btn-sm" id="sync-settings-btn" onclick="openSyncModal()" title="Synchronisation entre appareils">☁️ Sync</button>
     <button class="btn btn-ghost btn-sm" onclick="showQRCode()" title="Accès tablette / téléphone">📱 Tablette</button>
     <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📊 CSV</button>
@@ -543,6 +544,15 @@
       </div>
       <p id="discord-webhook-saved" style="display:none;font-size:.75rem;color:#16a34a;margin-top:6px">✅ Discord connecté — récap chaque dimanche !</p>
     </div>
+
+    <!-- Sauvegardes locales -->
+    <hr style="border:none;border-top:1px solid var(--gray-200);margin:20px 0">
+    <h3 style="margin:0 0 10px;font-size:.95rem">💾 Sauvegardes locales</h3>
+    <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:10px">Une copie complète est créée automatiquement chaque jour. Tu peux en télécharger une en cas de problème.</p>
+    <div id="backup-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+      <div style="font-size:.8rem;color:var(--gray-400)">Chargement…</div>
+    </div>
+    <button class="btn btn-ghost" style="width:100%" onclick="createBackupNow()">💾 Créer une sauvegarde maintenant</button>
   </div>
 </div>
 

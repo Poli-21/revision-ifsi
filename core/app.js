@@ -192,13 +192,15 @@ App.UI = (() => {
 
 // ── Initialisation ─────────────────────────────────────────────
 App.init = async function () {
-  await App.Store.load();   // IndexedDB est async
-  try { App.Sync?.init?.(); } catch(e) { console.warn('Sync init failed:', e); } // Sync
+  _initDarkMode();                  // Dark mode (avant tout rendu)
+  await App.Store.load();
+  try { App.Sync?.init?.(); } catch(e) { console.warn('Sync init failed:', e); }
   App.Render.all();
   App.UI.switchTab('home');
   _initKeyboard();
-  App.Store.save();         // déclenche l'indicateur de stockage
-  try { initNotifications(); } catch(e) {}  // Notifications + Discord
+  App.Store.save();
+  try { initNotifications(); } catch(e) {}
+  try { _initBackup(); } catch(e) {}  // Sauvegarde quotidienne
 };
 
 function _initKeyboard() {
@@ -498,6 +500,7 @@ function openSyncModal() {
   overlay.style.display = 'flex';
   requestAnimationFrame(() => overlay.style.opacity = '1');
   try { _updateNotifUI(); } catch(e) {}
+  try { _refreshBackupList(); } catch(e) {}
 }
 
 function closeSyncModal() {
@@ -957,6 +960,121 @@ function _updateNotifUI() {
   const wh    = localStorage.getItem(DISCORD_KEY) || '';
   if (inp && !inp.value) inp.value = wh;
   if (saved) saved.style.display = wh ? 'block' : 'none';
+}
+
+// ── Dark Mode ──────────────────────────────────────────────────
+function toggleDarkMode() {
+  const dark = document.body.classList.toggle('dark');
+  localStorage.setItem('ifsi_dark', dark ? '1' : '0');
+  const btn = document.getElementById('dark-toggle');
+  if (btn) btn.textContent = dark ? '☀️' : '🌙';
+}
+
+function _initDarkMode() {
+  const stored = localStorage.getItem('ifsi_dark');
+  // Si jamais défini, suit la préférence système
+  const prefersDark = stored === null
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : stored === '1';
+  if (prefersDark) {
+    document.body.classList.add('dark');
+    const btn = document.getElementById('dark-toggle');
+    if (btn) btn.textContent = '☀️';
+  }
+  // Écoute les changements système (si pas de préférence stockée)
+  if (stored === null) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+      document.body.classList.toggle('dark', e.matches);
+      const btn = document.getElementById('dark-toggle');
+      if (btn) btn.textContent = e.matches ? '☀️' : '🌙';
+    });
+  }
+}
+
+// ── Sauvegardes locales ────────────────────────────────────────
+const BACKUP_PREFIX = 'ifsi_backup_';
+const BACKUP_DAYS   = 7;
+
+async function _initBackup() {
+  const today = new Date().toISOString().slice(0, 10);
+  const key   = BACKUP_PREFIX + today;
+  // Déjà sauvegardé aujourd'hui ?
+  const existing = await App.Store.getBackup(key);
+  if (!existing) {
+    await _saveBackup(today);
+    _showBackupToast(today);
+  }
+  // Nettoyage des vieilles sauvegardes
+  await _pruneBackups();
+}
+
+async function _saveBackup(dateStr) {
+  const { state } = App.Store;
+  const data = {
+    v: 1,
+    date: dateStr,
+    cards:    state.cards,
+    studyLog: state.studyLog,
+    catOrder: state.catOrder
+  };
+  await App.Store.setBackup(BACKUP_PREFIX + dateStr, data);
+}
+
+async function createBackupNow() {
+  const today = new Date().toISOString().slice(0, 10);
+  await _saveBackup(today);
+  _showBackupToast(today);
+  _refreshBackupList();
+}
+
+async function _pruneBackups() {
+  const keys = await App.Store.listBackupKeys();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - BACKUP_DAYS);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  for (const k of keys) {
+    const d = k.replace(BACKUP_PREFIX, '');
+    if (d < cutoffStr) await App.Store.deleteBackup(k);
+  }
+}
+
+async function _refreshBackupList() {
+  const list = document.getElementById('backup-list');
+  if (!list) return;
+  const keys = (await App.Store.listBackupKeys()).sort().reverse();
+  if (keys.length === 0) {
+    list.innerHTML = '<div style="font-size:.8rem;color:var(--gray-400)">Aucune sauvegarde locale.</div>';
+    return;
+  }
+  list.innerHTML = keys.map(k => {
+    const d = k.replace(BACKUP_PREFIX, '');
+    const label = new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--gray-100);border-radius:8px;font-size:.82rem">
+      <span>📁 ${label}</span>
+      <button class="btn btn-ghost btn-sm" onclick="downloadBackup('${k}')">⬇️ Télécharger</button>
+    </div>`;
+  }).join('');
+}
+
+async function downloadBackup(key) {
+  const data = await App.Store.getBackup(key);
+  if (!data) { alert('Sauvegarde introuvable.'); return; }
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `revision-ifsi-backup-${data.date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function _showBackupToast(dateStr) {
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f8fafc;padding:10px 20px;border-radius:99px;font-size:.82rem;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:fadeInUp .3s ease';
+  toast.textContent = `💾 Sauvegarde locale créée (${dateStr})`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
 }
 
 document.addEventListener('DOMContentLoaded', App.init);

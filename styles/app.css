@@ -942,3 +942,109 @@ textarea#write-input:focus{outline:none;border-color:var(--primary);box-shadow:0
 .spell-dot.ok  { background:var(--success-light);color:var(--success); }
 .spell-dot.err { background:var(--danger-light);color:var(--danger); }
 @keyframes mic-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+
+/* ══ DARK MODE ═════════════════════════════════════════════════ */
+body.dark {
+  --primary: #60a5fa;
+  --primary-light: #1e3a5f;
+  --success: #4ade80;
+  --success-light: #14532d;
+  --danger: #f87171;
+  --danger-light: #7f1d1d;
+  --warning: #fbbf24;
+  --warning-light: #78350f;
+  --easy: #c4b5fd;
+  --easy-light: #3b0764;
+  --gray-50:  #0f172a;
+  --gray-100: #1e293b;
+  --gray-200: #334155;
+  --gray-300: #475569;
+  --gray-400: #64748b;
+  --gray-500: #94a3b8;
+  --gray-600: #cbd5e1;
+  --gray-700: #e2e8f0;
+  --gray-900: #f8fafc;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+/* Surfaces blanches */
+body.dark header,
+body.dark .sidebar,
+body.dark .modal,
+body.dark .tabs,
+body.dark .card-item,
+body.dark .card-face,
+body.dark .flashcard,
+body.dark .write-card,
+body.dark .qcm-card,
+body.dark .game-mode-card,
+body.dark .game-card,
+body.dark .ortho-step,
+body.dark .ortho-done,
+body.dark .session-done,
+body.dark .games-done-screen,
+body.dark .detail-card {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+body.dark .card-back-face,
+body.dark .card-back { background: #162032 !important; }
+
+/* Inputs */
+body.dark input,
+body.dark textarea,
+body.dark select {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+body.dark input::placeholder,
+body.dark textarea::placeholder { color: #64748b !important; }
+
+/* Boutons */
+body.dark .btn-ghost {
+  color: var(--gray-600);
+  border-color: var(--gray-300);
+}
+body.dark .btn-ghost:hover { background: var(--gray-100) !important; }
+
+/* Tabs */
+body.dark .tab { color: var(--gray-500); }
+body.dark .tab.active { background: var(--primary-light) !important; color: var(--primary) !important; border-color: var(--primary) !important; }
+
+/* Overlay modaux */
+body.dark .overlay { background: rgba(0,0,0,.7) !important; }
+
+/* Badges */
+body.dark .badge-blue { background: var(--primary-light); color: var(--primary); }
+
+/* Progress bars */
+body.dark .session-progress-bar,
+body.dark .ortho-prog-bar { background: var(--gray-200) !important; }
+
+/* Kbd */
+body.dark .kbd-hint,
+body.dark .kbd-pill { background: var(--gray-100) !important; border-color: var(--gray-200) !important; color: var(--gray-600) !important; }
+
+/* QCM choices */
+body.dark .qcm-choice { background: var(--gray-100) !important; border-color: var(--gray-200) !important; color: var(--gray-700) !important; }
+body.dark .qcm-choice:hover { border-color: var(--primary) !important; background: var(--primary-light) !important; }
+
+/* Sync modal zones */
+body.dark #sync-setup-zone ol,
+body.dark #sync-setup-zone p,
+body.dark #sync-connected-zone p { color: var(--gray-600) !important; }
+
+/* Bouton dark mode toggle */
+#dark-toggle { font-size: 1.1rem; line-height:1; padding: 5px 9px; }
+
+/* Transition douce au changement */
+body { transition: background .25s, color .25s; }
+header, .sidebar, .modal, .card-face, .card-item { transition: background .25s, border-color .25s; }
+
+@keyframes fadeInUp {
+  from { opacity:0; transform:translateX(-50%) translateY(12px); }
+  to   { opacity:1; transform:translateX(-50%) translateY(0); }
+}

@@ -163,5 +163,25 @@ App.Store = (() => {
     return streak;
   }
 
-  return { state, load, save, saveLog, saveOrder, normCat, logReview, logSessionDuration, getStreak };
+  // ── Backup IndexedDB helpers ───────────────────────────────────
+  async function getBackup(key)    { try { return await _get(key); }   catch(e) { return null; } }
+  async function setBackup(key, v) { try { _set(key, v); }             catch(e) {} }
+  async function deleteBackup(key) {
+    if (!db) return;
+    try {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(key);
+    } catch(e) {}
+  }
+  async function listBackupKeys() {
+    if (!db) return [];
+    return new Promise(resolve => {
+      const tx   = db.transaction(STORE, 'readonly');
+      const req  = tx.objectStore(STORE).getAllKeys();
+      req.onsuccess = e => resolve((e.target.result || []).filter(k => String(k).startsWith('ifsi_backup_')));
+      req.onerror   = () => resolve([]);
+    });
+  }
+
+  return { state, load, save, saveLog, saveOrder, normCat, logReview, logSessionDuration, getStreak, getBackup, setBackup, deleteBackup, listBackupKeys };
 })();
