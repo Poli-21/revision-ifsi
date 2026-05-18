@@ -988,8 +988,18 @@ const EXAMS_KEY = 'ifsi_exams_v2';
 let _editingExamId = null;
 
 function _loadExams() {
-  try { return JSON.parse(localStorage.getItem(EXAMS_KEY) || '[]'); }
-  catch(e) { return []; }
+  try {
+    let exams = JSON.parse(localStorage.getItem(EXAMS_KEY) || '[]');
+    // Nettoyage auto : supprime les examens passés depuis plus de 7 jours
+    const todayMs = new Date().setHours(0, 0, 0, 0);
+    const before  = exams.length;
+    exams = exams.filter(e => {
+      const examMs = new Date(e.date + 'T00:00:00').getTime();
+      return (todayMs - examMs) < 7 * 86400000; // garde si < 7 jours de retard
+    });
+    if (exams.length !== before) _saveExams(exams); // persiste si nettoyage
+    return exams;
+  } catch(e) { return []; }
 }
 function _saveExams(exams) {
   localStorage.setItem(EXAMS_KEY, JSON.stringify(exams));
