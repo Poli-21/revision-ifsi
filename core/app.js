@@ -24,13 +24,14 @@ App.UI = (() => {
 
   function switchTab(tab) {
     currentTab = tab;
-    document.getElementById('home-view').style.display   = tab === 'home'   ? 'block' : 'none';
-    document.getElementById('browse-view').style.display = tab === 'browse'  ? 'block' : 'none';
-    document.getElementById('stats-view').style.display  = tab === 'stats'   ? 'block' : 'none';
-    document.getElementById('ortho-view').style.display  = tab === 'ortho'   ? 'block' : 'none';
-    document.getElementById('games-view').style.display  = tab === 'games'   ? 'block' : 'none';
+    document.getElementById('home-view').style.display    = tab === 'home'   ? 'block' : 'none';
+    document.getElementById('browse-view').style.display  = tab === 'browse'  ? 'block' : 'none';
+    document.getElementById('stats-view').style.display   = tab === 'stats'   ? 'block' : 'none';
+    document.getElementById('ortho-view').style.display   = tab === 'ortho'   ? 'block' : 'none';
+    document.getElementById('games-view').style.display   = tab === 'games'   ? 'block' : 'none';
+    document.getElementById('schema-view').style.display  = tab === 'schema'  ? 'block' : 'none';
     document.getElementById('session-view').style.display = 'none';
-    ['home','browse','stats','ortho','games'].forEach(t => {
+    ['home','browse','stats','ortho','games','schema'].forEach(t => {
       const btn = document.getElementById('tab-' + t);
       if (btn) btn.classList.toggle('active', t === tab);
     });
@@ -38,6 +39,7 @@ App.UI = (() => {
     if (tab === 'stats')  App.Render.stats();
     if (tab === 'ortho')  App.Ortho.populateCatSelect();
     if (tab === 'games')  App.Games.populateCatSelect();
+    if (tab === 'schema') App.Schema.showGallery();
   }
 
   function setCategory(cat) {
