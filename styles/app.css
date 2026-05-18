@@ -942,3 +942,153 @@ textarea#write-input:focus{outline:none;border-color:var(--primary);box-shadow:0
 .spell-dot.ok  { background:var(--success-light);color:var(--success); }
 .spell-dot.err { background:var(--danger-light);color:var(--danger); }
 @keyframes mic-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+
+/* ══ MODE SCHÉMAS ═══════════════════════════════════════════════ */
+.schema-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+  padding: 20px 0;
+}
+.schema-card {
+  border: 2px solid var(--gray-200);
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s, border-color .15s;
+  background: #fff;
+}
+.schema-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(37,99,235,.15);
+  border-color: var(--primary);
+}
+.schema-thumb-wrap {
+  position: relative;
+  background: var(--gray-50);
+  aspect-ratio: 4/3;
+  overflow: hidden;
+}
+.schema-thumb {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  padding: 8px;
+}
+.schema-due-badge {
+  position: absolute; top: 6px; right: 6px;
+  background: var(--primary); color: #fff;
+  font-size: .68rem; font-weight: 700;
+  padding: 2px 7px; border-radius: 99px;
+}
+.schema-card-info {
+  padding: 8px 10px 10px;
+}
+.schema-card-cat {
+  font-size: .8rem; font-weight: 600;
+  color: var(--gray-700);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.schema-card-count {
+  font-size: .75rem; color: var(--gray-400); margin-top: 2px;
+}
+
+/* Session schéma */
+.schema-img-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--gray-50);
+  border-bottom: 2px solid var(--gray-200);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: zoom-in;
+  transition: max-height .3s ease;
+  max-height: 260px;
+  overflow: hidden;
+  padding: 8px;
+}
+.schema-img-wrap.zoomed {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  max-height: 100vh;
+  z-index: 1000;
+  background: rgba(0,0,0,.88);
+  cursor: zoom-out;
+  padding: 16px;
+  justify-content: center;
+}
+.schema-big-img {
+  max-height: 240px;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  transition: max-height .3s ease;
+}
+.schema-img-wrap.zoomed .schema-big-img {
+  max-height: calc(100vh - 32px);
+  max-width: 100%;
+}
+.schema-zoom-hint {
+  font-size: .7rem; color: var(--gray-400);
+  margin-top: 4px;
+  pointer-events: none;
+}
+.schema-img-wrap.zoomed .schema-zoom-hint { color: rgba(255,255,255,.5); }
+
+.schema-card-area {
+  padding: 20px 16px 100px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+/* Flashcard schéma */
+.schema-flashcard {
+  perspective: 1000px;
+  cursor: pointer;
+  margin-bottom: 20px;
+}
+.schema-flashcard .schema-face {
+  backface-visibility: hidden;
+  border-radius: 16px;
+  padding: 24px 20px;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,.08);
+  transition: transform .45s cubic-bezier(.4,0,.2,1);
+}
+.schema-flashcard .schema-front {
+  background: #fff;
+  border: 2px solid var(--gray-200);
+  transform: rotateY(0deg);
+  position: relative;
+}
+.schema-flashcard .schema-back {
+  background: var(--primary-light);
+  border: 2px solid var(--primary);
+  transform: rotateY(180deg);
+  position: absolute;
+  top: 0; left: 0; right: 0;
+}
+.schema-flashcard {
+  position: relative;
+  transform-style: preserve-3d;
+}
+.schema-flashcard.flipped .schema-front { transform: rotateY(-180deg); }
+.schema-flashcard.flipped .schema-back  { transform: rotateY(0deg); }
+
+.sc-cat  { font-size: .75rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.sc-term { font-size: 1.5rem; font-weight: 700; color: var(--gray-900); }
+.sc-hint { font-size: .82rem; color: var(--gray-400); margin-top: 12px; }
+.sc-term-small { font-size: .9rem; font-weight: 600; color: var(--primary); margin-bottom: 8px; }
+.sc-def  { font-size: 1rem; color: var(--gray-800); line-height: 1.6; }
+
+.schema-answer-btns {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
