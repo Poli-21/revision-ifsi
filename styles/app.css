@@ -1040,6 +1040,25 @@ body.dark #sync-connected-zone p { color: var(--gray-600) !important; }
 /* Bouton dark mode toggle */
 #dark-toggle { font-size: 1.1rem; line-height:1; padding: 5px 9px; }
 
+/* ── Sidebar desktop collapse ── */
+.sidebar { transition: width .22s ease, min-width .22s ease, padding .22s ease; }
+.sidebar-close-btn {
+  display: none;
+  align-self: flex-end;
+  background: none; border: none; cursor: pointer;
+  font-size: .85rem; color: var(--gray-400); padding: 2px 4px;
+  border-radius: 5px; line-height:1;
+}
+.sidebar-close-btn:hover { background: var(--gray-100); color: var(--gray-600); }
+@media (min-width: 701px) {
+  .sidebar-close-btn { display: block; }
+  .sidebar.collapsed {
+    width: 0 !important; min-width: 0 !important;
+    padding: 0 !important; overflow: hidden;
+    border-right: none;
+  }
+}
+
 /* Transition douce au changement */
 body { transition: background .25s, color .25s; }
 header, .sidebar, .modal, .card-face, .card-item { transition: background .25s, border-color .25s; }

@@ -119,6 +119,21 @@ App.Render = (() => {
       }
     }
 
+    // Estimation inline dans le bandeau
+    const dueEstEl = document.getElementById('due-est-inline');
+    if (dueEstEl) {
+      const estTxtSidebar = document.getElementById('stat-est')?.textContent;
+      if (due.length > 0 && estTxtSidebar && estTxtSidebar !== '—') {
+        dueEstEl.textContent = estTxtSidebar;
+        dueEstEl.style.display = 'inline';
+      } else {
+        dueEstEl.style.display = 'none';
+      }
+    }
+
+    // ── Exam date ──────────────────────────────────────────────
+    _renderExamDate(state, due);
+
     // Bandeau du jour
     _setText('due-count', due.length);
     const chips = document.getElementById('cat-due-chips');
@@ -653,6 +668,85 @@ App.Render = (() => {
         document.getElementById('ypt-tooltip').style.display = 'none';
       });
     });
+  }
+
+  // ── Exam date ──────────────────────────────────────────────────
+  function _renderExamDate(state, due) {
+    const examDate = localStorage.getItem('ifsi_exam_date');
+    const cdEl     = document.getElementById('exam-countdown');
+    const riskEl   = document.getElementById('exam-atrisk');
+    const alertEl  = document.getElementById('exam-alert-home');
+    const inp      = document.getElementById('exam-date-input');
+
+    // Pré-remplit l'input si date stockée
+    if (inp && examDate && !inp.value) inp.value = examDate;
+
+    if (!examDate) {
+      if (cdEl)    cdEl.style.display    = 'none';
+      if (riskEl)  riskEl.style.display  = 'none';
+      if (alertEl) alertEl.style.display = 'none';
+      return;
+    }
+
+    const today    = new Date(); today.setHours(0,0,0,0);
+    const exam     = new Date(examDate + 'T00:00:00');
+    const diffMs   = exam - today;
+    const diffDays = Math.round(diffMs / 86400000);
+
+    // Countdown sidebar
+    if (cdEl) {
+      cdEl.style.display = 'block';
+      if (diffDays < 0) {
+        cdEl.innerHTML = `<span style="font-size:.8rem;color:var(--gray-400)">Examen passé</span>`;
+      } else if (diffDays === 0) {
+        cdEl.innerHTML = `<span style="font-weight:700;color:var(--danger)">🎓 C'est aujourd'hui !</span>`;
+      } else {
+        const col = diffDays <= 7 ? 'var(--danger)' : diffDays <= 14 ? 'var(--warning)' : 'var(--success)';
+        cdEl.innerHTML = `<span style="font-size:1.4rem;font-weight:800;color:${col}">${diffDays}</span><span style="font-size:.78rem;color:var(--gray-500);margin-left:5px">jours restants</span>`;
+      }
+    }
+
+    if (diffDays < 0) {
+      if (riskEl)  riskEl.style.display  = 'none';
+      if (alertEl) alertEl.style.display = 'none';
+      return;
+    }
+
+    // Cartes à risque : nextReview après la date d'exam
+    const atRisk = state.cards.filter(c => {
+      if (c.suspended || !c.progress) return false;
+      const nr = c.progress.nextReview;
+      return nr && nr > examDate;
+    });
+
+    // Cartes pas encore commencées (nouvelles) — à risque aussi si peu de jours
+    const newCards = state.cards.filter(c => !c.suspended && !c.progress);
+
+    const totalRisk = atRisk.length + (diffDays <= 7 ? newCards.length : 0);
+
+    if (riskEl) {
+      if (totalRisk > 0) {
+        const byCat = {};
+        atRisk.forEach(c => { byCat[c.cat] = (byCat[c.cat] || 0) + 1; });
+        const topCats = Object.entries(byCat).sort((a,b) => b[1]-a[1]).slice(0,3).map(([c,n]) => `${c} (${n})`).join(', ');
+        riskEl.style.display = 'block';
+        riskEl.innerHTML = `⚠️ <strong>${totalRisk} carte${totalRisk>1?'s':''}</strong> risquent d'être oubliées avant l'exam${topCats ? `<br><span style="opacity:.8">${topCats}</span>` : ''}`;
+      } else {
+        riskEl.style.display = 'none';
+      }
+    }
+
+    if (alertEl) {
+      if (totalRisk > 0 && diffDays <= 14) {
+        alertEl.style.display = 'block';
+        alertEl.textContent = `🎓 Exam dans ${diffDays}j · ${totalRisk} carte${totalRisk>1?'s':''} à risque`;
+      } else if (diffDays <= 7) {
+        alertEl.style.display = 'block';
+        alertEl.textContent = `🎓 Exam dans ${diffDays} jour${diffDays>1?'s':''} — continue !`;
+      } else {
+        alertEl.style.display = 'none';
+      }
+    }
   }
 
   return { all, browse, browseDebounced, stats, heatmap, cardItemHTML, orderedCats };

@@ -25,6 +25,7 @@
   <span class="kbd-hint" title="Raccourcis clavier">Espace=retourner · 1/2/3/4=répondre · N=nouvelle carte · /=rechercher · Échap=quitter</span>
   <div class="header-right">
     <span id="storage-indicator" style="display:none;font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:99px;cursor:default"></span>
+    <button class="btn btn-ghost btn-sm" id="sidebar-reopen-btn" onclick="toggleDesktopSidebar()" title="Ouvrir le panneau" style="display:none">▶</button>
     <button class="btn btn-ghost btn-sm" id="dark-toggle" onclick="toggleDarkMode()" title="Mode nuit">🌙</button>
     <button class="btn btn-ghost btn-sm" id="sync-settings-btn" onclick="openSyncModal()" title="Synchronisation entre appareils">☁️ Sync</button>
     <button class="btn btn-ghost btn-sm" onclick="showQRCode()" title="Accès tablette / téléphone">📱 Tablette</button>
@@ -39,7 +40,8 @@
 <div class="app">
 
   <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="main-sidebar">
+    <button class="sidebar-close-btn" onclick="toggleDesktopSidebar()" title="Réduire le panneau">◀</button>
     <div class="sidebar-section">
       <h3>Aujourd'hui</h3>
       <div class="stat-row"><span class="label">À réviser</span><span class="value" id="stat-due">—</span></div>
@@ -57,6 +59,12 @@
       <h3>Niveaux</h3>
       <div id="level-bars"></div>
     </div>
+    <div class="sidebar-section">
+      <h3>🎓 Examen</h3>
+      <div id="exam-countdown" style="display:none;margin-bottom:8px"></div>
+      <input type="date" id="exam-date-input" style="width:100%;padding:6px 10px;border:1px solid var(--gray-300);border-radius:8px;font-size:.83rem;font-family:inherit;color:var(--gray-700);background:var(--gray-50)" onchange="saveExamDate(this.value)">
+      <div id="exam-atrisk" style="display:none;margin-top:8px;font-size:.78rem;padding:7px 10px;background:var(--warning-light);color:var(--warning);border-radius:8px;line-height:1.4"></div>
+    </div>
   </aside>
 
   <!-- MAIN -->
@@ -73,9 +81,13 @@
     <!-- ── HOME ──────────────────────────────────────────────── -->
     <div id="home-view">
       <div class="due-alert" id="due-alert">
-        <div>
-          <div class="big" id="due-count">0</div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <div class="big" id="due-count">0</div>
+            <span id="due-est-inline" style="font-size:.9rem;font-weight:600;color:rgba(255,255,255,.75);display:none"></span>
+          </div>
           <div class="label">cartes à réviser maintenant</div>
+          <div id="exam-alert-home" style="display:none;margin-top:6px;font-size:.78rem;background:rgba(0,0,0,.18);border-radius:8px;padding:5px 10px;color:rgba(255,255,255,.9)"></div>
           <div class="cat-due-chips" id="cat-due-chips"></div>
         </div>
         <button class="btn btn-start" onclick="startSession()" style="align-self:flex-start">Tout réviser →</button>

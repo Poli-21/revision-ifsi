@@ -78,8 +78,11 @@ App.Session = (() => {
     }
     if (!cards.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
 
-    // Tri : J+1 en premier → autres révisions → nouvelles cartes
+    // Tri : cartes à risque exam → J+1 → apprentissage → nouvelles
+    const examDate = localStorage.getItem('ifsi_exam_date');
     function _cardPriority(c) {
+      // Carte dont la prochaine révision dépasse la date d'exam → priorité max
+      if (examDate && c.progress?.nextReview && c.progress.nextReview > examDate) return 0;
       if (!c.progress) return 3;                    // nouvelle carte
       if (c.progress.repetitions <= 1) return 2;   // en apprentissage
       return 1;                                     // révision (J+x)

@@ -193,6 +193,7 @@ App.UI = (() => {
 // ── Initialisation ─────────────────────────────────────────────
 App.init = async function () {
   _initDarkMode();                  // Dark mode (avant tout rendu)
+  _initSidebarState();             // Sidebar collapse
   await App.Store.load();
   try { App.Sync?.init?.(); } catch(e) { console.warn('Sync init failed:', e); }
   App.Render.all();
@@ -960,6 +961,33 @@ function _updateNotifUI() {
   const wh    = localStorage.getItem(DISCORD_KEY) || '';
   if (inp && !inp.value) inp.value = wh;
   if (saved) saved.style.display = wh ? 'block' : 'none';
+}
+
+// ── Sidebar desktop collapse ───────────────────────────────────
+function toggleDesktopSidebar() {
+  const sidebar  = document.getElementById('main-sidebar');
+  const reopenBtn = document.getElementById('sidebar-reopen-btn');
+  if (!sidebar) return;
+  const collapsed = sidebar.classList.toggle('collapsed');
+  localStorage.setItem('ifsi_sidebar_collapsed', collapsed ? '1' : '0');
+  if (reopenBtn) reopenBtn.style.display = collapsed ? 'inline-flex' : 'none';
+}
+
+function _initSidebarState() {
+  if (window.innerWidth <= 700) return; // mobile = géré séparément
+  if (localStorage.getItem('ifsi_sidebar_collapsed') === '1') {
+    const sidebar   = document.getElementById('main-sidebar');
+    const reopenBtn = document.getElementById('sidebar-reopen-btn');
+    if (sidebar)   sidebar.classList.add('collapsed');
+    if (reopenBtn) reopenBtn.style.display = 'inline-flex';
+  }
+}
+
+// ── Date d'examen ─────────────────────────────────────────────
+function saveExamDate(val) {
+  if (val) localStorage.setItem('ifsi_exam_date', val);
+  else     localStorage.removeItem('ifsi_exam_date');
+  App.Render.all();
 }
 
 // ── Dark Mode ──────────────────────────────────────────────────
