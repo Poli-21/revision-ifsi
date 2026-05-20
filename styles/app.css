@@ -499,6 +499,14 @@ textarea#write-input:focus{outline:none;border-color:var(--primary);box-shadow:0
 .bac-badge-cbph{background:#dbeafe;color:#1e40af;}
 .bac-badge-stss{background:#d1fae5;color:#065f46;}
 
+/* Chapitres STSS */
+.bac-chap-btn{padding:5px 12px;border-radius:99px;border:1px solid var(--gray-300);background:white;color:var(--gray-600);font-size:.76rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;}
+.bac-chap-btn:hover{background:var(--gray-100);}
+.bac-chap-btn.active{background:var(--success);color:white;border-color:var(--success);}
+
+/* Intro sujet */
+.bac-intro{background:var(--gray-50);border-left:3px solid var(--primary-light);padding:10px 14px;margin-bottom:10px;font-size:.85rem;color:var(--gray-600);line-height:1.65;border-radius:0 8px 8px 0;}
+
 /* Navigation sujets */
 .bac-nav-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--gray-300);background:white;color:var(--gray-600);font-size:1rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background .12s;}
 .bac-nav-btn:hover{background:var(--gray-100);}
@@ -537,6 +545,9 @@ body.dark .bac-q-item{color:var(--gray-700);border-top-color:var(--gray-200);}
 body.dark .bac-answer-wrap{background:var(--gray-100);border-color:var(--gray-200);}
 body.dark .bac-textarea{background:var(--gray-50);border-color:var(--gray-300);color:var(--gray-800);}
 body.dark .bac-nav-btn{background:var(--gray-100);border-color:var(--gray-300);}
+body.dark .bac-chap-btn{background:var(--gray-100);border-color:var(--gray-300);color:var(--gray-600);}
+body.dark .bac-chap-btn.active{background:var(--success);color:white;border-color:var(--success);}
+body.dark .bac-intro{background:var(--gray-100);border-left-color:var(--primary);color:var(--gray-500);}
 
 /* Mobile */
 @media (max-width: 700px) {
