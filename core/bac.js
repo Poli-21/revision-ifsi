@@ -536,27 +536,93 @@ App.Bac = (() => {
     if (wrap) wrap.classList.remove('bac-timer-warn','bac-timer-danger');
   }
 
-  // ===== CLE API & CORRECTION CHATGPT =====
+  // ===== PROVIDERS IA =====
 
-  var _AI_KEY = 'ifsi_openai_key';
+  var _PROVIDERS = {
+    groq: {
+      name: 'Groq',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      model: 'llama-3.1-70b-versatile',
+      keyPrefix: 'gsk_',
+      info: 'Gratuit sans limite. Cle sur console.groq.com (pas de CB). Modele : Llama 3.1 70B.',
+      needsKey: true
+    },
+    ollama: {
+      name: 'Ollama',
+      url: 'http://localhost:11434/v1/chat/completions',
+      model: 'llama3.1',
+      keyPrefix: '',
+      info: 'Local sur ton PC. Installe ollama.ai puis lance : ollama pull llama3.1. Aucune cle necesssaire.',
+      needsKey: false
+    },
+    openai: {
+      name: 'OpenAI',
+      url: 'https://api.openai.com/v1/chat/completions',
+      model: 'gpt-4o-mini',
+      keyPrefix: 'sk-',
+      info: 'Payant. Cle sur platform.openai.com. Modele : GPT-4o mini.',
+      needsKey: true
+    }
+  };
+
+  var _PROV_KEY = 'ifsi_ai_provider';
+  var _AI_KEY   = 'ifsi_ai_apikey';
+
+  function _currentProvider() {
+    return _PROVIDERS[localStorage.getItem(_PROV_KEY) || 'groq'] || _PROVIDERS.groq;
+  }
+
+  function setProvider(id) {
+    localStorage.setItem(_PROV_KEY, id);
+    // Mettre a jour les boutons
+    document.querySelectorAll('.ai-prov-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.prov === id);
+    });
+    // Mettre a jour l'info et le champ cle
+    var prov = _PROVIDERS[id] || _PROVIDERS.groq;
+    var info = document.getElementById('ai-prov-info');
+    if (info) info.textContent = prov.info;
+    var keyWrap = document.getElementById('ai-key-wrap');
+    var keyLbl  = document.getElementById('ai-key-label');
+    var keyInp  = document.getElementById('claude-api-key-input');
+    if (keyWrap) keyWrap.style.display = prov.needsKey ? 'block' : 'none';
+    if (keyLbl)  keyLbl.textContent = 'Cle API ' + prov.name;
+    if (keyInp)  keyInp.placeholder = prov.needsKey ? (prov.keyPrefix + '...') : '(non necessaire)';
+    // Mise a jour du bouton de correction
+    var btn = document.getElementById('bac-correct-btn');
+    if (btn) btn.textContent = 'Corriger avec ' + prov.name;
+    // Mise a jour du header correction
+    var hdr = document.querySelector('.bac-correction-header span');
+    if (hdr) hdr.textContent = 'Correction par ' + prov.name;
+  }
+
+  // Init provider UI au chargement
+  function _initProviderUI() {
+    var saved = localStorage.getItem(_PROV_KEY) || 'groq';
+    setProvider(saved);
+  }
+
+  // ===== CLE API =====
 
   function saveApiKey() {
     var inp = document.getElementById('claude-api-key-input');
     var st  = document.getElementById('claude-key-status');
     if (!inp) return;
     var key = inp.value.trim();
-    if (!key || !key.startsWith('sk-')) {
-      if (st) { st.style.display='block'; st.style.color='#dc2626'; st.textContent='La cle doit commencer par sk-'; }
+    var prov = _currentProvider();
+    if (prov.needsKey && !key) {
+      if (st) { st.style.display='block'; st.style.color='#dc2626'; st.textContent='Entre une cle API.'; }
       return;
     }
-    localStorage.setItem(_AI_KEY, key);
+    localStorage.setItem(_AI_KEY + '_' + (localStorage.getItem(_PROV_KEY)||'groq'), key);
     inp.value = '';
-    if (st) { st.style.display='block'; st.style.color='#16a34a'; st.textContent='Cle enregistree - correction directe activee !'; }
-    setTimeout(function(){ if(st) st.style.display='none'; }, 3000);
+    if (st) { st.style.display='block'; st.style.color='#16a34a'; st.textContent='Cle enregistree !'; }
+    setTimeout(function(){ if(st) st.style.display='none'; }, 2500);
   }
 
   function clearApiKey() {
-    localStorage.removeItem(_AI_KEY);
+    var provId = localStorage.getItem(_PROV_KEY) || 'groq';
+    localStorage.removeItem(_AI_KEY + '_' + provId);
     var inp = document.getElementById('claude-api-key-input');
     if (inp) inp.value = '';
     var st = document.getElementById('claude-key-status');
@@ -573,8 +639,8 @@ App.Bac = (() => {
     p += 'Voici un sujet de ' + label + ' et la reponse d un eleve. ';
     p += 'Corrige cette reponse en : commencant par une appreciation generale (2-3 lignes), ';
     p += 'puis en commentant chaque question separement (ce qui est bon, ce qui manque, les erreurs), ';
-    p += 'et en terminant par une NOTE/' + totalPts + ' pts justifiee avec des conseils d amelioration.\n\n';
-    p += '=== SUJET : ' + q.annee + ' - ' + q.theme + ' ===\n\n';
+    p += 'et en terminant par une NOTE/' + totalPts + ' pts justifiee avec des conseils.';
+    p += '\n\n=== SUJET : ' + q.annee + ' - ' + q.theme + ' ===\n\n';
     if (q.dossier && q.dossier.length) {
       q.dossier.forEach(function(doc) {
         p += '[' + doc.id + (doc.titre ? ' - ' + doc.titre : '') + ']\n' + doc.texte + '\n\n';
@@ -586,20 +652,23 @@ App.Bac = (() => {
     return p;
   }
 
-  // ===== APPEL API OPENAI =====
+  // ===== APPEL API =====
 
   function submitAnswer() {
     var q = _currentQ();
     if (!q) return;
     var answer = (document.getElementById('bac-answer')||{}).value || '';
-    var apiKey = localStorage.getItem(_AI_KEY);
+    var provId  = localStorage.getItem(_PROV_KEY) || 'groq';
+    var prov    = _PROVIDERS[provId] || _PROVIDERS.groq;
+    var apiKey  = prov.needsKey ? (localStorage.getItem(_AI_KEY + '_' + provId) || '') : 'ollama';
 
-    if (!apiKey) {
+    if (prov.needsKey && !apiKey) {
       var overlay = document.getElementById('sync-overlay');
       if (overlay) {
         overlay.style.display = 'flex';
         requestAnimationFrame(function(){ overlay.style.opacity = '1'; });
         setTimeout(function(){
+          setProvider(provId);
           var el = document.getElementById('claude-api-key-input');
           if (el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.focus(); }
         }, 200);
@@ -611,34 +680,33 @@ App.Bac = (() => {
     var corrBody = document.getElementById('bac-correction-body');
     if (!corrWrap || !corrBody) return;
     corrWrap.style.display = 'block';
-    corrBody.innerHTML = '<div class="bac-correction-loading">Correction en cours... (15-20 secondes)</div>';
+    corrBody.innerHTML = '<div class="bac-correction-loading">Correction en cours avec ' + prov.name + '...</div>';
     corrWrap.scrollIntoView({behavior:'smooth', block:'nearest'});
 
     var btn = document.getElementById('bac-correct-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Correction...'; }
 
     var prompt = _buildPrompt(q, answer);
+    var headers = { 'Content-Type': 'application/json' };
+    if (prov.needsKey) headers['Authorization'] = 'Bearer ' + apiKey;
 
-    fetch('https://api.openai.com/v1/chat/completions', {
+    fetch(prov.url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey
-      },
+      headers: headers,
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: prov.model,
         max_tokens: 2048,
         messages: [
-          { role: 'system', content: 'Tu es un professeur de terminale ST2S exigeant et bienveillant, specialiste de la correction du baccalaureat. Tu utilises le markdown pour structurer tes corrections.' },
+          { role: 'system', content: 'Tu es un professeur de terminale ST2S. Tu utilises le markdown pour structurer tes corrections.' },
           { role: 'user', content: prompt }
         ]
       })
     })
     .then(function(res) { return res.json(); })
     .then(function(data) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Corriger avec ChatGPT'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Corriger avec ' + prov.name; }
       if (data.error) {
-        corrBody.innerHTML = '<p style="color:var(--danger);font-size:.85rem;">Erreur API : ' + _esc(data.error.message || JSON.stringify(data.error)) + '</p>';
+        corrBody.innerHTML = '<p style="color:var(--danger);font-size:.85rem;">Erreur ' + prov.name + ' : ' + _esc(data.error.message || JSON.stringify(data.error)) + '</p>';
         return;
       }
       var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
@@ -646,8 +714,12 @@ App.Bac = (() => {
       _renderMath(corrBody);
     })
     .catch(function(err) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Corriger avec ChatGPT'; }
-      corrBody.innerHTML = '<p style="color:var(--danger);font-size:.85rem;">Erreur reseau : ' + _esc(String(err)) + '</p>';
+      if (btn) { btn.disabled = false; btn.textContent = 'Corriger avec ' + prov.name; }
+      var msg = String(err);
+      if (provId === 'ollama' && msg.indexOf('Failed to fetch') !== -1) {
+        msg = 'Impossible de joindre Ollama. Lance "ollama serve" dans un terminal, puis reessaie.';
+      }
+      corrBody.innerHTML = '<p style="color:var(--danger);font-size:.85rem;">' + _esc(msg) + '</p>';
     });
   }
 
@@ -680,7 +752,7 @@ App.Bac = (() => {
     setTimeout(function(){ toast.style.opacity='0'; toast.style.transform='translate(-50%,8px)'; }, 2800);
   }
 
-  // ===== RENDU KATEX (formules comme Notion) =====
+  // ===== RENDU KATEX =====
 
   function _renderMath(el) {
     if (!el || !window.renderMathInElement) return;
@@ -702,7 +774,6 @@ App.Bac = (() => {
     var html = '';
     var inList = false;
     lines.forEach(function(rawLine) {
-      var line = _esc(rawLine);
       if (/^## /.test(rawLine))        { if(inList){html+='</ul>';inList=false;} html += '<h2>' + _inlineMd(rawLine.slice(3)) + '</h2>'; }
       else if (/^# /.test(rawLine))    { if(inList){html+='</ul>';inList=false;} html += '<h2>' + _inlineMd(rawLine.slice(2)) + '</h2>'; }
       else if (/^### /.test(rawLine))  { if(inList){html+='</ul>';inList=false;} html += '<h3>' + _inlineMd(rawLine.slice(4)) + '</h3>'; }
@@ -711,52 +782,46 @@ App.Bac = (() => {
       else { if(inList){html+='</ul>';inList=false;} html += '<p>' + _inlineMd(rawLine) + '</p>'; }
     });
     if (inList) html += '</ul>';
-    // Note finale encadree
     html = html.replace(/(Note\s*(?:finale|globale|:)?\s*[:/]?\s*[\d.,]+\s*\/\s*\d+[^<]*)/gi,
       '<div class="corr-grade">$1</div>');
     return html;
   }
 
   function _inlineMd(s) {
-    // Separer les formules math des parties texte
     var result = '';
     var i = 0;
     while (i < s.length) {
-      // Formule display $$...$$
       if (s[i] === '$' && s[i+1] === '$') {
         var end = s.indexOf('$$', i+2);
         if (end !== -1) { result += s.slice(i, end+2); i = end+2; continue; }
       }
-      // Formule inline $...$
       if (s[i] === '$') {
         var end2 = s.indexOf('$', i+1);
         if (end2 !== -1 && end2 > i+1) { result += s.slice(i, end2+1); i = end2+1; continue; }
       }
       result += s[i]; i++;
     }
-    // Appliquer markdown uniquement sur les parties hors formule
-    return result
+    return _esc(result)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/_(.+?)_/g, '<em>$1</em>');
   }
 
-  // ===== RENDU FORMULES dans le dossier =====
+  // ===== RENDU FORMULES DOSSIER =====
 
   function _renderDossierMath() {
-    var d = document.getElementById('bac-dossier');
-    var q2 = document.getElementById('bac-questions');
-    _renderMath(d);
-    _renderMath(q2);
+    _renderMath(document.getElementById('bac-dossier'));
+    _renderMath(document.getElementById('bac-questions'));
   }
 
   // ===== API PUBLIQUE =====
 
   return {
-    init: init, switchSubject: switchSubject, switchChap: switchChap,
+    init: function() { _initProviderUI(); init(); },
+    switchSubject: switchSubject, switchChap: switchChap,
     prevQ: prevQ, nextQ: nextQ, onInput: onInput,
     toggleTimer: toggleTimer, submitAnswer: submitAnswer, copyAnswer: copyAnswer,
-    saveApiKey: saveApiKey, clearApiKey: clearApiKey
+    saveApiKey: saveApiKey, clearApiKey: clearApiKey, setProvider: setProvider
   };
 
 })();

@@ -620,13 +620,24 @@
       <p id="discord-webhook-saved" style="display:none;font-size:.75rem;color:#16a34a;margin-top:6px">✅ Discord connecté — récap chaque dimanche !</p>
     </div>
 
-    <!-- Clé API Claude (correction Bac) -->
+    <!-- Correction Bac IA -->
     <hr style="border:none;border-top:1px solid var(--gray-200);margin:20px 0">
-    <h3 style="margin:0 0 10px;font-size:.95rem">✨ Correction Bac ST2S avec ChatGPT</h3>
-    <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:8px">Entre ta clé API OpenAI pour obtenir des corrections directement dans le site sans copier-coller.</p>
-    <p style="font-size:.76rem;color:var(--gray-400);margin-bottom:10px">Clé disponible sur <strong>platform.openai.com</strong> → API Keys. Ta clé reste stockée localement sur ton appareil.</p>
-    <div class="form-group" style="margin-bottom:8px">
-      <label style="font-size:.82rem;color:var(--gray-600)">Clé API OpenAI</label>
+    <h3 style="margin:0 0 10px;font-size:.95rem">✨ Correction Bac ST2S par IA</h3>
+    <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:10px">Choisis ton provider IA pour les corrections directes dans le site.</p>
+
+    <!-- Sélecteur provider -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="ai-provider-btns">
+      <button class="ai-prov-btn active" data-prov="groq"   onclick="App.Bac.setProvider('groq')">⚡ Groq <span style="font-size:.65rem;opacity:.7">(gratuit)</span></button>
+      <button class="ai-prov-btn"        data-prov="ollama" onclick="App.Bac.setProvider('ollama')">🖥 Ollama <span style="font-size:.65rem;opacity:.7">(local)</span></button>
+      <button class="ai-prov-btn"        data-prov="openai" onclick="App.Bac.setProvider('openai')">OpenAI</button>
+    </div>
+
+    <!-- Info provider -->
+    <div id="ai-prov-info" style="font-size:.76rem;color:var(--gray-400);margin-bottom:10px;padding:7px 10px;background:var(--gray-50);border-radius:8px;line-height:1.6"></div>
+
+    <!-- Clé API (cachée pour Ollama) -->
+    <div id="ai-key-wrap" class="form-group" style="margin-bottom:8px">
+      <label style="font-size:.82rem;color:var(--gray-600)" id="ai-key-label">Clé API</label>
       <input type="password" id="claude-api-key-input" placeholder="sk-…"
         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
         style="width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.78rem;font-family:monospace;box-sizing:border-box">

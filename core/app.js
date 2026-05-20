@@ -30,9 +30,11 @@ App.UI = (() => {
     document.getElementById('ortho-view').style.display  = tab === 'ortho'   ? 'block' : 'none';
     document.getElementById('games-view').style.display  = tab === 'games'   ? 'block' : 'none';
     document.getElementById('bac-view').style.display    = tab === 'bac'     ? 'block' : 'none';
+    document.getElementById('oral-view').style.display   = tab === 'oral'    ? 'block' : 'none';
     document.getElementById('session-view').style.display = 'none';
-    if (tab === 'bac') App.Bac.init();
-    ['home','browse','stats','ortho','games','bac'].forEach(t => {
+    if (tab === 'bac')  App.Bac.init();
+    if (tab === 'oral') App.Oral.init();
+    ['home','browse','stats','ortho','games','bac','oral'].forEach(t => {
       const btn = document.getElementById('tab-' + t);
       if (btn) btn.classList.toggle('active', t === tab);
     });
