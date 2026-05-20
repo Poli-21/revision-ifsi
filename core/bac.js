@@ -608,7 +608,11 @@ App.Bac = (() => {
     var inp = document.getElementById('claude-api-key-input');
     var st  = document.getElementById('claude-key-status');
     if (!inp) return;
-    var key = inp.value.trim();
+    // Supprime tous les caracteres non-ASCII (evite l'erreur ISO-8859-1 dans les headers HTTP)
+    var key = inp.value.trim().replace(/[^\x20-\x7E]/g, '');
+    if (inp.value.trim() !== key && key) {
+      if (st) { st.style.display='block'; st.style.color='#d97706'; st.textContent='Caracteres speciaux retires de la cle.'; }
+    }
     var prov = _currentProvider();
     if (prov.needsKey && !key) {
       if (st) { st.style.display='block'; st.style.color='#dc2626'; st.textContent='Entre une cle API.'; }
@@ -660,7 +664,7 @@ App.Bac = (() => {
     var answer = (document.getElementById('bac-answer')||{}).value || '';
     var provId  = localStorage.getItem(_PROV_KEY) || 'groq';
     var prov    = _PROVIDERS[provId] || _PROVIDERS.groq;
-    var apiKey  = prov.needsKey ? (localStorage.getItem(_AI_KEY + '_' + provId) || '') : 'ollama';
+    var apiKey  = prov.needsKey ? ((localStorage.getItem(_AI_KEY + '_' + provId) || '').replace(/[^\x20-\x7E]/g, '')) : 'ollama';
 
     if (prov.needsKey && !apiKey) {
       var overlay = document.getElementById('sync-overlay');

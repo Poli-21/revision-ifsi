@@ -261,7 +261,7 @@ App.Oral = (function() {
       openai: { url: 'https://api.openai.com/v1/chat/completions',         model: 'gpt-4o-mini',             needsKey: true }
     };
     var prov   = PROVIDERS[provId] || PROVIDERS['groq'];
-    var apiKey = prov.needsKey ? (localStorage.getItem('ifsi_ai_apikey_' + provId) || '') : 'no-key';
+    var apiKey = prov.needsKey ? ((localStorage.getItem('ifsi_ai_apikey_' + provId) || '').replace(/[^ -~]/g, '')) : 'no-key';
 
     var systemPrompt = prob.aiContext +
       '\n\nTu dois évaluer le plan de présentation de l\'élève pour son Grand Oral (bac ST2S).' +
