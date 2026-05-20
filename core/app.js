@@ -29,8 +29,10 @@ App.UI = (() => {
     document.getElementById('stats-view').style.display  = tab === 'stats'   ? 'block' : 'none';
     document.getElementById('ortho-view').style.display  = tab === 'ortho'   ? 'block' : 'none';
     document.getElementById('games-view').style.display  = tab === 'games'   ? 'block' : 'none';
+    document.getElementById('bac-view').style.display    = tab === 'bac'     ? 'block' : 'none';
     document.getElementById('session-view').style.display = 'none';
-    ['home','browse','stats','ortho','games'].forEach(t => {
+    if (tab === 'bac') App.Bac.init();
+    ['home','browse','stats','ortho','games','bac'].forEach(t => {
       const btn = document.getElementById('tab-' + t);
       if (btn) btn.classList.toggle('active', t === tab);
     });
@@ -663,6 +665,8 @@ function saveDiscordWebhook() {
   localStorage.setItem(DISCORD_KEY, url);
   _updateNotifUI();
   if (url) {
+    _dailyTimerRunning = false;   // reset pour permettre le redémarrage
+    _initDailyReportTimer();
     _sendDiscordMsg('✅ Webhook connecté ! Tu recevras un rapport détaillé chaque jour à **17h30** et un bilan chaque **dimanche**.').catch(() => {});
     alert('✅ Discord connecté !');
   } else {
@@ -676,11 +680,13 @@ async function sendDiscordRecapNow() {
 }
 
 // ── Timer rapport quotidien 17h30 ──────────────────────────────
+let _dailyTimerRunning = false;
 function _initDailyReportTimer() {
   if (!localStorage.getItem(DISCORD_KEY)) return;
-  // Vérifie toutes les 60 secondes
-  setInterval(_maybeSendDailyReport, 60000);
-  setTimeout(_maybeSendDailyReport, 3000); // check au démarrage aussi
+  if (_dailyTimerRunning) return;   // évite les doublons si appelé plusieurs fois
+  _dailyTimerRunning = true;
+  setInterval(_maybeSendDailyReport, 60000);  // vérifie toutes les 60s
+  setTimeout(_maybeSendDailyReport, 3000);    // check immédiat au démarrage
 }
 
 function _maybeSendDailyReport() {

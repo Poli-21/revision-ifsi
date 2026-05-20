@@ -64,41 +64,27 @@ App.Render = (() => {
       }
     }
 
-    // Estimation du temps — pondérée par niveau de maîtrise, EF et échecs
-    const estEl = document.getElementById('stat-est');
-    if (estEl) {
+    // Estimation inline dans le bandeau
+    const dueEstEl = document.getElementById('due-est-inline');
+    if (dueEstEl) {
       if (due.length === 0) {
-        estEl.textContent = '—';
-        estEl.title = '';
+        dueEstEl.style.display = 'none';
       } else {
-        // Temps de base par niveau (secondes) : nouveau → maîtrisé
         const BASE_SECS = [65, 50, 38, 30, 24, 18, 14, 11];
-
         let estSecs = 0;
-        let nNew = 0, nEasy = 0, nHard = 0, nLeech = 0;
-
         due.forEach(card => {
           const level  = SRS.getLevel(card);
           const ef     = card.progress?.easeFactor ?? 2.5;
           const lapses = card.progress?.lapses      ?? 0;
           let t = BASE_SECS[level];
-
-          // Modificateurs EaseFactor
-          if      (ef < 1.5) t += 25;   // très difficile
-          else if (ef < 1.8) t += 15;   // difficile
-          else if (ef < 2.1) t +=  7;   // un peu difficile
-          else if (ef > 2.4) t -=  4;   // facile à mémoriser
-
-          // Modificateurs échecs cumulés
-          if      (lapses >= 5) { t += 18; nLeech++; }
-          else if (lapses >= 3) { t += 10; nHard++;  }
-          else if (lapses === 0 && !card.progress) nNew++;
-          else if (ef >= 2.3 && lapses === 0)      nEasy++;
-
+          if      (ef < 1.5) t += 25;
+          else if (ef < 1.8) t += 15;
+          else if (ef < 2.1) t +=  7;
+          else if (ef > 2.4) t -=  4;
+          if      (lapses >= 5) t += 18;
+          else if (lapses >= 3) t += 10;
           estSecs += Math.max(8, t);
         });
-
-        // Formatage
         let estTxt;
         if      (estSecs < 60)   estTxt = `~${estSecs}s`;
         else if (estSecs < 3600) estTxt = `~${Math.round(estSecs / 60)}min`;
@@ -107,27 +93,8 @@ App.Render = (() => {
           const m = Math.round((estSecs % 3600) / 60);
           estTxt = m > 0 ? `~${h}h${m}min` : `~${h}h`;
         }
-
-        estEl.textContent = estTxt;
-        estEl.title = [
-          `${due.length} cartes à réviser`,
-          nNew   ? `${nNew} nouvelles`            : '',
-          nEasy  ? `${nEasy} faciles`             : '',
-          nHard  ? `${nHard} difficiles`          : '',
-          nLeech ? `${nLeech} très difficiles 🩸` : '',
-        ].filter(Boolean).join(' · ');
-      }
-    }
-
-    // Estimation inline dans le bandeau
-    const dueEstEl = document.getElementById('due-est-inline');
-    if (dueEstEl) {
-      const estTxtSidebar = document.getElementById('stat-est')?.textContent;
-      if (due.length > 0 && estTxtSidebar && estTxtSidebar !== '—') {
-        dueEstEl.textContent = estTxtSidebar;
+        dueEstEl.textContent = estTxt;
         dueEstEl.style.display = 'inline';
-      } else {
-        dueEstEl.style.display = 'none';
       }
     }
 

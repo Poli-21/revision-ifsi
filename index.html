@@ -26,7 +26,7 @@
   <div class="header-right">
     <span id="storage-indicator" style="display:none;font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:99px;cursor:default"></span>
     <button class="btn btn-ghost btn-sm" id="sidebar-reopen-btn" onclick="toggleDesktopSidebar()" title="Ouvrir le panneau" style="display:none">▶</button>
-    <button class="btn btn-ghost btn-sm" id="dark-toggle" onclick="toggleDarkMode()" title="Mode nuit">🌙</button>
+    <button class="btn btn-ghost btn-sm btn-keep-mobile" id="dark-toggle" onclick="toggleDarkMode()" title="Mode nuit">🌙</button>
     <button class="btn btn-ghost btn-sm" id="sync-settings-btn" onclick="openSyncModal()" title="Synchronisation entre appareils">☁️ Sync</button>
     <button class="btn btn-ghost btn-sm" onclick="showQRCode()" title="Accès tablette / téléphone">📱 Tablette</button>
     <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📊 CSV</button>
@@ -49,7 +49,6 @@
       <div class="stat-row"><span class="label">Total</span><span class="value" id="stat-total">—</span></div>
       <div class="stat-row"><span class="label">Série</span><span class="value" id="stat-streak">—</span></div>
       <div class="stat-row"><span class="label">⏱ Temps</span><span class="value" id="stat-time">—</span></div>
-      <div class="stat-row"><span class="label">🎯 Estimation</span><span class="value" id="stat-est" style="color:var(--primary)">—</span></div>
     </div>
     <div class="sidebar-section">
       <h3>Matières</h3>
@@ -77,6 +76,7 @@
       <button class="tab"        onclick="switchTab('stats')"  id="tab-stats">📊 Statistiques</button>
       <button class="tab"        onclick="switchTab('ortho')"  id="tab-ortho">✏️ Orthographe</button>
       <button class="tab"        onclick="switchTab('games')"  id="tab-games">🎯 Entraînement</button>
+      <button class="tab"        onclick="switchTab('bac')"    id="tab-bac">📝 Bac ST2S</button>
     </div>
 
     <!-- ── HOME ──────────────────────────────────────────────── -->
@@ -437,6 +437,50 @@
       </div>
     </div>
 
+    <!-- ── BAC ST2S ───────────────────────────────────────────── -->
+    <div id="bac-view" style="display:none">
+
+      <!-- Sélecteur matière -->
+      <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;align-items:center">
+        <button class="bac-tab active" data-subj="cbph" onclick="App.Bac.switchSubject('cbph')">CBPH</button>
+        <button class="bac-tab" data-subj="stss" onclick="App.Bac.switchSubject('stss')">STSS</button>
+        <span id="bac-subj-badge" class="bac-badge bac-badge-cbph" style="margin-left:4px">CBPH</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <button class="bac-nav-btn" onclick="App.Bac.prevQ()" title="Sujet précédent">&#8592;</button>
+          <span id="bac-q-counter" style="font-size:.82rem;color:var(--gray-500)">1 / 6</span>
+          <button class="bac-nav-btn" onclick="App.Bac.nextQ()" title="Sujet suivant">&#8594;</button>
+        </div>
+      </div>
+
+      <!-- Dossier documentaire -->
+      <div class="bac-dossier-wrap" id="bac-dossier"></div>
+
+      <!-- Questions -->
+      <div class="bac-questions-wrap" id="bac-questions"></div>
+
+      <!-- Zone de réponse -->
+      <div class="bac-answer-wrap">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-400)">Votre réponse</span>
+          <div id="bac-timer-wrap" style="display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--gray-500)">
+            ⏱ <span id="bac-timer-val">00:00</span>
+            <button id="bac-timer-btn" class="btn btn-ghost btn-sm" onclick="App.Bac.toggleTimer()">Démarrer</button>
+          </div>
+        </div>
+        <textarea id="bac-answer" class="bac-textarea" placeholder="Rédigez votre réponse ici, comme sur une copie de bac…" oninput="App.Bac.onInput()"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:8px">
+          <span id="bac-wcount" style="font-size:.75rem;color:var(--gray-400)">0 mot</span>
+          <button class="btn btn-primary" onclick="App.Bac.submitAnswer()">📋 Copier pour correction</button>
+        </div>
+      </div>
+
+      <!-- Toast copié -->
+      <div id="bac-toast" style="position:fixed;bottom:24px;left:50%;transform:translate(-50%,8px);background:var(--gray-900);color:white;border-radius:10px;padding:10px 20px;font-size:.84rem;font-weight:600;opacity:0;transition:all .3s;pointer-events:none;z-index:999">
+        ✅ Copié ! Colle dans Claude pour la correction.
+      </div>
+
+    </div>
+
   </main>
 </div>
 
@@ -629,6 +673,7 @@
 <script src="ui/modal.js"></script>
 <script src="core/ortho.js"></script>
 <script src="core/games.js"></script>
+<script src="core/bac.js"></script>
 <script src="core/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
