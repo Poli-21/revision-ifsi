@@ -12,6 +12,9 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>Révision IFSI</title>
 <link rel="stylesheet" href="styles/app.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js" defer crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" defer crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -473,8 +476,20 @@
         <textarea id="bac-answer" class="bac-textarea" placeholder="Rédigez votre réponse ici, comme sur une copie de bac…" oninput="App.Bac.onInput()"></textarea>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:8px">
           <span id="bac-wcount" style="font-size:.75rem;color:var(--gray-400)">0 mot</span>
-          <button class="btn btn-primary" onclick="App.Bac.submitAnswer()">📋 Copier pour correction</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="App.Bac.copyAnswer()" title="Copier le prompt pour le coller dans Claude">📋 Copier</button>
+            <button class="btn btn-primary" id="bac-correct-btn" onclick="App.Bac.submitAnswer()">✨ Corriger avec Claude</button>
+          </div>
         </div>
+      </div>
+
+      <!-- Zone de correction IA -->
+      <div id="bac-correction" class="bac-correction-wrap" style="display:none">
+        <div class="bac-correction-header">
+          <span>✨ Correction par ChatGPT</span>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('bac-correction').style.display='none'">✕ Fermer</button>
+        </div>
+        <div id="bac-correction-body" class="bac-correction-body"></div>
       </div>
 
       <!-- Toast copié -->
@@ -604,6 +619,23 @@
       </div>
       <p id="discord-webhook-saved" style="display:none;font-size:.75rem;color:#16a34a;margin-top:6px">✅ Discord connecté — récap chaque dimanche !</p>
     </div>
+
+    <!-- Clé API Claude (correction Bac) -->
+    <hr style="border:none;border-top:1px solid var(--gray-200);margin:20px 0">
+    <h3 style="margin:0 0 10px;font-size:.95rem">✨ Correction Bac ST2S avec ChatGPT</h3>
+    <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:8px">Entre ta clé API OpenAI pour obtenir des corrections directement dans le site sans copier-coller.</p>
+    <p style="font-size:.76rem;color:var(--gray-400);margin-bottom:10px">Clé disponible sur <strong>platform.openai.com</strong> → API Keys. Ta clé reste stockée localement sur ton appareil.</p>
+    <div class="form-group" style="margin-bottom:8px">
+      <label style="font-size:.82rem;color:var(--gray-600)">Clé API OpenAI</label>
+      <input type="password" id="claude-api-key-input" placeholder="sk-…"
+        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        style="width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.78rem;font-family:monospace;box-sizing:border-box">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="App.Bac.saveApiKey()">Enregistrer</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="App.Bac.clearApiKey()">Supprimer</button>
+    </div>
+    <p id="claude-key-status" style="display:none;font-size:.75rem;margin-top:6px"></p>
 
     <!-- Sauvegardes locales -->
     <hr style="border:none;border-top:1px solid var(--gray-200);margin:20px 0">
