@@ -51,7 +51,7 @@ App.Oral = (function() {
   var _presTimer   = null;
   var _presRunning = false;
   var _presElapsed = 0;
-  var _PRES_TOTAL  = 300;  // 5 min
+  var _PRES_TOTAL  = 600;  // 10 min
   var _juryTimer   = null;
   var _juryRunning = false;
   var _juryElapsed = 0;
@@ -92,9 +92,9 @@ App.Oral = (function() {
   // ── Phase présentation ─────────────────────────────────────────
   // 0-60s: Intro, 60-240s: Développement, 240-300s: Conclusion
   function _getPresPhase(elapsed) {
-    if (elapsed < 60)  return { key: 'intro', name: 'Introduction',   color: '#3b82f6', pct: (elapsed / 60) * 100 };
-    if (elapsed < 240) return { key: 'dev',   name: 'Développement',  color: '#10b981', pct: ((elapsed - 60) / 180) * 100 };
-    return               { key: 'ccl',   name: 'Conclusion',     color: '#f59e0b', pct: ((elapsed - 240) / 60) * 100 };
+    if (elapsed < 120) return { key: 'intro', name: 'Introduction',   color: '#3b82f6', pct: (elapsed / 120) * 100 };
+    if (elapsed < 480) return { key: 'dev',   name: 'Développement',  color: '#10b981', pct: ((elapsed - 120) / 360) * 100 };
+    return               { key: 'ccl',   name: 'Conclusion',     color: '#f59e0b', pct: ((elapsed - 480) / 120) * 100 };
   }
 
   // ── Présentation timer ─────────────────────────────────────────
@@ -112,7 +112,7 @@ App.Oral = (function() {
       _presTimer = setInterval(function() {
         _presElapsed++;
         // Bip aux transitions de phase
-        if (_presElapsed === 60 || _presElapsed === 240) _beep(660, 0.3);
+        if (_presElapsed === 120 || _presElapsed === 480) _beep(660, 0.3);
         var remaining = _PRES_TOTAL - _presElapsed;
         if (remaining <= 0) {
           clearInterval(_presTimer);
@@ -156,7 +156,7 @@ App.Oral = (function() {
     var btn   = document.getElementById('oral-pres-btn');
     var al    = document.getElementById('oral-pres-alert');
     var bar   = document.getElementById('oral-pres-progress-bar');
-    if (disp)  { disp.textContent = '5:00'; disp.style.color = ''; }
+    if (disp)  { disp.textContent = '10:00'; disp.style.color = ''; }
     if (label) label.textContent = 'Prêt à commencer';
     if (btn)   btn.textContent   = '▶ Commencer';
     if (al)    al.style.display  = 'none';
