@@ -80,6 +80,7 @@
       <button class="tab"        onclick="switchTab('ortho')"  id="tab-ortho">✏️ Orthographe</button>
       <button class="tab"        onclick="switchTab('games')"  id="tab-games">🎯 Entraînement</button>
       <button class="tab"        onclick="switchTab('bac')"    id="tab-bac">📝 Bac ST2S</button>
+      <button class="tab"        onclick="switchTab('oral')"   id="tab-oral">🎤 Grand Oral</button>
     </div>
 
     <!-- ── HOME ──────────────────────────────────────────────── -->
@@ -499,6 +500,94 @@
 
     </div>
 
+    <!-- ── GRAND ORAL ─────────────────────────────────────────── -->
+    <div id="oral-view" style="display:none">
+
+      <!-- En-tête + sélecteur P1/P2 -->
+      <div class="oral-header">
+        <div>
+          <h2 class="oral-title">🎤 Grand Oral — ST2S</h2>
+          <p class="oral-subtitle">Entraîne-toi à la présentation et à l'échange avec le jury</p>
+        </div>
+        <div class="oral-prob-selector">
+          <button class="oral-prob-btn active" data-prob="p1" onclick="App.Oral.setProblematique('p1')">
+            <span class="oral-prob-label">P1</span>
+            <span class="oral-prob-hint">Expliquer la pression</span>
+          </button>
+          <button class="oral-prob-btn" data-prob="p2" onclick="App.Oral.setProblematique('p2')">
+            <span class="oral-prob-label">P2</span>
+            <span class="oral-prob-hint">Conséquences &amp; remèdes</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Problématique affichée -->
+      <div class="oral-question-card">
+        <div class="oral-question-badge">Problématique</div>
+        <div class="oral-question-text" id="oral-question-text"></div>
+      </div>
+
+      <!-- 3 panneaux -->
+      <div class="oral-panels">
+
+        <!-- Panneau 1 : Plan + retour IA -->
+        <div class="oral-panel">
+          <div class="oral-panel-head">📋 <strong>Ton plan</strong></div>
+          <textarea id="oral-plan" class="oral-plan-textarea"
+            placeholder="Rédige ton plan ici…&#10;&#10;Introduction :&#10;• Accroche&#10;• Définitions clés&#10;• Annonce du plan&#10;&#10;I. Premier axe&#10; → argument + exemple&#10;&#10;II. Deuxième axe&#10; → argument + exemple&#10;&#10;Conclusion :&#10;• Bilan&#10;• Ouverture / perspectives"></textarea>
+          <button class="btn btn-primary oral-ai-btn" onclick="App.Oral.submitPlan()">✨ Retour IA sur mon plan</button>
+          <div id="oral-plan-feedback" class="bac-correction-wrap" style="display:none;margin-top:12px">
+            <div class="bac-correction-header">
+              <span>✨ Retour IA</span>
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('oral-plan-feedback').style.display='none'">✕</button>
+            </div>
+            <div id="oral-plan-feedback-body" class="bac-correction-body"></div>
+          </div>
+        </div>
+
+        <!-- Panneau 2 : Timer présentation 5 min -->
+        <div class="oral-panel">
+          <div class="oral-panel-head">⏱ <strong>Présentation</strong> <span class="oral-duration-badge">5 min</span></div>
+          <div class="oral-timer-display" id="oral-pres-display">5:00</div>
+          <div class="oral-phase-label" id="oral-pres-phase-label">Prêt à commencer</div>
+          <div class="oral-progress-track">
+            <div class="oral-progress-fill" id="oral-pres-progress-bar" style="width:0%"></div>
+          </div>
+          <div class="oral-phase-segments">
+            <div class="oral-phase-seg" data-phase="intro" title="Introduction (0–1 min)">
+              <span>Intro</span><small>1 min</small>
+            </div>
+            <div class="oral-phase-seg" data-phase="dev" title="Développement (1–4 min)">
+              <span>Développement</span><small>3 min</small>
+            </div>
+            <div class="oral-phase-seg" data-phase="ccl" title="Conclusion (4–5 min)">
+              <span>Conclusion</span><small>1 min</small>
+            </div>
+          </div>
+          <div id="oral-pres-alert" class="oral-alert" style="display:none"></div>
+          <div class="oral-timer-btns">
+            <button class="btn btn-primary" id="oral-pres-btn" onclick="App.Oral.togglePres()">▶ Commencer</button>
+            <button class="btn btn-ghost" onclick="App.Oral.resetPres()">↺ Réinitialiser</button>
+          </div>
+        </div>
+
+        <!-- Panneau 3 : Échange jury 10 min -->
+        <div class="oral-panel">
+          <div class="oral-panel-head">💬 <strong>Échange jury</strong> <span class="oral-duration-badge">10 min</span></div>
+          <div class="oral-timer-display" id="oral-jury-display">10:00</div>
+          <div class="oral-jury-question-box" id="oral-jury-question">
+            <span class="oral-jury-placeholder">Lance l'échange pour voir les questions du jury</span>
+          </div>
+          <div class="oral-timer-btns" style="flex-wrap:wrap">
+            <button class="btn btn-primary" id="oral-jury-btn" onclick="App.Oral.toggleJury()">▶ Commencer</button>
+            <button class="btn btn-ghost" onclick="App.Oral.nextQuestion()">➡ Question suivante</button>
+            <button class="btn btn-ghost btn-sm" onclick="App.Oral.resetJury()" title="Réinitialiser">↺</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -720,6 +809,7 @@
 <script src="core/ortho.js"></script>
 <script src="core/games.js"></script>
 <script src="core/bac.js"></script>
+<script src="core/oral.js"></script>
 <script src="core/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
