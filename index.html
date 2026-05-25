@@ -475,27 +475,9 @@
           </div>
         </div>
         <textarea id="bac-answer" class="bac-textarea" placeholder="Rédigez votre réponse ici, comme sur une copie de bac…" oninput="App.Bac.onInput()"></textarea>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:8px">
+        <div style="margin-top:8px">
           <span id="bac-wcount" style="font-size:.75rem;color:var(--gray-400)">0 mot</span>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-ghost btn-sm" onclick="App.Bac.copyAnswer()" title="Copier le prompt pour le coller dans Claude">📋 Copier</button>
-            <button class="btn btn-primary" id="bac-correct-btn" onclick="App.Bac.submitAnswer()">✨ Corriger avec Claude</button>
-          </div>
         </div>
-      </div>
-
-      <!-- Zone de correction IA -->
-      <div id="bac-correction" class="bac-correction-wrap" style="display:none">
-        <div class="bac-correction-header">
-          <span>✨ Correction par ChatGPT</span>
-          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('bac-correction').style.display='none'">✕ Fermer</button>
-        </div>
-        <div id="bac-correction-body" class="bac-correction-body"></div>
-      </div>
-
-      <!-- Toast copié -->
-      <div id="bac-toast" style="position:fixed;bottom:24px;left:50%;transform:translate(-50%,8px);background:var(--gray-900);color:white;border-radius:10px;padding:10px 20px;font-size:.84rem;font-weight:600;opacity:0;transition:all .3s;pointer-events:none;z-index:999">
-        ✅ Copié ! Colle dans Claude pour la correction.
       </div>
 
     </div>
@@ -535,14 +517,6 @@
           <div class="oral-panel-head">📋 <strong>Ton plan</strong></div>
           <textarea id="oral-plan" class="oral-plan-textarea"
             placeholder="Rédige ton plan ici…&#10;&#10;Introduction :&#10;• Accroche&#10;• Définitions clés&#10;• Annonce du plan&#10;&#10;I. Premier axe&#10; → argument + exemple&#10;&#10;II. Deuxième axe&#10; → argument + exemple&#10;&#10;Conclusion :&#10;• Bilan&#10;• Ouverture / perspectives"></textarea>
-          <button class="btn btn-primary oral-ai-btn" onclick="App.Oral.submitPlan()">✨ Retour IA sur mon plan</button>
-          <div id="oral-plan-feedback" class="bac-correction-wrap" style="display:none;margin-top:12px">
-            <div class="bac-correction-header">
-              <span>✨ Retour IA</span>
-              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('oral-plan-feedback').style.display='none'">✕</button>
-            </div>
-            <div id="oral-plan-feedback-body" class="bac-correction-body"></div>
-          </div>
         </div>
 
         <!-- Panneau 2 : Timer présentation 5 min -->
@@ -708,34 +682,6 @@
       </div>
       <p id="discord-webhook-saved" style="display:none;font-size:.75rem;color:#16a34a;margin-top:6px">✅ Discord connecté — récap chaque dimanche !</p>
     </div>
-
-    <!-- Correction Bac IA -->
-    <hr style="border:none;border-top:1px solid var(--gray-200);margin:20px 0">
-    <h3 style="margin:0 0 10px;font-size:.95rem">✨ Correction Bac ST2S par IA</h3>
-    <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:10px">Choisis ton provider IA pour les corrections directes dans le site.</p>
-
-    <!-- Sélecteur provider -->
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="ai-provider-btns">
-      <button class="ai-prov-btn active" data-prov="groq"   onclick="App.Bac.setProvider('groq')">⚡ Groq <span style="font-size:.65rem;opacity:.7">(gratuit)</span></button>
-      <button class="ai-prov-btn"        data-prov="ollama" onclick="App.Bac.setProvider('ollama')">🖥 Ollama <span style="font-size:.65rem;opacity:.7">(local)</span></button>
-      <button class="ai-prov-btn"        data-prov="openai" onclick="App.Bac.setProvider('openai')">OpenAI</button>
-    </div>
-
-    <!-- Info provider -->
-    <div id="ai-prov-info" style="font-size:.76rem;color:var(--gray-400);margin-bottom:10px;padding:7px 10px;background:var(--gray-50);border-radius:8px;line-height:1.6"></div>
-
-    <!-- Clé API (cachée pour Ollama) -->
-    <div id="ai-key-wrap" class="form-group" style="margin-bottom:8px">
-      <label style="font-size:.82rem;color:var(--gray-600)" id="ai-key-label">Clé API</label>
-      <input type="password" id="claude-api-key-input" placeholder="sk-…"
-        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-        style="width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.78rem;font-family:monospace;box-sizing:border-box">
-    </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-primary" style="flex:1" onclick="App.Bac.saveApiKey()">Enregistrer</button>
-      <button class="btn btn-ghost" style="flex:1" onclick="App.Bac.clearApiKey()">Supprimer</button>
-    </div>
-    <p id="claude-key-status" style="display:none;font-size:.75rem;margin-top:6px"></p>
 
     <!-- Sauvegardes locales -->
     <hr style="border:none;border-top:1px solid var(--gray-200);margin:20px 0">

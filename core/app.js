@@ -291,6 +291,7 @@ Object.assign(window, {
       App.Store.state.cards.filter(c => c.cat.startsWith(p + ' > ')).map(c => c.cat).filter((v,i,a) => a.indexOf(v)===i)
     ),
   startRenameCat     : (cat, btn) => _startRenameCat(cat, btn),
+  deleteCat          : (cat)      => deleteCat(cat),
   handleCatClick     : (cat, e, btn) => _handleCatClick(cat, e, btn),
   renderBrowse   : ()     => App.Render.browseDebounced(),
   // Modales
@@ -474,6 +475,23 @@ function _startRenameCat(oldCat, btn) {
     if (e.key === 'Escape') { input.value = oldCat; input.blur(); }
   });
   input.addEventListener('blur', commit, { once: true });
+}
+
+function deleteCat(cat) {
+  const state = App.Store.state;
+  const n = state.cards.filter(c => c.cat === cat).length;
+  const label = n === 0 ? `la matière "${cat}" (aucune carte)` : `la matière "${cat}" et ses ${n} carte${n > 1 ? 's' : ''}`;
+  if (!confirm(`Supprimer définitivement ${label} ?\n\nCette action est irréversible.`)) return;
+
+  // Supprime toutes les cartes de cette matière
+  state.cards = state.cards.filter(c => c.cat !== cat);
+  // Supprime de l'ordre (inclut les sous-catégories du même groupe)
+  state.catOrder = state.catOrder.filter(c => c !== cat);
+  App.Store.save();
+  App.Store.saveOrder();
+  // Si la catégorie active était celle-là, revenir à "Toutes"
+  if (App.UI.activeCategory === cat) App.UI.setCategory('');
+  else App.Render.all();
 }
 
 function _renameCat(oldCat, newCat) {
@@ -937,11 +955,41 @@ function _frDate(d) {
 function _sendDiscordMsg(content) {
   const webhook = localStorage.getItem(DISCORD_KEY);
   if (!webhook) return Promise.resolve(false);
-  return fetch(webhook, {
+
+  // Discord limite a 2000 caracteres par message — on decoupe par blocs
+  const LIMIT = 1900;
+  const chunks = [];
+  if (content.length <= LIMIT) {
+    chunks.push(content);
+  } else {
+    // Decoupe sur les sauts de ligne pour ne pas couper une ligne en deux
+    const lines = content.split('\n');
+    let current = '';
+    for (const line of lines) {
+      const candidate = current ? current + '\n' + line : line;
+      if (candidate.length > LIMIT) {
+        if (current) chunks.push(current);
+        current = line.length > LIMIT ? line.slice(0, LIMIT) : line;
+      } else {
+        current = candidate;
+      }
+    }
+    if (current) chunks.push(current);
+  }
+
+  // Envoie les morceaux sequentiellement
+  const _post = (text) => fetch(webhook, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content, username: '🩺 Révision IFSI' })
-  }).then(r => r.ok).catch(() => false);
+    body: JSON.stringify({ content: text, username: 'Revision IFSI' })
+  }).then(r => {
+    if (!r.ok) return r.text().then(t => { console.warn('Discord error', r.status, t); return false; });
+    return true;
+  }).catch(e => { console.warn('Discord fetch error', e); return false; });
+
+  return chunks.reduce((promise, chunk) =>
+    promise.then(ok => ok ? _post(chunk) : Promise.resolve(false))
+  , Promise.resolve(true));
 }
 
 function _streakCount(studyLog) {

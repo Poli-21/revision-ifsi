@@ -97,6 +97,18 @@ App.Oral = (function() {
     return               { key: 'ccl',   name: 'Conclusion',     color: '#f59e0b', pct: ((elapsed - 480) / 120) * 100 };
   }
 
+
+  // ── Tracking temps de révision ────────────────────────────────
+  function _logOralMinute() {
+    try {
+      var today = new Date().toISOString().slice(0, 10);
+      var log   = App.Store.state.studyLog;
+      if (!log[today]) log[today] = { reviewed: 0, ok: 0, hard: 0, nope: 0 };
+      log[today].oral_min = (log[today].oral_min || 0) + 1;
+      App.Store.save();
+    } catch(e) {}
+  }
+
   // ── Présentation timer ─────────────────────────────────────────
   function togglePres() {
     if (_presRunning) {
@@ -105,7 +117,6 @@ App.Oral = (function() {
       var btn = document.getElementById('oral-pres-btn');
       if (btn) btn.textContent = '▶ Reprendre';
     } else {
-      if (_presElapsed >= _PRES_TOTAL) return; // deja fini
       _presRunning = true;
       var btn = document.getElementById('oral-pres-btn');
       if (btn) btn.textContent = '⏸ Pause';
@@ -113,18 +124,15 @@ App.Oral = (function() {
         _presElapsed++;
         // Bip aux transitions de phase
         if (_presElapsed === 120 || _presElapsed === 480) _beep(660, 0.3);
-        var remaining = _PRES_TOTAL - _presElapsed;
-        if (remaining <= 0) {
-          clearInterval(_presTimer);
-          _presRunning = false;
-          remaining = 0;
+        // Log 1 min de révision toutes les 60s
+        if (_presElapsed % 60 === 0) _logOralMinute();
+        // Bip unique a la fin du temps reglementaire
+        if (_presElapsed === _PRES_TOTAL) {
           _doubleBeep();
-          var btn2 = document.getElementById('oral-pres-btn');
-          if (btn2) btn2.textContent = '✓ Terminé';
           var al = document.getElementById('oral-pres-alert');
-          if (al) { al.textContent = '⏰ Temps de présentation écoulé !'; al.style.display = 'block'; }
+          if (al) { al.textContent = '⏰ Temps réglementaire écoulé — tu continues !'; al.style.display = 'block'; }
         }
-        _updatePresDisplay(remaining, _presElapsed);
+        _updatePresDisplay(_PRES_TOTAL - _presElapsed, _presElapsed);
       }, 1000);
     }
   }
@@ -134,16 +142,22 @@ App.Oral = (function() {
     var label = document.getElementById('oral-pres-phase-label');
     var bar   = document.getElementById('oral-pres-progress-bar');
     if (disp) {
-      disp.textContent = _fmtTime(remaining);
-      if (remaining <= 30)       disp.style.color = 'var(--danger)';
-      else if (remaining <= 60)  disp.style.color = 'var(--warning)';
-      else                       disp.style.color = '';
+      if (remaining < 0) {
+        disp.textContent = '+' + _fmtTime(-remaining);
+        disp.style.color = 'var(--danger)';
+      } else {
+        disp.textContent = _fmtTime(remaining);
+        if (remaining <= 30)       disp.style.color = 'var(--danger)';
+        else if (remaining <= 60)  disp.style.color = 'var(--warning)';
+        else                       disp.style.color = '';
+      }
     }
-    var phase = _getPresPhase(elapsed);
-    if (label) label.textContent = '📍 ' + phase.name;
-    if (bar) { bar.style.width = phase.pct + '%'; bar.style.background = phase.color; }
+    var clampedElapsed = Math.min(elapsed, _PRES_TOTAL);
+    var phase = _getPresPhase(clampedElapsed);
+    if (label) label.textContent = remaining < 0 ? '⏱ Dépassement' : '📍 ' + phase.name;
+    if (bar) { bar.style.width = (remaining < 0 ? 100 : phase.pct) + '%'; bar.style.background = remaining < 0 ? 'var(--danger)' : phase.color; }
     document.querySelectorAll('.oral-phase-seg').forEach(function(el) {
-      el.classList.toggle('active', el.dataset.phase === phase.key);
+      el.classList.toggle('active', el.dataset.phase === phase.key && remaining >= 0);
     });
   }
 
@@ -172,7 +186,6 @@ App.Oral = (function() {
       var btn = document.getElementById('oral-jury-btn');
       if (btn) btn.textContent = '▶ Reprendre';
     } else {
-      if (_juryElapsed >= _JURY_TOTAL) return;
       // Initialise questions au premier lancement
       if (_juryQIdx === -1) { _shuffleQuestions(); _showCurrentQuestion(); }
       _juryRunning = true;
@@ -181,20 +194,21 @@ App.Oral = (function() {
       _juryTimer = setInterval(function() {
         _juryElapsed++;
         var remaining = _JURY_TOTAL - _juryElapsed;
-        if (remaining <= 0) {
-          clearInterval(_juryTimer);
-          _juryRunning = false;
-          remaining = 0;
-          _doubleBeep();
-          var btn2 = document.getElementById('oral-jury-btn');
-          if (btn2) btn2.textContent = '✓ Terminé';
-        }
+        // Bip unique a la fin du temps reglementaire
+        if (_juryElapsed === _JURY_TOTAL) _doubleBeep();
+        // Log 1 min de révision toutes les 60s
+        if (_juryElapsed % 60 === 0) _logOralMinute();
         var disp = document.getElementById('oral-jury-display');
         if (disp) {
-          disp.textContent = _fmtTime(remaining);
-          if (remaining <= 60)       disp.style.color = 'var(--danger)';
-          else if (remaining <= 120) disp.style.color = 'var(--warning)';
-          else                       disp.style.color = '';
+          if (remaining < 0) {
+            disp.textContent = '+' + _fmtTime(-remaining);
+            disp.style.color = 'var(--danger)';
+          } else {
+            disp.textContent = _fmtTime(remaining);
+            if (remaining <= 60)       disp.style.color = 'var(--danger)';
+            else if (remaining <= 120) disp.style.color = 'var(--warning)';
+            else                       disp.style.color = '';
+          }
         }
       }, 1000);
     }
@@ -239,135 +253,6 @@ App.Oral = (function() {
     if (disp) { disp.textContent = '10:00'; disp.style.color = ''; }
     if (box)  box.innerHTML = '<span class="oral-jury-placeholder">Lance l\'échange pour voir les questions du jury</span>';
     if (btn)  btn.textContent = '▶ Commencer';
-  }
-
-  // ── AI Plan feedback ───────────────────────────────────────────
-  function submitPlan() {
-    var plan = (document.getElementById('oral-plan') || {}).value;
-    if (!plan || !plan.trim()) { alert('Écris d\'abord ton plan !'); return; }
-
-    var prob = _PROBLEMS[_probId];
-    var wrap = document.getElementById('oral-plan-feedback');
-    var body = document.getElementById('oral-plan-feedback-body');
-    if (!wrap || !body) return;
-
-    wrap.style.display = 'block';
-    body.innerHTML = '<div class="bac-correction-loading"><div class="bac-spinner"></div><span>Analyse en cours…</span></div>';
-
-    var provId = localStorage.getItem('ifsi_ai_provider') || 'groq';
-    var PROVIDERS = {
-      groq:   { url: 'https://api.groq.com/openai/v1/chat/completions',  model: 'llama-3.1-70b-versatile', needsKey: true },
-      ollama: { url: 'http://localhost:11434/v1/chat/completions',         model: 'llama3.1',                needsKey: false },
-      openai: { url: 'https://api.openai.com/v1/chat/completions',         model: 'gpt-4o-mini',             needsKey: true }
-    };
-    var prov   = PROVIDERS[provId] || PROVIDERS['groq'];
-    var apiKey = prov.needsKey ? ((localStorage.getItem('ifsi_ai_apikey_' + provId) || '').replace(/[^ -~]/g, '')) : 'no-key';
-
-    var systemPrompt = prob.aiContext +
-      '\n\nTu dois évaluer le plan de présentation de l\'élève pour son Grand Oral (bac ST2S).' +
-      '\nCritères :\n- Pertinence des axes par rapport à la problématique\n- Structure logique (intro / développement en 2-3 axes / conclusion)\n- Présence d\'arguments et d\'exemples concrets\n- Utilisation des notions ST2S (déterminants de santé, offre de soins, ISS, parcours de soins…)\n\nStructure ta réponse :\n**Points forts** : ce qui est bien\n**Points à améliorer** : ce qui manque ou est flou\n**Suggestions concrètes** : exemples, arguments, données à ajouter\n**Note globale** : X/5\n\nSois bienveillant mais précis. Réponds en français.';
-
-    var userPrompt = 'Problématique : "' + prob.text + '"\n\nMon plan :\n' + plan.trim();
-
-    fetch(prov.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': 'Bearer ' + apiKey
-      },
-      body: JSON.stringify({
-        model: prov.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user',   content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 1200
-      })
-    })
-    .then(function(r) {
-      if (!r.ok) return r.text().then(function(t) { throw new Error(r.status + ' — ' + t.slice(0, 200)); });
-      return r.json();
-    })
-    .then(function(data) {
-      var text = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '(Pas de réponse)';
-      body.innerHTML = _mdToHtml(text);
-      if (window.renderMathInElement) {
-        try {
-          window.renderMathInElement(body, {
-            delimiters: [{ left: '$', right: '$', display: false }],
-            throwOnError: false
-          });
-        } catch(e) {}
-      }
-    })
-    .catch(function(err) {
-      body.innerHTML = '<div style="color:var(--danger);padding:12px">❌ Erreur : ' + _esc(String(err)) + '<br><br>Vérifie ta clé API dans ☁️ Sync → Correction Bac ST2S par IA.</div>';
-    });
-  }
-
-  // ── Markdown → HTML ────────────────────────────────────────────
-  function _mdToHtml(text) {
-    var lines  = text.split('\n');
-    var html   = '';
-    var inUl   = false;
-    var inOl   = false;
-
-    function closeList() {
-      if (inUl) { html += '</ul>'; inUl = false; }
-      if (inOl) { html += '</ol>'; inOl = false; }
-    }
-
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i];
-      if (/^### /.test(line)) { closeList(); html += '<h4 style="margin:.7em 0 .3em">' + _inlineMd(line.slice(4)) + '</h4>'; continue; }
-      if (/^## /.test(line))  { closeList(); html += '<h3 style="margin:.8em 0 .3em">' + _inlineMd(line.slice(3)) + '</h3>'; continue; }
-      if (/^# /.test(line))   { closeList(); html += '<h3 style="margin:.8em 0 .3em">' + _inlineMd(line.slice(2)) + '</h3>'; continue; }
-      if (/^[-*•] /.test(line)) {
-        if (inOl) { html += '</ol>'; inOl = false; }
-        if (!inUl) { html += '<ul style="margin:.4em 0 .4em 1.2em;padding:0">'; inUl = true; }
-        html += '<li style="margin:.2em 0">' + _inlineMd(line.replace(/^[-*•] /, '')) + '</li>'; continue;
-      }
-      if (/^\d+\. /.test(line)) {
-        if (inUl) { html += '</ul>'; inUl = false; }
-        if (!inOl) { html += '<ol style="margin:.4em 0 .4em 1.2em;padding:0">'; inOl = true; }
-        html += '<li style="margin:.2em 0">' + _inlineMd(line.replace(/^\d+\. /, '')) + '</li>'; continue;
-      }
-      closeList();
-      if (line.trim() === '') { html += '<br>'; continue; }
-      html += '<p style="margin:.35em 0">' + _inlineMd(line) + '</p>';
-    }
-    closeList();
-    return html;
-  }
-
-  function _inlineMd(s) {
-    // Protege les formules $...$ avant l'echappement
-    var parts  = [];
-    var result = '';
-    var i = 0;
-    while (i < s.length) {
-      if (s[i] === '$') {
-        var end = s.indexOf('$', i + 1);
-        if (end !== -1) { parts.push({ math: true, val: s.slice(i, end + 1) }); i = end + 1; continue; }
-      }
-      var last = parts[parts.length - 1];
-      if (last && !last.math) { last.val += s[i]; }
-      else                    { parts.push({ math: false, val: s[i] }); }
-      i++;
-    }
-    for (var j = 0; j < parts.length; j++) {
-      var p = parts[j];
-      if (p.math) {
-        result += p.val; // KaTeX le rendra ensuite
-      } else {
-        result += _esc(p.val)
-          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*(.+?)\*/g,     '<em>$1</em>')
-          .replace(/`(.+?)`/g,       '<code style="background:var(--gray-100);padding:1px 4px;border-radius:3px;font-size:.85em">$1</code>');
-      }
-    }
-    return result;
   }
 
   // ── Sélection problématique ────────────────────────────────────
@@ -424,8 +309,7 @@ App.Oral = (function() {
     resetPres:        resetPres,
     toggleJury:       toggleJury,
     resetJury:        resetJury,
-    nextQuestion:     nextQuestion,
-    submitPlan:       submitPlan
+    nextQuestion:     nextQuestion
   };
 
 })();
