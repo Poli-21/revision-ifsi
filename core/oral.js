@@ -98,6 +98,199 @@ App.Oral = (function() {
   }
 
 
+
+  // ── Reconnaissance vocale ──────────────────────────────────────
+  var _recog       = null;
+  var _transcript  = '';   // texte final cumulé
+  var _interimText = '';   // résultat partiel en cours
+
+  var _KW_P1 = [
+    'préhospitalière','préhospitalier','précaire','précarité','seine-saint-denis',
+    'samu','smur','urgences','urgence','désert médical','déterminants','inégalités',
+    'offre de soins','renoncement','densité médicale','pression','sociale',
+    'population','santé publique','soin','soins'
+  ];
+  var _KW_P2 = [
+    'conséquences','remède','solution','maison de santé','msp','ipa',
+    'infirmier de pratique avancée','télémédecine','prévention','cls',
+    'contrat local','asalee','parcours de soins','saturation','épuisement',
+    'retard','mortalité','dépassement','réforme','politique de santé'
+  ];
+  var _CONNECTORS = [
+    'premièrement','deuxièmement','troisièmement','tout d\'abord','ensuite',
+    'par ailleurs','de plus','en outre','cependant','néanmoins','en revanche',
+    'dans un premier temps','dans un second temps','d\'une part','d\'autre part',
+    'enfin','pour finir','notamment','ainsi','c\'est pourquoi','en effet'
+  ];
+  var _INTRO_WORDS  = ['bonjour','problématique','je vais','pour commencer','nous allons','introduction'];
+  var _CCL_WORDS    = ['en conclusion','pour conclure','en résumé','en définitive','pour terminer','en somme'];
+  var _FILLERS      = ['euh','heu','bah','ben','voilà','donc euh','euh donc'];
+
+  function _startSpeechRecognition() {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return; // navigateur non supporté — silencieux
+    if (_recog) { try { _recog.stop(); } catch(e) {} }
+
+    _recog = new SR();
+    _recog.continuous    = true;
+    _recog.interimResults= true;
+    _recog.lang          = 'fr-FR';
+    _recog.maxAlternatives = 1;
+
+    _recog.onresult = function(event) {
+      var interim = '';
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          _transcript += ' ' + t;
+        } else {
+          interim += t;
+        }
+      }
+      _interimText = interim;
+      _updateTranscriptDisplay();
+    };
+
+    _recog.onerror = function(e) {
+      if (e.error === 'not-allowed') {
+        var wrap = document.getElementById('oral-transcript-wrap');
+        if (wrap) wrap.innerHTML = '<div style="color:var(--danger);font-size:.8rem">❌ Micro refusé — autorise le micro dans le navigateur.</div>';
+      }
+    };
+
+    // Redémarre automatiquement si coupé (timeout navigateur)
+    _recog.onend = function() {
+      if (_presRunning) {
+        try { _recog.start(); } catch(e) {}
+      }
+    };
+
+    try {
+      _recog.start();
+      var wrap = document.getElementById('oral-transcript-wrap');
+      if (wrap) wrap.style.display = 'block';
+    } catch(e) {}
+  }
+
+  function _stopSpeechRecognition() {
+    if (_recog) {
+      try { _recog.stop(); } catch(e) {}
+      _recog = null;
+    }
+  }
+
+  function _updateTranscriptDisplay() {
+    var el = document.getElementById('oral-transcript');
+    if (!el) return;
+    var full = (_transcript + ' ' + _interimText).trim();
+    var words = full.split(/\s+/).filter(Boolean).length;
+    el.innerHTML =
+      '<div class="oral-transcript-stats">' + words + ' mots · ' +
+      (_presElapsed > 0 ? Math.round(words / (_presElapsed / 60)) : 0) + ' mots/min</div>' +
+      '<div class="oral-transcript-text">' + _esc(full.slice(-600)) + '<span class="oral-interim"> ' + _esc(_interimText) + '</span></div>';
+  }
+
+  function analyzePresentation() {
+    var text = (_transcript + ' ' + _interimText).trim().toLowerCase();
+    if (!text) {
+      alert('Aucun texte transcrit. Assure-toi que le micro est autorisé dans Chrome.');
+      return;
+    }
+
+    var words    = text.split(/\s+/).filter(Boolean).length;
+    var duration = _presElapsed || 1;
+    var wpm      = Math.round(words / (duration / 60));
+
+    // Mots-clés du domaine selon la problématique
+    var domainKw = _probId === 'p1' ? _KW_P1 : _KW_P2;
+    var kwFound  = domainKw.filter(function(kw) { return text.includes(kw); });
+    var kwScore  = Math.min(kwFound.length, 10); // 0-10 termes détectés
+
+    // Connecteurs logiques
+    var connFound = _CONNECTORS.filter(function(c) { return text.includes(c); });
+    var connScore = Math.min(connFound.length, 8);
+
+    // Structure intro / conclusion
+    var hasIntro = _INTRO_WORDS.some(function(w) { return text.includes(w); });
+    var hasCcl   = _CCL_WORDS.some(function(w)   { return text.includes(w); });
+
+    // Mots de remplissage (fillers)
+    var fillerCount = _FILLERS.reduce(function(n, f) {
+      var re = new RegExp(f, 'g');
+      return n + (text.match(re) || []).length;
+    }, 0);
+    var fillerRate = words > 0 ? fillerCount / words : 0;
+
+    // ── Calcul scores (1-4) ────────────────────────────────────────
+    // c1 : Qualité orale — débit + fillers
+    var c1 = 1;
+    if (wpm >= 100 && wpm <= 180 && fillerRate < 0.08) c1 = 4;
+    else if (wpm >= 80  && wpm <= 200 && fillerRate < 0.12) c1 = 3;
+    else if (wpm >= 60  || fillerRate < 0.20) c1 = 2;
+
+    // c2 : Prise de parole — longueur + connecteurs
+    var c2 = 1;
+    if (words >= 800 && connScore >= 4) c2 = 4;
+    else if (words >= 500 && connScore >= 2) c2 = 3;
+    else if (words >= 250 || connScore >= 1) c2 = 2;
+
+    // c3 : Connaissances — mots-clés domaine
+    var c3 = 1;
+    if (kwScore >= 7) c3 = 4;
+    else if (kwScore >= 4) c3 = 3;
+    else if (kwScore >= 2) c3 = 2;
+
+    // c4 : Interaction — non évaluable sur la présentation → neutre
+    var c4 = 0; // laissé à remplir manuellement
+
+    // c5 : Argumentation — structure + connecteurs
+    var c5 = 1;
+    if (hasIntro && hasCcl && connScore >= 3) c5 = 4;
+    else if ((hasIntro || hasCcl) && connScore >= 2) c5 = 3;
+    else if (connScore >= 1 || hasIntro || hasCcl) c5 = 2;
+
+    // ── Affichage du rapport d'analyse ────────────────────────────
+    var report = document.getElementById('oral-analysis-report');
+    if (!report) {
+      report = document.createElement('div');
+      report.id = 'oral-analysis-report';
+      report.className = 'oral-analysis-report';
+      var section = document.getElementById('oral-eval-section');
+      if (section) section.insertBefore(report, section.querySelector('.oral-eval-grid'));
+    }
+
+    var kwList = kwFound.slice(0, 8).join(', ') || 'aucun';
+    var connList = connFound.slice(0, 6).join(', ') || 'aucun';
+
+    report.innerHTML =
+      '<div class="oral-analysis-title">🔍 Analyse automatique</div>' +
+      '<div class="oral-analysis-stats">' +
+        '<div class="oral-stat-pill">' + words + ' mots</div>' +
+        '<div class="oral-stat-pill">' + wpm + ' mots/min</div>' +
+        '<div class="oral-stat-pill ' + (fillerRate < 0.08 ? 'good' : 'warn') + '">' + fillerCount + ' hésitations</div>' +
+        '<div class="oral-stat-pill ' + (kwFound.length >= 4 ? 'good' : 'warn') + '">' + kwFound.length + ' mots-clés ST2S</div>' +
+        '<div class="oral-stat-pill ' + (connFound.length >= 3 ? 'good' : 'warn') + '">' + connFound.length + ' connecteurs</div>' +
+        '<div class="oral-stat-pill ' + (hasIntro ? 'good' : 'warn') + '">' + (hasIntro ? '✓' : '✗') + ' Intro détectée</div>' +
+        '<div class="oral-stat-pill ' + (hasCcl   ? 'good' : 'warn') + '">' + (hasCcl   ? '✓' : '✗') + ' Conclusion détectée</div>' +
+      '</div>' +
+      '<div class="oral-analysis-detail">' +
+        'Mots-clés : <em>' + _esc(kwList) + '</em><br>' +
+        'Connecteurs : <em>' + _esc(connList) + '</em>' +
+      '</div>' +
+      '<div class="oral-analysis-note">⚠️ C4 (Interaction) non évalué ici — remplis-le manuellement après l\'entretien jury.</div>';
+
+    // Applique les scores automatiquement
+    var scores = { c1: c1, c2: c2, c3: c3, c4: c4, c5: c5 };
+    Object.keys(scores).forEach(function(crit) {
+      var val = scores[crit];
+      if (val > 0) setLevel(crit, val);
+    });
+
+    // Scroll vers la grille
+    var grid = document.getElementById('oral-eval-section');
+    if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   // ── Tracking temps de révision ────────────────────────────────
   function _logOralMinute() {
     try {
@@ -114,12 +307,14 @@ App.Oral = (function() {
     if (_presRunning) {
       clearInterval(_presTimer);
       _presRunning = false;
+      _stopSpeechRecognition();
       var btn = document.getElementById('oral-pres-btn');
       if (btn) btn.textContent = '▶ Reprendre';
     } else {
       _presRunning = true;
       var btn = document.getElementById('oral-pres-btn');
       if (btn) btn.textContent = '⏸ Pause';
+      _startSpeechRecognition();
       _presTimer = setInterval(function() {
         _presElapsed++;
         // Bip aux transitions de phase
@@ -131,6 +326,8 @@ App.Oral = (function() {
           _doubleBeep();
           var al = document.getElementById('oral-pres-alert');
           if (al) { al.textContent = '⏰ Temps réglementaire écoulé — tu continues !'; al.style.display = 'block'; }
+          var ab = document.getElementById('oral-analyze-btn');
+          if (ab) ab.style.display = 'block';
         }
         _updatePresDisplay(_PRES_TOTAL - _presElapsed, _presElapsed);
       }, 1000);
@@ -170,6 +367,14 @@ App.Oral = (function() {
     var btn   = document.getElementById('oral-pres-btn');
     var al    = document.getElementById('oral-pres-alert');
     var bar   = document.getElementById('oral-pres-progress-bar');
+    _stopSpeechRecognition();
+    _transcript = ''; _interimText = '';
+    var tw = document.getElementById('oral-transcript-wrap');
+    if (tw) { tw.style.display = 'none'; var td = document.getElementById('oral-transcript'); if (td) td.innerHTML = ''; }
+    var ab = document.getElementById('oral-analyze-btn');
+    if (ab) ab.style.display = 'none';
+    var rep = document.getElementById('oral-analysis-report');
+    if (rep) rep.remove();
     if (disp)  { disp.textContent = '10:00'; disp.style.color = ''; }
     if (label) label.textContent = 'Prêt à commencer';
     if (btn)   btn.textContent   = '▶ Commencer';

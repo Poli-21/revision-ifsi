@@ -539,10 +539,16 @@
             </div>
           </div>
           <div id="oral-pres-alert" class="oral-alert" style="display:none"></div>
+          <!-- Transcript en direct -->
+          <div id="oral-transcript-wrap" style="display:none">
+            <div class="oral-rec-bar"><span class="oral-rec-dot"></span> Micro actif</div>
+            <div id="oral-transcript" class="oral-transcript-box"></div>
+          </div>
           <div class="oral-timer-btns">
             <button class="btn btn-primary" id="oral-pres-btn" onclick="App.Oral.togglePres()">▶ Commencer</button>
             <button class="btn btn-ghost" onclick="App.Oral.resetPres()">↺ Réinitialiser</button>
           </div>
+          <button id="oral-analyze-btn" class="btn btn-primary" style="display:none;width:100%;margin-top:6px" onclick="App.Oral.analyzePresentation()">🔍 Analyser et évaluer automatiquement</button>
         </div>
 
         <!-- Panneau 3 : Échange jury 10 min -->

@@ -1568,3 +1568,53 @@ body.dark .oral-lvl-btn { background: #334155; border-color: #475569; color: #cb
 
 /* Retire les anciens styles étoiles */
 .oral-stars, .oral-star { display: none; }
+
+/* ── Reconnaissance vocale / Transcript ── */
+.oral-rec-bar {
+  display: flex; align-items: center; gap: 7px;
+  font-size: .75rem; font-weight: 700; color: var(--danger);
+  margin-bottom: 5px;
+}
+.oral-rec-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--danger);
+  animation: rec-pulse 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes rec-pulse {
+  0%,100% { opacity: 1; } 50% { opacity: .2; }
+}
+.oral-transcript-box {
+  background: var(--gray-50); border: 1px solid var(--gray-200);
+  border-radius: 8px; padding: 8px 10px;
+  max-height: 100px; overflow-y: auto;
+  font-size: .78rem; color: var(--gray-700); line-height: 1.5;
+}
+body.dark .oral-transcript-box { background: #0f172a; border-color: #334155; color: #94a3b8; }
+.oral-transcript-stats { font-size: .7rem; color: var(--primary); font-weight: 700; margin-bottom: 4px; }
+.oral-transcript-text { color: var(--gray-700); }
+body.dark .oral-transcript-text { color: #94a3b8; }
+.oral-interim { color: var(--gray-400); font-style: italic; }
+
+/* ── Rapport d'analyse automatique ── */
+.oral-analysis-report {
+  background: #f0f9ff; border: 1px solid #bae6fd;
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
+}
+body.dark .oral-analysis-report { background: #0c2a3a; border-color: #0284c7; }
+.oral-analysis-title {
+  font-size: .88rem; font-weight: 700; color: #0369a1; margin-bottom: 10px;
+}
+.oral-analysis-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.oral-stat-pill {
+  padding: 3px 9px; border-radius: 99px; font-size: .74rem; font-weight: 600;
+  background: white; border: 1px solid var(--gray-200); color: var(--gray-700);
+}
+.oral-stat-pill.good { background: #dcfce7; border-color: #86efac; color: #15803d; }
+.oral-stat-pill.warn { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+body.dark .oral-stat-pill { background: #1e293b; border-color: #334155; color: #cbd5e1; }
+.oral-analysis-detail { font-size: .78rem; color: var(--gray-600); margin-bottom: 8px; line-height: 1.6; }
+.oral-analysis-note {
+  font-size: .75rem; color: var(--gray-400); font-style: italic; padding-top: 6px;
+  border-top: 1px solid #bae6fd;
+}
