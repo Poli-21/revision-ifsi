@@ -1,0 +1,19 @@
+name: Rapport Discord quotidien
+
+on:
+  schedule:
+    - cron: '0 15 * * *'   # 17h00 heure de Paris (été CEST = UTC+2)
+  workflow_dispatch:         # permet de lancer manuellement depuis GitHub
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Envoyer le rapport Discord
+        env:
+          GIST_TOKEN:      ${{ secrets.GIST_TOKEN }}
+          GIST_ID:         ${{ secrets.GIST_ID }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: python3 .github/scripts/discord_report.py

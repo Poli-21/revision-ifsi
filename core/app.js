@@ -629,8 +629,8 @@ function initNotifications() {
   if (Notification.permission === 'granted') {
     setTimeout(_checkAndNotifyToday, 2000);
   }
-  _checkDiscordRecap();   // Récap dimanche
-  _initDailyReportTimer(); // Rapport quotidien 17h30
+  _checkDiscordRecap();   // Récap dimanche (JS fallback)
+  // Le rapport quotidien 17h00 est géré par GitHub Actions (.github/workflows/daily-report.yml)
   _updateNotifUI();
 }
 
