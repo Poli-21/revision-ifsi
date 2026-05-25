@@ -104,7 +104,7 @@ App.Oral = (function() {
       var today = new Date().toISOString().slice(0, 10);
       var log   = App.Store.state.studyLog;
       if (!log[today]) log[today] = { reviewed: 0, ok: 0, hard: 0, nope: 0 };
-      log[today].oral_min = (log[today].oral_min || 0) + 1;
+      log[today].seconds = (log[today].seconds || 0) + 60;
       App.Store.save();
     } catch(e) {}
   }
