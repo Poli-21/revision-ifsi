@@ -255,6 +255,208 @@ App.Oral = (function() {
     if (btn)  btn.textContent = '▶ Commencer';
   }
 
+
+  // ── Auto-évaluation (barème officiel Grand Oral) ─────────────
+  var _EVAL_KEY = 'ifsi_oral_evals';
+  var _evalRatings = { c1: 0, c2: 0, c3: 0, c4: 0, c5: 0 };
+
+  // Barème officiel — 5 critères × 4 niveaux (1=Très insuf, 2=Insuf, 3=Satisf, 4=Très satisf)
+  // 5 critères × 4 pts max = 20 pts
+  var _BAREME = {
+    c1: {
+      name: 'Qualité orale de l\'épreuve',
+      desc: [
+        'Difficilement audible. Ne parvient pas à capter l\'attention.',
+        'Voix plus audible mais monocorde. Vocabulaire limité.',
+        'Quelques variations de voix, prise de parole affirmée, lexique adapté.',
+        'Voix soutient le discours. Qualités prosodiques marquées. Vocabulaire riche et précis.'
+      ]
+    },
+    c2: {
+      name: 'Qualité de la prise de parole en continu',
+      desc: [
+        'Énoncés courts, pauses et faux démarrages, syntaxe mal maîtrisée.',
+        'Discours assez clair mais vocabulaire limité et énoncés schématiques.',
+        'Discours articulé et pertinent, énoncés bien construits.',
+        'Discours fluide, efficace, tirant pleinement profit du temps et développant ses propositions.'
+      ]
+    },
+    c3: {
+      name: 'Qualité des connaissances',
+      desc: [
+        'Connaissances imprécises, incapacité à répondre aux questions même avec aide.',
+        'Connaissances réelles mais difficulté à les mobiliser en situation.',
+        'Connaissances précises, capacité à les mobiliser aux questions du jury.',
+        'Connaissances maîtrisées, réponses témoignant d\'une capacité à les mobiliser et exposer clairement.'
+      ]
+    },
+    c4: {
+      name: 'Qualité de l\'interaction',
+      desc: [
+        'Réponses courtes ou rares. Communication repose principalement sur l\'évaluateur.',
+        'L\'entretien permet une amorce d\'échange. Interaction reste limitée.',
+        'Répond, contribue, réagit. Se reprend, reformule en s\'aidant des propositions du jury.',
+        'S\'engage dans sa parole, réagit de façon pertinente. Prend l\'initiative. Exploite judicieusement les éléments fournis.'
+      ]
+    },
+    c5: {
+      name: 'Qualité et construction de l\'argumentation',
+      desc: [
+        'Pas de compréhension du sujet, discours non argumenté et décousu.',
+        'Début de démonstration mais raisonnement lacunaire. Discours insuffisamment structuré.',
+        'Démonstration construite et appuyée sur des arguments précis et pertinents.',
+        'Maîtrise des enjeux du sujet, argumentation personnelle bien construite et raisonnée.'
+      ]
+    }
+  };
+
+  var _LEVEL_COLORS = ['', '#dc2626', '#d97706', '#16a34a', '#2563eb'];
+  var _LEVEL_LABELS = ['', 'Très insuf.', 'Insuffisant', 'Satisfaisant', 'Très satisf.'];
+
+  function setLevel(crit, val) {
+    _evalRatings[crit] = val;
+    // Met à jour les boutons
+    document.querySelectorAll('.oral-lvl-btn[data-crit="' + crit + '"]').forEach(function(btn) {
+      var active = parseInt(btn.dataset.val) === val;
+      btn.classList.toggle('active', active);
+      btn.style.background = active ? _LEVEL_COLORS[val] : '';
+      btn.style.color      = active ? 'white' : '';
+      btn.style.borderColor= active ? _LEVEL_COLORS[val] : '';
+    });
+    // Affiche la description du niveau
+    var desc = document.getElementById('oral-desc-' + crit);
+    if (desc) {
+      desc.textContent = _BAREME[crit].desc[val - 1];
+      desc.style.color = _LEVEL_COLORS[val];
+    }
+    _refreshScore();
+  }
+
+  function _initEvalUI() {
+    // Reset visuel
+    Object.keys(_evalRatings).forEach(function(crit) {
+      document.querySelectorAll('.oral-lvl-btn[data-crit="' + crit + '"]').forEach(function(btn) {
+        btn.classList.remove('active');
+        btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
+      });
+      var desc = document.getElementById('oral-desc-' + crit);
+      if (desc) desc.textContent = '';
+    });
+    _syncEvalProb();
+    _renderHistory();
+  }
+
+  function _syncEvalProb() {
+    var el = document.getElementById('oral-eval-prob');
+    if (el) el.textContent = _probId.toUpperCase();
+  }
+
+  function _refreshScore() {
+    var total = Object.values(_evalRatings).reduce(function(s, v) { return s + (v || 0); }, 0);
+    var pts   = total; // max 5×4 = 20
+    var el    = document.getElementById('oral-eval-score');
+    if (!el) return;
+    var col = pts >= 16 ? 'var(--success)' : pts >= 12 ? 'var(--warning)' : pts > 0 ? 'var(--danger)' : 'var(--gray-400)';
+    var mention = pts >= 18 ? '— Très bien' : pts >= 16 ? '— Bien' : pts >= 14 ? '— Assez bien' : pts >= 10 ? '— Passable' : pts > 0 ? '— Insuffisant' : '';
+    el.innerHTML = '<span style="font-size:1.6rem;font-weight:900;color:' + col + '">' + (pts || '—') + '</span><span style="color:var(--gray-400);font-size:.85rem"> / 20 ' + mention + '</span>';
+  }
+
+  function _calcScore() {
+    return Object.values(_evalRatings).reduce(function(s, v) { return s + (v || 0); }, 0);
+  }
+
+  function saveEval() {
+    var filled = Object.values(_evalRatings).some(function(v) { return v > 0; });
+    if (!filled) { alert('Évalue au moins un critère avant de sauvegarder.'); return; }
+
+    var notes = (document.getElementById('oral-eval-notes') || {}).value || '';
+    var score = _calcScore();
+    var entry = {
+      date:    new Date().toISOString(),
+      prob:    _probId,
+      ratings: Object.assign({}, _evalRatings),
+      score:   score,
+      notes:   notes.trim()
+    };
+
+    var evals = _loadEvals();
+    evals.unshift(entry);
+    if (evals.length > 50) evals = evals.slice(0, 50);
+    localStorage.setItem(_EVAL_KEY, JSON.stringify(evals));
+
+    // Reset
+    _evalRatings = { c1: 0, c2: 0, c3: 0, c4: 0, c5: 0 };
+    _initEvalUI();
+    var notesEl = document.getElementById('oral-eval-notes');
+    if (notesEl) notesEl.value = '';
+    var scoreEl = document.getElementById('oral-eval-score');
+    if (scoreEl) scoreEl.innerHTML = '— / 20';
+
+    var btn = document.querySelector('.oral-eval-save-btn');
+    if (btn) {
+      var orig = btn.textContent;
+      btn.textContent = '✅ Session sauvegardée !';
+      setTimeout(function() { btn.textContent = orig; }, 2000);
+    }
+    _renderHistory();
+  }
+
+  function _loadEvals() {
+    try { return JSON.parse(localStorage.getItem(_EVAL_KEY) || '[]'); } catch(e) { return []; }
+  }
+
+  function deleteEval(idx) {
+    if (!confirm('Supprimer cette évaluation ?')) return;
+    var evals = _loadEvals();
+    evals.splice(idx, 1);
+    localStorage.setItem(_EVAL_KEY, JSON.stringify(evals));
+    _renderHistory();
+  }
+
+  function _renderHistory() {
+    var container = document.getElementById('oral-eval-history');
+    if (!container) return;
+    var evals = _loadEvals();
+    if (evals.length === 0) { container.innerHTML = ''; return; }
+
+    var html = '<div class="oral-hist-title">📈 Historique (' + evals.length + ' session' + (evals.length > 1 ? 's' : '') + ')</div>';
+
+    if (evals.length >= 2) {
+      var diff = Math.round((evals[0].score - evals[1].score) * 10) / 10;
+      var arrow = diff > 0 ? '↑ +' + diff : diff < 0 ? '↓ ' + diff : '→ stable';
+      var col   = diff > 0 ? 'var(--success)' : diff < 0 ? 'var(--danger)' : 'var(--gray-400)';
+      html += '<div class="oral-hist-trend" style="color:' + col + '">Tendance : ' + arrow + ' pts</div>';
+    }
+
+    evals.slice(0, 10).forEach(function(e, i) {
+      var d = new Date(e.date);
+      var dateStr = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) +
+                    ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      var col = e.score >= 16 ? 'var(--success)' : e.score >= 12 ? 'var(--warning)' : 'var(--danger)';
+      var detail = '';
+      if (e.ratings) {
+        detail = Object.keys(e.ratings).map(function(k) {
+          var v = e.ratings[k];
+          return v ? '<span style="color:' + _LEVEL_COLORS[v] + ';font-size:.72rem">' + (k.toUpperCase()) + ':' + _LEVEL_LABELS[v] + '</span>' : '';
+        }).filter(Boolean).join(' · ');
+      }
+      html += '<div class="oral-hist-row">' +
+        '<div style="flex:1;min-width:0">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span class="oral-hist-date">' + _esc(dateStr) + ' — ' + e.prob.toUpperCase() + '</span>' +
+        '<span class="oral-hist-score" style="color:' + col + '">' + e.score + '/20</span>' +
+        '</div>' +
+        (detail ? '<div style="margin-top:4px">' + detail + '</div>' : '') +
+        (e.notes ? '<div class="oral-hist-notes">' + _esc(e.notes) + '</div>' : '') +
+        '</div>' +
+        '<button class="oral-hist-del" onclick="App.Oral.deleteEval(' + i + ')" title="Supprimer">✕</button>' +
+        '</div>';
+    });
+
+    container.innerHTML = html;
+  }
+
+
   // ── Sélection problématique ────────────────────────────────────
   function setProblematique(id) {
     if (!(id in _PROBLEMS)) return;
@@ -270,6 +472,7 @@ App.Oral = (function() {
     // Question
     var qEl = document.getElementById('oral-question-text');
     if (qEl) qEl.textContent = _PROBLEMS[id].text;
+    _syncEvalProb();
     // Reset affichages
     resetPres();
     resetJury();
@@ -282,6 +485,8 @@ App.Oral = (function() {
   function init() {
     var qEl = document.getElementById('oral-question-text');
     if (qEl && !qEl.textContent) qEl.textContent = _PROBLEMS[_probId].text;
+    _initEvalUI();
+    _renderHistory();
     // Raffraichit les timers si actifs
     if (_presElapsed > 0) {
       _updatePresDisplay(_PRES_TOTAL - _presElapsed, _presElapsed);

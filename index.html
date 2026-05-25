@@ -560,6 +560,100 @@
         </div>
 
       </div>
+
+      <!-- ── Grille d'auto-évaluation ── -->
+      <div class="oral-eval-section" id="oral-eval-section">
+        <div class="oral-eval-title-row">
+          <h3 class="oral-eval-title">📝 Évaluer cette session</h3>
+          <span class="oral-eval-probadge" id="oral-eval-prob">P1</span>
+        </div>
+
+        <!-- Critères officiels du barème bac -->
+        <div class="oral-eval-grid" id="oral-eval-grid">
+
+          <div class="oral-eval-row" data-crit="c1">
+            <div class="oral-eval-crit-wrap">
+              <div class="oral-eval-crit-name">Qualité orale de l'épreuve</div>
+              <div class="oral-eval-crit-desc" id="oral-desc-c1"></div>
+            </div>
+            <div class="oral-level-btns">
+              <button class="oral-lvl-btn" data-crit="c1" data-val="1" onclick="App.Oral.setLevel('c1',1)">Très insuf.</button>
+              <button class="oral-lvl-btn" data-crit="c1" data-val="2" onclick="App.Oral.setLevel('c1',2)">Insuffisant</button>
+              <button class="oral-lvl-btn" data-crit="c1" data-val="3" onclick="App.Oral.setLevel('c1',3)">Satisfaisant</button>
+              <button class="oral-lvl-btn" data-crit="c1" data-val="4" onclick="App.Oral.setLevel('c1',4)">Très satisf.</button>
+            </div>
+          </div>
+
+          <div class="oral-eval-row" data-crit="c2">
+            <div class="oral-eval-crit-wrap">
+              <div class="oral-eval-crit-name">Qualité de la prise de parole en continu</div>
+              <div class="oral-eval-crit-desc" id="oral-desc-c2"></div>
+            </div>
+            <div class="oral-level-btns">
+              <button class="oral-lvl-btn" data-crit="c2" data-val="1" onclick="App.Oral.setLevel('c2',1)">Très insuf.</button>
+              <button class="oral-lvl-btn" data-crit="c2" data-val="2" onclick="App.Oral.setLevel('c2',2)">Insuffisant</button>
+              <button class="oral-lvl-btn" data-crit="c2" data-val="3" onclick="App.Oral.setLevel('c2',3)">Satisfaisant</button>
+              <button class="oral-lvl-btn" data-crit="c2" data-val="4" onclick="App.Oral.setLevel('c2',4)">Très satisf.</button>
+            </div>
+          </div>
+
+          <div class="oral-eval-row" data-crit="c3">
+            <div class="oral-eval-crit-wrap">
+              <div class="oral-eval-crit-name">Qualité des connaissances</div>
+              <div class="oral-eval-crit-desc" id="oral-desc-c3"></div>
+            </div>
+            <div class="oral-level-btns">
+              <button class="oral-lvl-btn" data-crit="c3" data-val="1" onclick="App.Oral.setLevel('c3',1)">Très insuf.</button>
+              <button class="oral-lvl-btn" data-crit="c3" data-val="2" onclick="App.Oral.setLevel('c3',2)">Insuffisant</button>
+              <button class="oral-lvl-btn" data-crit="c3" data-val="3" onclick="App.Oral.setLevel('c3',3)">Satisfaisant</button>
+              <button class="oral-lvl-btn" data-crit="c3" data-val="4" onclick="App.Oral.setLevel('c3',4)">Très satisf.</button>
+            </div>
+          </div>
+
+          <div class="oral-eval-row" data-crit="c4">
+            <div class="oral-eval-crit-wrap">
+              <div class="oral-eval-crit-name">Qualité de l'interaction</div>
+              <div class="oral-eval-crit-desc" id="oral-desc-c4"></div>
+            </div>
+            <div class="oral-level-btns">
+              <button class="oral-lvl-btn" data-crit="c4" data-val="1" onclick="App.Oral.setLevel('c4',1)">Très insuf.</button>
+              <button class="oral-lvl-btn" data-crit="c4" data-val="2" onclick="App.Oral.setLevel('c4',2)">Insuffisant</button>
+              <button class="oral-lvl-btn" data-crit="c4" data-val="3" onclick="App.Oral.setLevel('c4',3)">Satisfaisant</button>
+              <button class="oral-lvl-btn" data-crit="c4" data-val="4" onclick="App.Oral.setLevel('c4',4)">Très satisf.</button>
+            </div>
+          </div>
+
+          <div class="oral-eval-row" data-crit="c5">
+            <div class="oral-eval-crit-wrap">
+              <div class="oral-eval-crit-name">Qualité et construction de l'argumentation</div>
+              <div class="oral-eval-crit-desc" id="oral-desc-c5"></div>
+            </div>
+            <div class="oral-level-btns">
+              <button class="oral-lvl-btn" data-crit="c5" data-val="1" onclick="App.Oral.setLevel('c5',1)">Très insuf.</button>
+              <button class="oral-lvl-btn" data-crit="c5" data-val="2" onclick="App.Oral.setLevel('c5',2)">Insuffisant</button>
+              <button class="oral-lvl-btn" data-crit="c5" data-val="3" onclick="App.Oral.setLevel('c5',3)">Satisfaisant</button>
+              <button class="oral-lvl-btn" data-crit="c5" data-val="4" onclick="App.Oral.setLevel('c5',4)">Très satisf.</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Score estimé -->
+        <div class="oral-eval-score-row">
+          <div class="oral-eval-score-label">Note estimée</div>
+          <div class="oral-eval-score" id="oral-eval-score">—&nbsp;/&nbsp;20</div>
+        </div>
+
+        <!-- Notes libres -->
+        <textarea id="oral-eval-notes" class="oral-eval-notes"
+          placeholder="Notes libres : ce qui s'est bien passé, ce à améliorer…"></textarea>
+
+        <button class="btn btn-primary oral-eval-save-btn" onclick="App.Oral.saveEval()">💾 Sauvegarder la session</button>
+
+        <!-- Historique -->
+        <div id="oral-eval-history" class="oral-eval-history"></div>
+      </div>
+
     </div>
 
   </main>
