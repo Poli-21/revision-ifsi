@@ -152,9 +152,18 @@ App.Oral = (function() {
     };
 
     _recog.onerror = function(e) {
-      if (e.error === 'not-allowed') {
-        var wrap = document.getElementById('oral-transcript-wrap');
-        if (wrap) wrap.innerHTML = '<div style="color:var(--danger);font-size:.8rem">❌ Micro refusé — autorise le micro dans le navigateur.</div>';
+      var wrap = document.getElementById('oral-transcript-wrap');
+      if (e.error === 'not-allowed' || e.error === 'permission-denied') {
+        if (wrap) wrap.innerHTML = '<div style="color:var(--danger);font-size:.82rem;padding:8px">🎤 Micro bloqué — clique sur l\'icône 🔒 dans la barre d\'adresse Chrome et autorise le micro, puis relance.</div>';
+      } else if (e.error === 'no-speech') {
+        // pas une erreur bloquante, le onend va redémarrer
+      } else {
+        if (wrap) {
+          var info = document.createElement('div');
+          info.style.cssText = 'color:var(--warning);font-size:.75rem;padding:4px';
+          info.textContent = '⚠ Micro : ' + e.error;
+          wrap.appendChild(info);
+        }
       }
     };
 
