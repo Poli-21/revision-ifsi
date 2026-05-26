@@ -292,6 +292,7 @@ Object.assign(window, {
     ),
   startRenameCat     : (cat, btn) => _startRenameCat(cat, btn),
   deleteCat          : (cat)      => deleteCat(cat),
+  _showToast         : (msg)      => _showToast(msg),
   handleCatClick     : (cat, e, btn) => _handleCatClick(cat, e, btn),
   renderBrowse   : ()     => App.Render.browseDebounced(),
   // Modales
@@ -477,42 +478,38 @@ function _startRenameCat(oldCat, btn) {
   input.addEventListener('blur', commit, { once: true });
 }
 
-function deleteCat(cat, btn) {
-  // Confirmation à 2 clics pour éviter les suppressions accidentelles
-  // (et contourner les navigateurs qui bloquent confirm())
-  if (btn && !btn.dataset.confirming) {
-    btn.dataset.confirming = '1';
-    const orig = btn.textContent;
-    btn.textContent = '✓?';
-    btn.style.cssText = 'opacity:1;background:var(--danger);color:#fff;border-radius:5px;border:none;cursor:pointer;font-size:.78rem;padding:2px 6px;';
-    btn.title = 'Cliquer à nouveau pour confirmer la suppression';
-    const reset = () => {
-      if (!btn.dataset.confirming) return;
-      delete btn.dataset.confirming;
-      btn.textContent = orig;
-      btn.style.cssText = '';
-      btn.title = 'Supprimer cette matière';
-    };
-    // Auto-annulation après 3 secondes
-    btn._resetTimer = setTimeout(reset, 3000);
-    return;
-  }
-  // Deuxième clic : supprimer
-  if (btn) {
-    clearTimeout(btn._resetTimer);
-    delete btn.dataset.confirming;
-  }
-
+function deleteCat(cat) {
   const state = App.Store.state;
-  // Supprime toutes les cartes de cette matière
-  state.cards = state.cards.filter(c => c.cat !== cat);
-  // Supprime de l'ordre
+  const n = state.cards.filter(c => c.cat === cat).length;
+
+  // Supprime les cartes et l'entrée d'ordre correspondant à cette cat exacte
+  state.cards    = state.cards.filter(c => c.cat !== cat);
   state.catOrder = state.catOrder.filter(c => c !== cat);
   App.Store.save();
   App.Store.saveOrder();
-  // Si la catégorie active était celle-là, revenir à "Toutes"
+
+  // Toast de confirmation visuel
+  _showToast('🗑 "' + cat.split(' > ').pop() + '" supprimée (' + n + ' carte' + (n > 1 ? 's' : '') + ')');
+
+  // Retour à "Toutes" si la catégorie active était celle-là
   if (App.UI.activeCategory === cat) App.UI.setCategory('');
   else App.Render.all();
+}
+
+function _showToast(msg) {
+  let t = document.getElementById('_app_toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = '_app_toast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);'
+      + 'background:#1e293b;color:#fff;padding:10px 20px;border-radius:10px;font-size:.85rem;'
+      + 'z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s';
+    document.body.appendChild(t);
+  }
+  clearTimeout(t._hide);
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t._hide = setTimeout(() => { t.style.opacity = '0'; }, 3000);
 }
 
 function _renameCat(oldCat, newCat) {

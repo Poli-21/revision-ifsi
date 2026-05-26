@@ -442,7 +442,7 @@ App.Render = (() => {
               <span class="cat-drag-handle" title="Glisser">⠿</span>
               <button class="cat-pill ${App.UI.activeCategory === cat ? 'active' : ''}" onclick="handleCatClick('${_esc(cat)}',event,this)" title="Double-clic pour renommer">${_esc(label)}${badge}<span class="cat-count">${n}</span></button>
               <button class="cat-unnest-btn" onclick="unnestCat('${_esc(cat)}')" title="Retirer du groupe">↑</button>
-              <button class="cat-delete-btn" data-cat="${_esc(cat)}" onclick="event.stopPropagation();deleteCat(this.dataset.cat,this)" title="Supprimer cette matière">🗑</button>
+              <button class="cat-delete-btn" data-cat="${_esc(cat)}" onclick="event.stopPropagation();deleteCat(this.dataset.cat)" title="Supprimer cette matière">🗑</button>
             </div>`;
           }).join('')}
         </div>`;
@@ -454,7 +454,7 @@ App.Render = (() => {
         html += `<div class="cat-pill-row" draggable="true" data-drag-top="${_esc(cat)}">
           ${handle}
           <button class="cat-pill ${App.UI.activeCategory === cat ? 'active' : ''}" onclick="handleCatClick('${_esc(cat)}',event,this)" title="Double-clic pour renommer">${_esc(cat)}${badge}<span class="cat-count">${n}</span></button>
-          <button class="cat-delete-btn" data-cat="${_esc(cat)}" onclick="event.stopPropagation();deleteCat(this.dataset.cat,this)" title="Supprimer cette matière">🗑</button>
+          <button class="cat-delete-btn" data-cat="${_esc(cat)}" onclick="event.stopPropagation();deleteCat(this.dataset.cat)" title="Supprimer cette matière">🗑</button>
         </div>`;
       }
     });
