@@ -292,6 +292,7 @@ Object.assign(window, {
     ),
   startRenameCat     : (cat, btn) => _startRenameCat(cat, btn),
   deleteCat          : (cat)      => _deleteCat(cat),
+  bulkDelete         : ()         => bulkDelete(),
   _showToast         : (msg)      => _showToast(msg),
   handleCatClick     : (cat, e, btn) => _handleCatClick(cat, e, btn),
   renderBrowse   : ()     => App.Render.browseDebounced(),
@@ -405,6 +406,18 @@ function bulkChangeCat() {
   // Feedback
   const btn = document.getElementById('select-mode-btn');
   if (btn) { const o = btn.textContent; btn.textContent = `✓ ${count} carte(s) déplacée(s)`; setTimeout(() => btn.textContent = o, 2000); }
+}
+
+function bulkDelete() {
+  const n = _selectedCards.size;
+  if (n === 0) return;
+  const ids = new Set(_selectedCards);
+  App.Store.state.cards = App.Store.state.cards.filter(c => !ids.has(c.id));
+  App.Store.save();
+  _selectedCards.clear();
+  toggleSelectMode();
+  App.Render.all();
+  _showToast('🗑 ' + n + ' carte' + (n > 1 ? 's' : '') + ' supprimée' + (n > 1 ? 's' : ''));
 }
 
 function _updateBulkCount() {
