@@ -291,7 +291,7 @@ Object.assign(window, {
       App.Store.state.cards.filter(c => c.cat.startsWith(p + ' > ')).map(c => c.cat).filter((v,i,a) => a.indexOf(v)===i)
     ),
   startRenameCat     : (cat, btn) => _startRenameCat(cat, btn),
-  deleteCat          : (cat)      => deleteCat(cat),
+  deleteCat          : (cat)      => _deleteCat(cat),
   _showToast         : (msg)      => _showToast(msg),
   handleCatClick     : (cat, e, btn) => _handleCatClick(cat, e, btn),
   renderBrowse   : ()     => App.Render.browseDebounced(),
@@ -478,7 +478,7 @@ function _startRenameCat(oldCat, btn) {
   input.addEventListener('blur', commit, { once: true });
 }
 
-function deleteCat(cat) {
+function _deleteCat(cat) {
   const state = App.Store.state;
   const n = state.cards.filter(c => c.cat === cat).length;
 
