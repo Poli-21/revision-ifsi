@@ -477,15 +477,36 @@ function _startRenameCat(oldCat, btn) {
   input.addEventListener('blur', commit, { once: true });
 }
 
-function deleteCat(cat) {
-  const state = App.Store.state;
-  const n = state.cards.filter(c => c.cat === cat).length;
-  const label = n === 0 ? `la matière "${cat}" (aucune carte)` : `la matière "${cat}" et ses ${n} carte${n > 1 ? 's' : ''}`;
-  if (!confirm(`Supprimer définitivement ${label} ?\n\nCette action est irréversible.`)) return;
+function deleteCat(cat, btn) {
+  // Confirmation à 2 clics pour éviter les suppressions accidentelles
+  // (et contourner les navigateurs qui bloquent confirm())
+  if (btn && !btn.dataset.confirming) {
+    btn.dataset.confirming = '1';
+    const orig = btn.textContent;
+    btn.textContent = '✓?';
+    btn.style.cssText = 'opacity:1;background:var(--danger);color:#fff;border-radius:5px;border:none;cursor:pointer;font-size:.78rem;padding:2px 6px;';
+    btn.title = 'Cliquer à nouveau pour confirmer la suppression';
+    const reset = () => {
+      if (!btn.dataset.confirming) return;
+      delete btn.dataset.confirming;
+      btn.textContent = orig;
+      btn.style.cssText = '';
+      btn.title = 'Supprimer cette matière';
+    };
+    // Auto-annulation après 3 secondes
+    btn._resetTimer = setTimeout(reset, 3000);
+    return;
+  }
+  // Deuxième clic : supprimer
+  if (btn) {
+    clearTimeout(btn._resetTimer);
+    delete btn.dataset.confirming;
+  }
 
+  const state = App.Store.state;
   // Supprime toutes les cartes de cette matière
   state.cards = state.cards.filter(c => c.cat !== cat);
-  // Supprime de l'ordre (inclut les sous-catégories du même groupe)
+  // Supprime de l'ordre
   state.catOrder = state.catOrder.filter(c => c !== cat);
   App.Store.save();
   App.Store.saveOrder();
