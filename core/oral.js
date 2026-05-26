@@ -126,10 +126,13 @@ App.Oral = (function() {
   var _CCL_WORDS    = ['en conclusion','pour conclure','en résumé','en définitive','pour terminer','en somme'];
   var _FILLERS      = ['euh','heu','bah','ben','voilà','donc euh','euh donc'];
 
+  var _recogBlocked = false; // true si erreur bloquante (network, permission…)
+
   function _startSpeechRecognition() {
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return; // navigateur non supporté — silencieux
     if (_recog) { try { _recog.stop(); } catch(e) {} }
+    _recogBlocked = false;
 
     _recog = new SR();
     _recog.continuous    = true;
@@ -154,22 +157,35 @@ App.Oral = (function() {
     _recog.onerror = function(e) {
       var wrap = document.getElementById('oral-transcript-wrap');
       if (e.error === 'not-allowed' || e.error === 'permission-denied') {
+        _recogBlocked = true;
         if (wrap) wrap.innerHTML = '<div style="color:var(--danger);font-size:.82rem;padding:8px">🎤 Micro bloqué — clique sur l\'icône 🔒 dans la barre d\'adresse Chrome et autorise le micro, puis relance.</div>';
       } else if (e.error === 'no-speech') {
-        // pas une erreur bloquante, le onend va redémarrer
-      } else {
+        // pas bloquant, onend redémarre normalement
+      } else if (e.error === 'network') {
+        // Le micro Chrome nécessite Internet. On affiche 1 seul message et on arrête.
+        _recogBlocked = true;
         if (wrap) {
-          var info = document.createElement('div');
-          info.style.cssText = 'color:var(--warning);font-size:.75rem;padding:4px';
-          info.textContent = '⚠ Micro : ' + e.error;
-          wrap.appendChild(info);
+          wrap.style.display = 'block';
+          wrap.innerHTML = '<div style="color:var(--warning);font-size:.82rem;padding:8px;line-height:1.5">'
+            + '⚠️ La reconnaissance vocale Chrome nécessite une connexion Internet active.<br>'
+            + 'Vérifie ta connexion puis relance le chrono.<br>'
+            + '<span style="font-size:.75rem;color:var(--text-muted)">L\'évaluation manuelle reste disponible ci-dessous.</span>'
+            + '</div>';
+        }
+      } else {
+        // Autre erreur inconnue : on bloque aussi pour éviter la boucle
+        _recogBlocked = true;
+        if (wrap) {
+          wrap.style.display = 'block';
+          wrap.innerHTML = '<div style="color:var(--warning);font-size:.82rem;padding:8px">'
+            + '⚠️ Micro indisponible (' + e.error + '). L\'évaluation manuelle reste disponible.</div>';
         }
       }
     };
 
-    // Redémarre automatiquement si coupé (timeout navigateur)
+    // Redémarre automatiquement si coupé (timeout navigateur) — sauf si erreur bloquante
     _recog.onend = function() {
-      if (_presRunning) {
+      if (_presRunning && !_recogBlocked) {
         try { _recog.start(); } catch(e) {}
       }
     };
@@ -177,7 +193,7 @@ App.Oral = (function() {
     try {
       _recog.start();
       var wrap = document.getElementById('oral-transcript-wrap');
-      if (wrap) wrap.style.display = 'block';
+      if (wrap) { wrap.style.display = 'block'; }
     } catch(e) {}
   }
 
