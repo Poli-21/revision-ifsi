@@ -738,13 +738,17 @@ App.Oral = (function() {
 
   // ── API publique ───────────────────────────────────────────────
   return {
-    init:             init,
-    setProblematique: setProblematique,
-    togglePres:       togglePres,
-    resetPres:        resetPres,
-    toggleJury:       toggleJury,
-    resetJury:        resetJury,
-    nextQuestion:     nextQuestion
+    init:               init,
+    setProblematique:   setProblematique,
+    togglePres:         togglePres,
+    resetPres:          resetPres,
+    toggleJury:         toggleJury,
+    resetJury:          resetJury,
+    nextQuestion:       nextQuestion,
+    setLevel:           setLevel,
+    saveEval:           saveEval,
+    deleteEval:         deleteEval,
+    analyzePresentation:analyzePresentation
   };
 
 })();
