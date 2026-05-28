@@ -9,6 +9,59 @@ App.Oral = (function() {
     p1: {
       label: 'P1',
       text: 'Comment expliquer la pression préhospitalière sur les populations les plus précaires en Seine-Saint-Denis ?',
+      plan: `INTRO
+- 2024 : 4M passages urgences IDF + 10h d'attente en 93
+- Pression ≠ équitable → précaires
+- 93 = + pauvre IDF + désert médical
+- Pb : pression préhosp / précaires / 93 ?
+- Plan : I. Organisation préhosp → II. Inégalités
+
+PROBLÉMATIQUE : Comment expliquer la pression préhospitalière sur les populations les plus précaires en Seine-Saint-Denis ?
+
+I. ORGANISATION PRÉHOSPITALIÈRE
+
+1) Définitions
+- Système de santé = acteurs + institutions + ressources → promouvoir / restaurer / maintenir santé
+- Préhospitalier = AVANT l'hôpital (appel → régul → secours → soins → transport)
+- Permanence des soins = continuité hors horaires cabinets → ARS
+
+2) Acteurs
+- SAMU → SMUR (médecin + IDE + ambulancier) → urgences vitales
+- CRRA = Centre de Réception et de Régulation des Appels
+- BSPP = militaire / 75-92-93-94 / 500 000 interventions/an / 80 % secours victimes
+- Ambulanciers privés + Croix-Rouge / Protection Civile (renfort)
+
+3) Régulation
+- 15 = SAMU → ARM → médecin régulateur → 4 choix : SMUR / urgences / ambulance / conseil
+- 18 = pompiers | 112 = européen | 116 117 = garde non vitale
+- ⚠ 15 saturé aux heures de pointe = grave
+
+II. INÉGALITÉS & ACCÈS AUX SOINS
+
+1) Non-recours & précarité
+- Non-recours = ne pas accéder aux droits auxquels on a droit
+- Causes : info / admin / coût / délais / transport / refus de soins
+- 20 % refus soins = patients C2S
+- Gradient social = + précaire → + risques → - soins
+- Dispositifs : C2S / PUMa / AME / PASS → insuffisants en 93
+
+2) Saturation urgences 2024
+- 4M passages IDF / 93 = parmi les + touchés
+- Avicenne (Bobigny) | Jean-Verdier (Bondy) | Robert-Ballanger (Aulnay)
+- 6-10h attente / fermetures de nuit
+- Bed-blockers = patients bloqués en attente de lit → paralysie
+- Urgences = médecin de premier recours pour les précaires = DÉRIVE
+
+3) Disparités 75/92/93/94
+- 75 : 12 médecins / 10 000 hab → densité élevée
+- 93 : 28 % sous seuil de pauvreté (vs 15 % France) / 11 % chômage à Aulnay
+- Densité médicale = parmi les + faibles de France = DÉSERT MÉDICAL URBAIN
+- 3 fragilités cumulées : pop pauvre + peu de médecins ville + demande urgences ↑↑
+
+CONCLUSION
+- Cumul de facteurs structurels : préhosp organisé mais saturé + désert médical + inégalités territoriales
+- Pistes : MSP / C2S / AME / PASS / prévention
+- ⚠ Sans politique de réduction des inégalités → préhosp pourra pas compenser`,
       questions: [
         "Qu'entendez-vous exactement par « pression préhospitalière » ?",
         "Pouvez-vous définir la notion de précarité dans un contexte médical et social ?",
@@ -42,7 +95,58 @@ App.Oral = (function() {
         "Que proposeriez-vous concrètement pour améliorer la situation en Seine-Saint-Denis ?",
         "Comment le Contrat Local de Santé (CLS) peut-il contribuer à une solution durable ?"
       ],
-      aiContext: "Tu es un professeur de Sciences et Techniques Sanitaires et Sociales (ST2S) préparant un élève au Grand Oral du baccalauréat. La problématique est : \"Quelles sont les conséquences de la pression préhospitalière sur la population en Seine-Saint-Denis et comment tenter d'y remédier ?\" Contexte clé : la pression préhospitalière génère des retards de soins, surcharge les urgences et épuise les soignants. Solutions envisagées : maisons de santé pluriprofessionnelles (MSP), infirmiers de pratique avancée (IPA), télémédecine, Contrat Local de Santé (CLS), prévention primaire, ASALEE."
+      aiContext: "Tu es un professeur de Sciences et Techniques Sanitaires et Sociales (ST2S) préparant un élève au Grand Oral du baccalauréat. La problématique est : \"Quelles sont les conséquences de la pression préhospitalière sur la population en Seine-Saint-Denis et comment tenter d'y remédier ?\" Contexte clé : la pression préhospitalière génère des retards de soins, surcharge les urgences et épuise les soignants. Solutions envisagées : maisons de santé pluriprofessionnelles (MSP), infirmiers de pratique avancée (IPA), télémédecine, Contrat Local de Santé (CLS), prévention primaire, ASALEE.",
+      plan: `INTRO
+- 45 min d'attente en + en 10 ans (DREES)
+- 93 = + pauvre IDF + désert médical
+- Préhospitalier = AVANT l'hôpital (appel → régul → secours → soins → transport)
+- Plan : I. Conséquences → II. Solutions
+
+PROBLÉMATIQUE : Quelles sont les conséquences de la pression préhospitalière sur la population en Seine-Saint-Denis et comment tenter d'y remédier ?
+
+I. CONSÉQUENCES SUR LA POPULATION
+
+1) Allongement des délais dans les SAU
+- SAU = Services d'Accueil des Urgences
+- 2013 : 80 % patients sortaient en - de 4h / +45 min d'attente en 10 ans (DREES)
+- 2023 IDF : médiane 3h30 (= 50 % de + que les autres régions)
+  · Retour à domicile = 2h30 / Hospitalisés = 5h20 / Attente lit = jusqu'à 15h
+- 93 : Avicenne 70 000 passages/an / urgences psy +50 %
+- Bed-blockers = patients bloqués attente lit → paralysie
+
+2) Dégradation qualité des soins
+- Médical : retard PEC → pronostic vital
+  · AVC = "time is brain" → séquelles, décès / Mortalité ↑ si passage > 6h
+- Humain : souffrance / anxiété / brancards couloirs
+- Personnel : burn-out / turn-over / arrêts → fermetures de nuit en 93
+- Inégalités : touche + les précaires (pas de médecin traitant → tout-urgences)
+  = renforcement gradient social de santé
+
+II. LES SOLUTIONS
+
+1) Les politiques publiques
+- 116 117 = médecine garde non vitale → désengorger 15
+- SAS (2021) = Service d'Accès aux Soins → médecine de ville + SAMU
+- MSP = Maisons de Santé Pluriprofessionnelles → lutte désert médical
+- Anti non-recours : C2S / PUMa / AME / PASS → soins en ville plutôt qu'urgences
+
+2) Beauvau de la sécurité civile
+- Grande concertation nationale lancée avril 2024 (ministère Intérieur)
+- 1ère réforme structurelle depuis 2004 (20 ans)
+- Interrompue dissolution juin 2024 → relancée fin 2024 / Rapport sept. 2025
+- Constat : 87 % activité pompiers = secours à personne
+  → "ambulanciers de l'urgence sociale" → loin du cœur de métier
+- Propositions :
+  · CTSU = Contrat Territorial du Secours d'Urgence (5 ans, par préfet)
+  · Plateformes communes 15-18-112
+  · Plus d'associations agréées (Croix-Rouge, Protection Civile)
+- ⚠ Médecins urgentistes + FHF demandent moratoire (janvier 2026)
+
+CONCLUSION
+- Conséquences : ↑ délais SAU + ↓ qualité soins → touche + les précaires
+- Solutions : SAS / 116 117 / MSP / anti non-recours + Beauvau
+- Priorité sanitaire = enjeu majeur pouvoirs publics
+- 93 = territoire emblématique mais aussi d'innovation (Samu Psy 93, mai 2024)`
     }
   };
 
@@ -691,6 +795,7 @@ App.Oral = (function() {
   function setProblematique(id) {
     if (!(id in _PROBLEMS)) return;
     _probId = id;
+    window._oralProbId = id;
     // Arrete les timers en cours
     clearInterval(_presTimer); _presRunning = false; _presElapsed = 0;
     clearInterval(_juryTimer); _juryRunning = false; _juryElapsed = 0;
@@ -702,6 +807,12 @@ App.Oral = (function() {
     // Question
     var qEl = document.getElementById('oral-question-text');
     if (qEl) qEl.textContent = _PROBLEMS[id].text;
+    // Charge le plan pré-enregistré si la textarea est vide (ou si on change de prob)
+    var planEl = document.getElementById('oral-plan');
+    if (planEl) {
+      var saved = localStorage.getItem('ifsi_oral_plan_' + id);
+      planEl.value = saved !== null ? saved : (_PROBLEMS[id].plan || '');
+    }
     _syncEvalProb();
     // Reset affichages
     resetPres();
@@ -713,8 +824,15 @@ App.Oral = (function() {
 
   // ── Init (appelé à chaque switchTab vers oral) ─────────────────
   function init() {
+    window._oralProbId = _probId;
     var qEl = document.getElementById('oral-question-text');
     if (qEl && !qEl.textContent) qEl.textContent = _PROBLEMS[_probId].text;
+    // Charge le plan si la textarea est vide
+    var planEl = document.getElementById('oral-plan');
+    if (planEl && !planEl.value) {
+      var saved = localStorage.getItem('ifsi_oral_plan_' + _probId);
+      planEl.value = saved !== null ? saved : (_PROBLEMS[_probId].plan || '');
+    }
     _initEvalUI();
     _renderHistory();
     // Raffraichit les timers si actifs

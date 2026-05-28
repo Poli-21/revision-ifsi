@@ -517,7 +517,8 @@
         <div class="oral-panel">
           <div class="oral-panel-head">📋 <strong>Ton plan</strong></div>
           <textarea id="oral-plan" class="oral-plan-textarea"
-            placeholder="Rédige ton plan ici…&#10;&#10;Introduction :&#10;• Accroche&#10;• Définitions clés&#10;• Annonce du plan&#10;&#10;I. Premier axe&#10; → argument + exemple&#10;&#10;II. Deuxième axe&#10; → argument + exemple&#10;&#10;Conclusion :&#10;• Bilan&#10;• Ouverture / perspectives"></textarea>
+            placeholder="Rédige ton plan ici…"
+            oninput="localStorage.setItem('ifsi_oral_plan_'+(window._oralProbId||'p1'), this.value)"></textarea>
         </div>
 
         <!-- Panneau 2 : Timer présentation 5 min -->
