@@ -6,6 +6,32 @@ App.Session = (() => {
   let current    = null;
   let mode       = 'flip';
 
+  // ── Ticker sidebar "Session en cours" ─────────────────────────
+  let _tickTimer = null;
+
+  function _startTicker() {
+    const row   = document.getElementById('stat-session-row');
+    const el    = document.getElementById('stat-session-timer');
+    if (row) row.style.display = 'flex';
+    clearInterval(_tickTimer);
+    _tickTimer = setInterval(() => {
+      if (!current) { _stopTicker(); return; }
+      const secs = Math.floor((Date.now() - current.startTime - (current.afkPausedMs || 0)) / 1000);
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      if (el) el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+    }, 1000);
+  }
+
+  function _stopTicker() {
+    clearInterval(_tickTimer);
+    _tickTimer = null;
+    const row = document.getElementById('stat-session-row');
+    const el  = document.getElementById('stat-session-timer');
+    if (row) row.style.display = 'none';
+    if (el)  el.textContent = '0:00';
+  }
+
   // ── AFK ────────────────────────────────────────────────────────
   const AFK_MS   = 10 * 60 * 1000;  // 10 minutes d'inactivité
   let _afkTimer  = null;
@@ -98,6 +124,7 @@ App.Session = (() => {
     App.UI.showView('session');
     _initAfkListeners();
     _resetAfkTimer();
+    _startTicker();
     show();
   }
 
@@ -305,6 +332,7 @@ App.Session = (() => {
       if (elapsed > 0) App.Store.logSessionDuration(elapsed);
     }
     _stopAfkTimer();
+    _stopTicker();
     current = null;
     App.UI.showView('home');
     App.Render.all();
