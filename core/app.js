@@ -293,7 +293,6 @@ Object.assign(window, {
   startRenameCat     : (cat, btn) => _startRenameCat(cat, btn),
   deleteCat          : (cat)      => _deleteCat(cat),
   bulkDelete         : ()         => bulkDelete(),
-  _showToast         : (msg)      => _showToast(msg),
   handleCatClick     : (cat, e, btn) => _handleCatClick(cat, e, btn),
   renderBrowse   : ()     => App.Render.browseDebounced(),
   // Modales
