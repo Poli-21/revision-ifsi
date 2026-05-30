@@ -10,26 +10,34 @@ App.Session = (() => {
   let _tickTimer = null;
 
   function _startTicker() {
-    const row   = document.getElementById('stat-session-row');
-    const el    = document.getElementById('stat-session-timer');
-    if (row) row.style.display = 'flex';
+    // Affiche la ligne sidebar
+    const sideRow = document.getElementById('stat-session-row');
+    if (sideRow) sideRow.style.display = 'flex';
     clearInterval(_tickTimer);
     _tickTimer = setInterval(() => {
       if (!current) { _stopTicker(); return; }
       const secs = Math.floor((Date.now() - current.startTime - (current.afkPausedMs || 0)) / 1000);
       const m = Math.floor(secs / 60);
       const s = secs % 60;
-      if (el) el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+      const txt = m + ':' + (s < 10 ? '0' : '') + s;
+      // Timer dans la sidebar
+      const sideEl = document.getElementById('stat-session-timer');
+      if (sideEl) sideEl.textContent = txt;
+      // Timer dans le header de session (toujours visible)
+      const chrono = document.getElementById('session-chrono');
+      if (chrono) chrono.textContent = '⏱ ' + txt;
     }, 1000);
   }
 
   function _stopTicker() {
     clearInterval(_tickTimer);
     _tickTimer = null;
-    const row = document.getElementById('stat-session-row');
-    const el  = document.getElementById('stat-session-timer');
-    if (row) row.style.display = 'none';
-    if (el)  el.textContent = '0:00';
+    const sideRow = document.getElementById('stat-session-row');
+    const sideEl  = document.getElementById('stat-session-timer');
+    if (sideRow) sideRow.style.display = 'none';
+    if (sideEl)  sideEl.textContent = '0:00';
+    const chrono = document.getElementById('session-chrono');
+    if (chrono) chrono.textContent = '⏱ 0:00';
   }
 
   // ── AFK ────────────────────────────────────────────────────────
@@ -390,4 +398,19 @@ App.Session = (() => {
   }
 
   return { start, startWithCards, setMode, show, flip, verifyWrite, answer, end, resumeAfk, getCurrentCat: () => current?.cat };
+})();
+e: Date.now(), afkPausedMs: 0, afkStart: null,
+      cat: label || 'Préparation exam',
+      isPractice: true
+    };
+    App.UI.showView('session');
+    _initAfkListeners();
+    _resetAfkTimer();
+    _startTicker();
+    show();
+  }
+
+  return { start, startWithCards, setMode, show, flip, verifyWrite, answer, end, resumeAfk, getCurrentCat: () => current?.cat };
+})();
+meAfk, getCurrentCat: () => current?.cat };
 })();
