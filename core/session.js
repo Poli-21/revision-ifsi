@@ -394,23 +394,9 @@ App.Session = (() => {
     App.UI.showView('session');
     _initAfkListeners();
     _resetAfkTimer();
-    show();
-  }
-
-  return { start, startWithCards, setMode, show, flip, verifyWrite, answer, end, resumeAfk, getCurrentCat: () => current?.cat };
-})();
-e: Date.now(), afkPausedMs: 0, afkStart: null,
-      cat: label || 'Préparation exam',
-      isPractice: true
-    };
-    App.UI.showView('session');
-    _initAfkListeners();
-    _resetAfkTimer();
     _startTicker();
     show();
   }
 
   return { start, startWithCards, setMode, show, flip, verifyWrite, answer, end, resumeAfk, getCurrentCat: () => current?.cat };
-})();
-meAfk, getCurrentCat: () => current?.cat };
 })();
