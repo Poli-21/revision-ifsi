@@ -866,7 +866,8 @@ CONCLUSION
     setLevel:           setLevel,
     saveEval:           saveEval,
     deleteEval:         deleteEval,
-    analyzePresentation:analyzePresentation
+    analyzePresentation:analyzePresentation,
+    refreshHistory:     _renderHistory
   };
 
 })();

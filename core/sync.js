@@ -73,21 +73,30 @@ App.Sync = (() => {
     const { state } = App.Store;
     const progress = {};
     state.cards.forEach(c => { if (c.progress) progress[c.id] = c.progress; });
+    // Données Grand Oral
+    let oralEvals = [];
+    try { oralEvals = JSON.parse(localStorage.getItem('ifsi_oral_evals') || '[]'); } catch(e) {}
     return JSON.stringify({
       v: 2,
       updatedAt: new Date().toISOString(),
-      progress,               // { cardId: progressObject }
+      progress,
       studyLog: state.studyLog,
-      catOrder: state.catOrder
+      catOrder: state.catOrder,
+      oralEvals,
+      oralPlanP1: localStorage.getItem('ifsi_oral_plan_p1') || '',
+      oralPlanP2: localStorage.getItem('ifsi_oral_plan_p2') || ''
     }, null, 0);
   }
 
   function _deserialize(data) {
     return {
-      progress: data.progress && typeof data.progress === 'object' ? data.progress : {},
-      studyLog: data.studyLog && typeof data.studyLog === 'object' ? data.studyLog : {},
-      catOrder: Array.isArray(data.catOrder) ? data.catOrder : [],
-      updatedAt: data.updatedAt || ''
+      progress:   data.progress && typeof data.progress === 'object' ? data.progress : {},
+      studyLog:   data.studyLog && typeof data.studyLog === 'object' ? data.studyLog : {},
+      catOrder:   Array.isArray(data.catOrder) ? data.catOrder : [],
+      updatedAt:  data.updatedAt || '',
+      oralEvals:  Array.isArray(data.oralEvals) ? data.oralEvals : [],
+      oralPlanP1: typeof data.oralPlanP1 === 'string' ? data.oralPlanP1 : null,
+      oralPlanP2: typeof data.oralPlanP2 === 'string' ? data.oralPlanP2 : null
     };
   }
 
@@ -210,11 +219,34 @@ App.Sync = (() => {
       if (remote.catOrder && remote.catOrder.length > 0)
         App.Store.state.catOrder = remote.catOrder;
 
+      // ── Merge Grand Oral ────────────────────────────────────────
+      // Évaluations : union par date exacte (évite les doublons)
+      if (remote.oralEvals && remote.oralEvals.length > 0) {
+        let localEvals = [];
+        try { localEvals = JSON.parse(localStorage.getItem('ifsi_oral_evals') || '[]'); } catch(e) {}
+        const seen = new Set(localEvals.map(e => e.date));
+        remote.oralEvals.forEach(e => { if (!seen.has(e.date)) localEvals.push(e); });
+        localEvals.sort((a, b) => b.date.localeCompare(a.date));
+        localStorage.setItem('ifsi_oral_evals', JSON.stringify(localEvals.slice(0, 50)));
+      }
+      // Plans : garde le plus long (le plus complet) entre local et distant
+      ['p1', 'p2'].forEach(id => {
+        const key = 'ifsi_oral_plan_' + id;
+        const remoteVal = id === 'p1' ? remote.oralPlanP1 : remote.oralPlanP2;
+        if (remoteVal && remoteVal.length > (localStorage.getItem(key) || '').length) {
+          localStorage.setItem(key, remoteVal);
+        }
+      });
+
       prog(80, 'Sauvegarde…');
       App.Store.save();
       App.Store.saveLog();
       App.Store.saveOrder();
       App.Render.all();
+      // Rafraîchit l'historique Grand Oral si le module est visible
+      if (window.App?.Oral) {
+        try { App.Oral.refreshHistory && App.Oral.refreshHistory(); } catch(e) {}
+      }
       prog(100, 'Synchronisé !');
       _setStatus('ok');
       return true;
@@ -223,6 +255,7 @@ App.Sync = (() => {
       return false;
     }
   }
+
 
   // ── Déconnexion ───────────────────────────────────────────────
   function disconnect() {
@@ -237,30 +270,30 @@ App.Sync = (() => {
     _status = s;
     const el = document.getElementById('sync-indicator');
     if (!el) return;
-    const icons = { idle:'☁️', syncing:'🔄', ok:'✅', error:'⚠️' };
+    const icons  = { idle:'☁️', syncing:'🔄', ok:'✅', error:'⚠️' };
     const colors = { idle:'#6b7280', syncing:'#2563eb', ok:'#16a34a', error:'#dc2626' };
     const labels = { idle:'Non sync.', syncing:'Sync…', ok: msg||'Synchronisé', error: msg||'Erreur sync' };
-    el.textContent = `${icons[s]} ${labels[s]}`;
-    el.style.color = colors[s];
-    if (s === 'syncing') el.style.animation = 'spin .8s linear infinite';
-    else el.style.animation = '';
+    el.textContent  = icons[s]  || '☁️';
+    el.style.color  = colors[s] || '#6b7280';
+    el.title        = labels[s] || s;
   }
 
   function _updateUI() {
-    const btn = document.getElementById('sync-settings-btn');
-    if (btn) btn.textContent = isConfigured() ? '☁️ Sync ON' : '☁️ Sync';
+    const configured = isConfigured();
+    const setupZone  = document.getElementById('sync-setup-zone');
+    const connZone   = document.getElementById('sync-connected-zone');
+    if (setupZone) setupZone.style.display  = configured ? 'none'  : 'block';
+    if (connZone)  connZone.style.display   = configured ? 'block' : 'none';
   }
 
-  // ── Init ──────────────────────────────────────────────────────
+  // ── Init (appelé au démarrage de l'app) ───────────────────────
   function init() {
     loadConfig();
     _updateUI();
     if (isConfigured()) {
-      _setStatus('ok', 'Configuré');
-      // Pull au démarrage pour récupérer les mises à jour d'autres appareils
+      _setStatus('ok');
+      // Pull automatique au démarrage (avec délai pour laisser le DOM se charger)
       setTimeout(pullRemote, 1000);
-    } else {
-      _setStatus('idle');
     }
   }
 
