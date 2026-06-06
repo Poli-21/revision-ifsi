@@ -258,6 +258,7 @@ function _initKeyboard() {
 Object.assign(window, {
   // Session
   startSession   : (cat)  => App.Session.start(cat),
+  startChrono    : ()     => App.Session.startChrono(),
   endSession     : ()     => App.Session.end(),
   flipCard       : ()     => App.Session.flip(),
   answer         : (q)    => App.Session.answer(q),

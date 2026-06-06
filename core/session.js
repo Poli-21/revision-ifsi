@@ -23,9 +23,12 @@ App.Session = (() => {
       // Timer dans la sidebar
       const sideEl = document.getElementById('stat-session-timer');
       if (sideEl) sideEl.textContent = txt;
-      // Timer dans le header de session (toujours visible)
+      // Timer dans le header de session
       const chrono = document.getElementById('session-chrono');
       if (chrono) chrono.textContent = '⏱ ' + txt;
+      // Grand affichage chrono libre
+      const libreDisplay = document.getElementById('chrono-libre-display');
+      if (libreDisplay) libreDisplay.textContent = txt;
     }, 1000);
   }
 
@@ -96,6 +99,22 @@ App.Session = (() => {
     );
   }
 
+  // ── Chrono libre (sans cartes) ─────────────────────────────────
+  function startChrono() {
+    current = {
+      queue: [], idx: 0,
+      stats: { ok: 0, hard: 0, nope: 0, again: 0 },
+      startTime: Date.now(), afkPausedMs: 0, afkStart: null,
+      cat: 'Chrono libre',
+      chronoOnly: true
+    };
+    App.UI.showView('session');
+    _initAfkListeners();
+    _resetAfkTimer();
+    _startTicker();
+    show();
+  }
+
   // ── Démarrage ──────────────────────────────────────────────────
   function start(cat) {
     const { state } = App.Store;
@@ -154,6 +173,21 @@ App.Session = (() => {
     document.getElementById('qcm-zone').style.display        = 'none';
     document.getElementById('write-answer-btns').style.display = 'none';
     document.getElementById('session-done').style.display    = 'none';
+    const chronoZone = document.getElementById('chrono-libre-zone');
+    if (chronoZone) chronoZone.style.display = 'none';
+    // Mode chrono libre : pas de cartes, juste le timer
+    if (current.chronoOnly) {
+      if (chronoZone) chronoZone.style.display = 'flex';
+      // Cache barre de progression et boutons de mode
+      const prog = document.querySelector('.session-progress-bar');
+      if (prog) prog.style.visibility = 'hidden';
+      const count = document.getElementById('session-count');
+      if (count) count.textContent = 'Chrono libre';
+      return;
+    }
+    // Restaure la barre de progression si on revient en mode normal
+    const prog = document.querySelector('.session-progress-bar');
+    if (prog) prog.style.visibility = 'visible';
     if (current.idx >= current.queue.length) { showDone(); return; }
     const c     = current.queue[current.idx];
     const total = current.queue.length;
@@ -337,8 +371,12 @@ App.Session = (() => {
   function end() {
     if (current) {
       const elapsed = _effectiveSecs();
+      // On log le temps même en mode chrono libre
       if (elapsed > 0) App.Store.logSessionDuration(elapsed);
     }
+    // Restaure la barre de progression si elle était cachée
+    const prog = document.querySelector('.session-progress-bar');
+    if (prog) prog.style.visibility = 'visible';
     _stopAfkTimer();
     _stopTicker();
     current = null;
@@ -398,5 +436,5 @@ App.Session = (() => {
     show();
   }
 
-  return { start, startWithCards, setMode, show, flip, verifyWrite, answer, end, resumeAfk, getCurrentCat: () => current?.cat };
+  return { start, startChrono, startWithCards, setMode, show, flip, verifyWrite, answer, end, resumeAfk, getCurrentCat: () => current?.cat };
 })();
