@@ -85,7 +85,8 @@
       <button class="tab"        onclick="switchTab('ortho')"  id="tab-ortho">✏️ Orthographe</button>
       <button class="tab"        onclick="switchTab('games')"  id="tab-games">🎯 Entraînement</button>
       <button class="tab"        onclick="switchTab('bac')"    id="tab-bac">📝 Bac ST2S</button>
-      <button class="tab"        onclick="switchTab('oral')"   id="tab-oral">🎤 Grand Oral</button>
+      <button class="tab"        onclick="switchTab('oral')"    id="tab-oral">🎤 Grand Oral</button>
+      <button class="tab"        onclick="switchTab('english')" id="tab-english">🇬🇧 Anglais</button>
     </div>
 
     <!-- ── HOME ──────────────────────────────────────────────── -->
@@ -676,6 +677,59 @@
 
     </div>
 
+    <!-- ══ ANGLAIS / DUOLINGO ══════════════════════════════════════ -->
+    <div id="english-view" style="display:none;padding:1.5rem 1rem">
+
+      <!-- Accueil leçons -->
+      <div id="english-home">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.4rem;flex-wrap:wrap;gap:.8rem">
+          <div>
+            <h2 style="margin:0;font-size:1.35rem">🇬🇧 Anglais IFSI</h2>
+            <p style="margin:.3rem 0 0;color:var(--text-secondary);font-size:.88rem">Maîtrise le vocabulaire médical anglais</p>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:1.4rem;font-weight:800;color:#f59e0b" id="english-total-xp">0 XP</div>
+            <div style="font-size:.72rem;color:var(--text-secondary)">XP total</div>
+          </div>
+        </div>
+        <div class="eng-lessons-grid" id="english-lessons-grid"></div>
+      </div>
+
+      <!-- Partie en cours -->
+      <div id="english-game" style="display:none;max-width:580px;margin:0 auto">
+        <div class="eng-topbar">
+          <button class="eng-quit-btn" onclick="App.English.quitLesson()" title="Quitter">✕</button>
+          <div class="eng-progress-bar"><div class="eng-progress-fill" id="eng-progress-fill"></div></div>
+          <div id="eng-hearts" style="font-size:1.1rem;white-space:nowrap">❤️❤️❤️</div>
+        </div>
+        <div style="text-align:right;font-size:.82rem;color:#f59e0b;font-weight:700;margin:.4rem 0 .6rem" id="eng-xp">0 XP</div>
+
+        <div class="eng-question-area">
+          <div class="eng-prompt-label" id="eng-prompt-label"></div>
+          <div class="eng-word" id="eng-word"></div>
+          <div class="eng-phonetic" id="eng-phonetic"></div>
+          <div class="eng-choices" id="eng-choices"></div>
+        </div>
+
+        <div id="eng-feedback" class="eng-feedback" style="display:none">
+          <div id="eng-feedback-text" style="flex:1"></div>
+          <button class="eng-continue-btn" onclick="App.English.continueQ()">Continuer →</button>
+        </div>
+      </div>
+
+      <!-- Résultats -->
+      <div id="english-result" style="display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3rem 1rem 6rem;gap:1.2rem;min-height:55vh">
+        <div id="eng-result-title" style="font-size:1.8rem;font-weight:800"></div>
+        <div id="eng-result-stars" style="font-size:2.6rem;letter-spacing:4px"></div>
+        <div id="eng-result-xp" style="font-size:1.05rem;margin-top:.3rem"></div>
+        <div style="display:flex;gap:1rem;margin-top:1.2rem;flex-wrap:wrap;justify-content:center">
+          <button class="btn btn-ghost" onclick="App.English.showHome()">← Retour</button>
+          <button class="btn btn-primary" onclick="App.English.replay()">🔄 Rejouer</button>
+        </div>
+      </div>
+
+    </div>
+
   </main>
 </div>
 
@@ -870,6 +924,7 @@
 <script src="core/games.js"></script>
 <script src="core/bac.js"></script>
 <script src="core/oral.js"></script>
+<script src="core/english.js"></script>
 <script src="core/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

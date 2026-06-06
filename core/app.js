@@ -30,11 +30,13 @@ App.UI = (() => {
     document.getElementById('ortho-view').style.display  = tab === 'ortho'   ? 'block' : 'none';
     document.getElementById('games-view').style.display  = tab === 'games'   ? 'block' : 'none';
     document.getElementById('bac-view').style.display    = tab === 'bac'     ? 'block' : 'none';
-    document.getElementById('oral-view').style.display   = tab === 'oral'    ? 'block' : 'none';
+    document.getElementById('oral-view').style.display    = tab === 'oral'    ? 'block' : 'none';
+    document.getElementById('english-view').style.display = tab === 'english' ? 'block' : 'none';
     document.getElementById('session-view').style.display = 'none';
-    if (tab === 'bac')  App.Bac.init();
-    if (tab === 'oral') App.Oral.init();
-    ['home','browse','stats','ortho','games','bac','oral'].forEach(t => {
+    if (tab === 'bac')     App.Bac.init();
+    if (tab === 'oral')    App.Oral.init();
+    if (tab === 'english') App.English.init();
+    ['home','browse','stats','ortho','games','bac','oral','english'].forEach(t => {
       const btn = document.getElementById('tab-' + t);
       if (btn) btn.classList.toggle('active', t === tab);
     });
@@ -1391,7 +1393,7 @@ async function downloadBackup(key) {
 function _showBackupToast(dateStr) {
   const toast = document.createElement('div');
   toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f8fafc;padding:10px 20px;border-radius:99px;font-size:.82rem;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:fadeInUp .3s ease';
-  toast.textContent = `💾 Sauvegarde locale créée (${dateStr})`;
+  toast.textContent = `💾 Sauvegarde locale du ${dateStr}`;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3500);
 }
