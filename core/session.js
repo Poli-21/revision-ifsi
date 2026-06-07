@@ -141,12 +141,28 @@ App.Session = (() => {
       if (c.progress.repetitions <= 1) return 2;
       return 1;
     }
-    // Mélange à l'intérieur de chaque groupe, puis trie par priorité
-    for (let i = cards.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [cards[i], cards[j]] = [cards[j], cards[i]];
+    // ── Tri : fragiles (<30J) groupés par chapitre, maîtrisés (≥30J) mélangés ──
+    const MASTERED_DAYS = 30;
+    function _shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
     }
-    cards.sort((a, b) => _cardPriority(a) - _cardPriority(b));
+    // Cartes à risque exam → restent en tête, mélangées entre elles
+    const examRisk = cards.filter(c => _cardPriority(c) === 0);
+    const rest     = cards.filter(c => _cardPriority(c) !== 0);
+    // Fragiles = jamais vues ou intervalle < 30J → groupées par matière
+    const fragile  = rest.filter(c => !c.progress || (c.progress.interval || 0) < MASTERED_DAYS);
+    const mastered = rest.filter(c => c.progress && (c.progress.interval || 0) >= MASTERED_DAYS);
+    // Fragiles : groupées par cat, mélangées dans chaque groupe, ordre des groupes mélangé
+    const catGroups = {};
+    fragile.forEach(c => { (catGroups[c.cat] = catGroups[c.cat] || []).push(c); });
+    const fragileOrdered = _shuffle(Object.values(catGroups).map(_shuffle)).flat();
+    // Maîtrisées : mélangées librement
+    _shuffle(mastered);
+    cards = [..._shuffle(examRisk), ...fragileOrdered, ...mastered];
     current = { queue: [...cards], idx: 0, stats: { ok: 0, hard: 0, nope: 0, again: 0 }, startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: sessionLabel };
     App.UI.showView('session');
     _initAfkListeners();
@@ -413,22 +429,26 @@ App.Session = (() => {
 
   function resumeAfk() { _resetAfkTimer(); }
 
-  // ── Session avec liste de cartes imposée (prép exam) ──────────
+
   function startWithCards(cards, label) {
-    if (!cards.length) { alert('Aucune carte à travailler !'); return; }
-    // Tri : cartes jamais vues d'abord, puis les plus fragiles (EF bas)
-    cards = [...cards].sort((a, b) => {
-      const efA = a.progress?.easeFactor ?? 0;
-      const efB = b.progress?.easeFactor ?? 0;
-      return efA - efB;
-    });
-    current = {
-      queue: cards, idx: 0,
-      stats: { ok: 0, hard: 0, nope: 0, again: 0 },
-      startTime: Date.now(), afkPausedMs: 0, afkStart: null,
-      cat: label || 'Préparation exam',
-      isPractice: true   // pas de mise à jour SRS — évite d'accélérer les intervalles
-    };
+    if (!cards || !cards.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
+    // Applique le même tri : fragiles par chapitre, maîtrisés mélangés
+    const MASTERED_DAYS = 30;
+    function _shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+    const fragile  = cards.filter(c => !c.progress || (c.progress.interval || 0) < MASTERED_DAYS);
+    const mastered = cards.filter(c => c.progress && (c.progress.interval || 0) >= MASTERED_DAYS);
+    const catGroups = {};
+    fragile.forEach(c => { (catGroups[c.cat] = catGroups[c.cat] || []).push(c); });
+    const fragileOrdered = _shuffle(Object.values(catGroups).map(_shuffle)).flat();
+    _shuffle(mastered);
+    const queue = [...fragileOrdered, ...mastered];
+    current = { queue, idx: 0, stats: { ok: 0, hard: 0, nope: 0, again: 0 }, startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: label || '' };
     App.UI.showView('session');
     _initAfkListeners();
     _resetAfkTimer();
@@ -436,5 +456,5 @@ App.Session = (() => {
     show();
   }
 
-  return { start, startChrono, startWithCards, setMode, show, flip, verifyWrite, answer, end, resumeAfk, getCurrentCat: () => current?.cat };
+  return { start, startChrono, startWithCards, show, end, setMode, rate, answer, resumeAfk };
 })();
