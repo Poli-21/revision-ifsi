@@ -1,4 +1,4 @@
-// core/session.js — Logique de session (flip / écriture / QCM + SM-2 + "Again")
+// core/session.js — Logique de session (flip / écriture / QCM + SM-2 + "Again"t)
 'use strict';
 window.App = window.App || {};
 
