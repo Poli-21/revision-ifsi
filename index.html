@@ -682,17 +682,32 @@
 
       <!-- Accueil leçons -->
       <div id="english-home">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.4rem;flex-wrap:wrap;gap:.8rem">
+        <!-- Header stats -->
+        <div class="eng-home-header">
           <div>
             <h2 style="margin:0;font-size:1.35rem">🇬🇧 Anglais IFSI</h2>
-            <p style="margin:.3rem 0 0;color:var(--text-secondary);font-size:.88rem">Maîtrise le vocabulaire médical anglais</p>
+            <p style="margin:.3rem 0 0;color:var(--text-secondary);font-size:.85rem">96 mots médicaux essentiels</p>
           </div>
-          <div style="text-align:right">
-            <div style="font-size:1.4rem;font-weight:800;color:#f59e0b" id="english-total-xp">0 XP</div>
-            <div style="font-size:.72rem;color:var(--text-secondary)">XP total</div>
+          <div class="eng-home-badges">
+            <div class="eng-streak-badge" id="eng-streak-badge" title="Série de jours">🔥 0</div>
+            <div class="eng-level-badge"  id="eng-level-badge">🌱 Débutant</div>
+            <div style="font-size:1.1rem;font-weight:800;color:#f59e0b" id="english-total-xp">0 XP</div>
           </div>
         </div>
+
+        <!-- Objectif journalier -->
+        <div class="eng-daily-wrap" id="eng-daily-goal-wrap">
+          <div class="eng-daily-label">🎯 Objectif du jour : <strong><span id="eng-daily-xp">0</span>/50 XP</strong></div>
+          <div class="eng-daily-bar"><div class="eng-daily-fill" id="eng-daily-fill" style="width:0%"></div></div>
+        </div>
+
+        <!-- Révision mots faibles -->
+        <div id="eng-review-btn-wrap" style="display:none;margin-bottom:1rem">
+          <button class="btn btn-primary" style="width:100%" onclick="App.English.startReview()">🔄 Réviser les mots difficiles</button>
+        </div>
+
         <div class="eng-lessons-grid" id="english-lessons-grid"></div>
+        <div id="eng-mastered-count" style="text-align:center;font-size:.8rem;color:var(--text-secondary);margin-top:1rem;padding-bottom:2rem"></div>
       </div>
 
       <!-- Partie en cours -->
@@ -700,15 +715,29 @@
         <div class="eng-topbar">
           <button class="eng-quit-btn" onclick="App.English.quitLesson()" title="Quitter">✕</button>
           <div class="eng-progress-bar"><div class="eng-progress-fill" id="eng-progress-fill"></div></div>
-          <div id="eng-hearts" style="font-size:1.1rem;white-space:nowrap">❤️❤️❤️</div>
+          <div id="eng-hearts" style="font-size:1.05rem;white-space:nowrap">❤️❤️❤️</div>
         </div>
-        <div style="text-align:right;font-size:.82rem;color:#f59e0b;font-weight:700;margin:.4rem 0 .6rem" id="eng-xp">0 XP</div>
+        <div style="display:flex;align-items:center;gap:.5rem;justify-content:flex-end;font-size:.82rem;font-weight:700;color:#f59e0b;margin:.3rem 0 .5rem">
+          <span id="eng-xp">0 XP</span>
+          <span id="eng-xp-anim" style="display:none;font-size:.75rem;color:#16a34a;font-weight:800"></span>
+        </div>
 
         <div class="eng-question-area">
           <div class="eng-prompt-label" id="eng-prompt-label"></div>
-          <div class="eng-word" id="eng-word"></div>
+          <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.4rem">
+            <div class="eng-word" id="eng-word" style="flex:1"></div>
+            <button id="eng-tts-btn" class="eng-tts-btn" onclick="App.English.speakWord()" title="Écouter">🔊</button>
+          </div>
           <div class="eng-phonetic" id="eng-phonetic"></div>
+          <!-- QCM -->
           <div class="eng-choices" id="eng-choices"></div>
+          <!-- Frappe -->
+          <div id="eng-type-zone" style="display:none">
+            <input type="text" id="eng-type-input" class="eng-type-input"
+              placeholder="Écris en anglais…" autocomplete="off" autocorrect="off" spellcheck="false" />
+            <button class="eng-check-btn" onclick="App.English.checkType()">Vérifier →</button>
+            <div class="eng-type-hint" id="eng-type-hint" style="display:none"></div>
+          </div>
         </div>
 
         <div id="eng-feedback" class="eng-feedback" style="display:none">
@@ -718,15 +747,20 @@
       </div>
 
       <!-- Résultats -->
-      <div id="english-result" style="display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3rem 1rem 6rem;gap:1.2rem;min-height:55vh">
+      <div id="english-result" style="display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3rem 1rem 6rem;gap:1rem;min-height:55vh">
+        <div id="eng-result-emoji" style="font-size:3.5rem"></div>
         <div id="eng-result-title" style="font-size:1.8rem;font-weight:800"></div>
-        <div id="eng-result-stars" style="font-size:2.6rem;letter-spacing:4px"></div>
-        <div id="eng-result-xp" style="font-size:1.05rem;margin-top:.3rem"></div>
+        <div id="eng-result-stars" style="font-size:2.4rem;letter-spacing:4px;margin:.2rem 0"></div>
+        <div id="eng-result-xp" style="font-size:1.1rem"></div>
+        <div id="eng-result-streak" style="font-size:.9rem;color:var(--text-secondary)"></div>
         <div style="display:flex;gap:1rem;margin-top:1.2rem;flex-wrap:wrap;justify-content:center">
           <button class="btn btn-ghost" onclick="App.English.showHome()">← Retour</button>
           <button class="btn btn-primary" onclick="App.English.replay()">🔄 Rejouer</button>
         </div>
       </div>
+
+      <!-- Confettis -->
+      <div id="eng-confetti" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:998;display:none;overflow:hidden"></div>
 
     </div>
 
