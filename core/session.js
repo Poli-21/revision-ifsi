@@ -456,5 +456,5 @@ App.Session = (() => {
     show();
   }
 
-  return { start, startChrono, startWithCards, show, end, setMode, rate, answer, resumeAfk };
+  return { start, startChrono, startWithCards, show, end, setMode, answer, resumeAfk };
 })();
