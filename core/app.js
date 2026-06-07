@@ -1204,11 +1204,8 @@ function startExamPrep(id) {
   let pool = state.cards.filter(c => !c.suspended);
   if (exam.cats?.length) pool = pool.filter(c => exam.cats.includes(c.cat));
 
-  // Cartes à risque : nextReview <= date exam (mémoire expirée avant l'exam), ou jamais révisées
-  const atRisk = pool.filter(c => {
-    if (!c.progress) return true; // jamais révisée
-    return (c.progress.nextReview || today) <= exam.date;
-  });
+  // Cartes à risque : jamais vues (repetitions < 1) — objectif exam = avoir vu une fois suffit
+  const atRisk = pool.filter(c => !c.progress || (c.progress.repetitions || 0) < 1);
 
   if (atRisk.length === 0) {
     alert(`✅ Aucune carte à risque pour "${exam.name}" — tu es prêt(e) !`);
@@ -1230,7 +1227,7 @@ function _renderExamFormStats(exam) {
   if (exam.cats?.length) pool = pool.filter(c => exam.cats.includes(c.cat));
 
   const total   = pool.length;
-  const atRisk  = pool.filter(c => !c.progress || (c.progress.nextReview || today) <= exam.date).length;
+  const atRisk  = pool.filter(c => !c.progress || (c.progress.repetitions || 0) < 1).length;
   const ready   = total - atRisk;
   const pct     = total > 0 ? Math.round(ready / total * 100) : 0;
   const diffDays = Math.round((new Date(exam.date + 'T00:00:00') - new Date()) / 86400000);
@@ -1242,7 +1239,7 @@ function _renderExamFormStats(exam) {
     const cat = c.cat || 'Général';
     if (!byCat[cat]) byCat[cat] = { total: 0, risk: 0 };
     byCat[cat].total++;
-    if (!c.progress || (c.progress.nextReview || today) > exam.date) byCat[cat].risk++;
+    if (!c.progress || (c.progress.repetitions || 0) < 1) byCat[cat].risk++;
   });
 
   const catRows = Object.entries(byCat).map(([cat, s]) => {
@@ -1267,7 +1264,7 @@ function _renderExamFormStats(exam) {
         <div style="height:8px;background:var(--gray-200);border-radius:99px;overflow:hidden;margin-bottom:5px">
           <div style="height:100%;width:${pct}%;background:${col};border-radius:99px;transition:width .4s"></div>
         </div>
-        <div style="font-size:.78rem;color:var(--gray-600)">${ready} / ${total} cartes maîtrisées · <strong style="color:var(--danger)">${atRisk} à risque</strong></div>
+        <div style="font-size:.78rem;color:var(--gray-600)">${ready} / ${total} cartes vues · <strong style="color:var(--danger)">${atRisk} jamais vues</strong></div>
         <div style="font-size:.75rem;color:var(--gray-400);margin-top:2px">${diffDays > 0 ? `${diffDays} jour${diffDays > 1 ? 's' : ''} restant${diffDays > 1 ? 's' : ''}` : diffDays === 0 ? "C'est aujourd'hui !" : 'Examen passé'}</div>
       </div>
     </div>
