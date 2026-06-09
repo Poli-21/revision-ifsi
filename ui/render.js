@@ -600,6 +600,76 @@ App.Render = (() => {
       <span style="color:var(--gray-400);font-size:.72rem">200+</span>
     </div>`;
 
+    // ── Moyennes hebdo / mensuel ─────────────────────────────────
+    // 4 dernières semaines complètes
+    const weekData = [];
+    for (let w = 3; w >= 0; w--) {
+      let wSecs = 0, wCards = 0;
+      for (let d = 0; d < 7; d++) {
+        const dt2 = new Date(today); dt2.setDate(dt2.getDate() - w*7 - d);
+        const e = log[dt2.toISOString().slice(0,10)] || {};
+        wSecs += e.seconds||0; wCards += e.reviewed||0;
+      }
+      weekData.push({ secs: wSecs, cards: wCards });
+    }
+    const activeWeeks = weekData.filter(w => w.secs > 0).length || 1;
+    const avgWkSecs  = Math.round(weekData.reduce((s,w) => s+w.secs,  0) / activeWeeks);
+    const avgWkCards = Math.round(weekData.reduce((s,w) => s+w.cards, 0) / activeWeeks);
+
+    // 3 derniers mois complets
+    const monthData = [];
+    for (let m = 2; m >= 0; m--) {
+      const mStart = new Date(today.getFullYear(), today.getMonth()-m, 1);
+      const mEnd   = new Date(today.getFullYear(), today.getMonth()-m+1, 0);
+      let mSecs = 0, mCards = 0;
+      for (let dt2 = new Date(mStart); dt2 <= mEnd; dt2.setDate(dt2.getDate()+1)) {
+        const e = log[dt2.toISOString().slice(0,10)] || {};
+        mSecs += e.seconds||0; mCards += e.reviewed||0;
+      }
+      monthData.push({ secs: mSecs, cards: mCards,
+        name: mStart.toLocaleDateString('fr',{month:'short'}).replace(/^\w/,c=>c.toUpperCase()) });
+    }
+    const activeMonths  = monthData.filter(m => m.secs > 0).length || 1;
+    const avgMoSecs  = Math.round(monthData.reduce((s,m) => s+m.secs,  0) / activeMonths);
+    const avgMoCards = Math.round(monthData.reduce((s,m) => s+m.cards, 0) / activeMonths);
+
+    const fmtTime = s => {
+      if (!s) return '—';
+      const h = Math.floor(s/3600), m2 = Math.floor((s%3600)/60);
+      return h > 0 ? h+'h'+(m2>0?m2+'min':'') : m2+'min';
+    };
+
+    // Barres temps/semaine (4 dernières semaines)
+    const maxWkSecs = Math.max(...weekData.map(w=>w.secs), 1);
+    const wkBarsHTML = weekData.map((w, i) => {
+      const pct  = Math.round(w.secs / maxWkSecs * 100);
+      const lbl  = i === 3 ? 'Cette sem.' : `S-${3-i}`;
+      const isNow = i === 3;
+      return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:3px">
+        <div style="font-size:.68rem;color:var(--gray-400);min-height:14px">${fmtTime(w.secs)}</div>
+        <div style="width:100%;height:52px;display:flex;align-items:flex-end">
+          <div style="width:100%;height:${Math.max(pct,2)}%;background:${isNow?'linear-gradient(180deg,#34d399,#059669)':'#6d28d9'};border-radius:4px 4px 0 0;opacity:${w.secs?1:0.25}"></div>
+        </div>
+        <div style="font-size:.68rem;color:${isNow?'#34d399':'var(--gray-400)'};font-weight:${isNow?700:400}">${lbl}</div>
+        <div style="font-size:.65rem;color:var(--gray-500)">${w.cards?w.cards+' cartes':''}</div>
+      </div>`;
+    }).join('');
+
+    // Barres temps/mois (3 derniers mois)
+    const maxMoSecs = Math.max(...monthData.map(m=>m.secs), 1);
+    const moBarsHTML = monthData.map((m, i) => {
+      const pct  = Math.round(m.secs / maxMoSecs * 100);
+      const isNow = i === 2;
+      return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:3px">
+        <div style="font-size:.68rem;color:var(--gray-400);min-height:14px">${fmtTime(m.secs)}</div>
+        <div style="width:100%;height:52px;display:flex;align-items:flex-end">
+          <div style="width:100%;height:${Math.max(pct,2)}%;background:${isNow?'linear-gradient(180deg,#60a5fa,#2563eb)':'#4c1d95'};border-radius:4px 4px 0 0;opacity:${m.secs?1:0.25}"></div>
+        </div>
+        <div style="font-size:.68rem;color:${isNow?'#60a5fa':'var(--gray-400)'};font-weight:${isNow?700:400}">${m.name}</div>
+        <div style="font-size:.65rem;color:var(--gray-500)">${m.cards?m.cards+' cartes':''}</div>
+      </div>`;
+    }).join('');
+
     // ── Injection DOM ──
     const el = document.getElementById('ypt-heatmap');
     if (!el) return;
@@ -613,6 +683,8 @@ App.Render = (() => {
         <div class="ypt-kpi"><span class="ypt-kpi-n" style="color:#a78bfa">🔥 ${streak}</span><span class="ypt-kpi-l">Série en cours</span></div>
         <div class="ypt-kpi"><span class="ypt-kpi-n">${totalCards.toLocaleString('fr')}</span><span class="ypt-kpi-l">Total révisées</span></div>
         <div class="ypt-kpi"><span class="ypt-kpi-n">${activeDays}</span><span class="ypt-kpi-l">Jours actifs</span></div>
+        <div class="ypt-kpi"><span class="ypt-kpi-n" style="color:#34d399">${fmtTime(avgWkSecs)}</span><span class="ypt-kpi-l">Moy. / semaine</span></div>
+        <div class="ypt-kpi"><span class="ypt-kpi-n" style="color:#60a5fa">${fmtTime(avgMoSecs)}</span><span class="ypt-kpi-l">Moy. / mois</span></div>
       </div>
 
       <!-- Prévision carte/jour -->
@@ -627,6 +699,19 @@ App.Render = (() => {
         ${bar30HTML}
       </div>
       <div class="ypt-tooltip" id="ypt-tooltip" style="display:none"></div>
+
+      <!-- Temps d'étude -->
+      <div class="ypt-section-label" style="margin-top:20px">⏱ Temps d'étude</div>
+      <div style="display:flex;gap:16px;margin-bottom:4px">
+        <div style="flex:1;background:var(--gray-800,#1e1e2e);border-radius:10px;padding:12px 10px">
+          <div style="font-size:.72rem;color:var(--gray-400);margin-bottom:8px;font-weight:600">PAR SEMAINE · moy. <span style="color:#34d399">${fmtTime(avgWkSecs)}</span> · <span style="color:var(--gray-400)">${avgWkCards} cartes</span></div>
+          <div style="display:flex;gap:4px;align-items:flex-end">${wkBarsHTML}</div>
+        </div>
+        <div style="flex:1;background:var(--gray-800,#1e1e2e);border-radius:10px;padding:12px 10px">
+          <div style="font-size:.72rem;color:var(--gray-400);margin-bottom:8px;font-weight:600">PAR MOIS · moy. <span style="color:#60a5fa">${fmtTime(avgMoSecs)}</span> · <span style="color:var(--gray-400)">${avgMoCards} cartes</span></div>
+          <div style="display:flex;gap:4px;align-items:flex-end">${moBarsHTML}</div>
+        </div>
+      </div>
 
       <!-- Heatmap 6 mois -->
       <div class="ypt-section-label" style="margin-top:20px">🗓 Activité — 6 mois</div>
