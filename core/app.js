@@ -1139,13 +1139,15 @@ function openExamModal(id) {
     _renderExamFormStats(exam);
     if (statsEl) statsEl.style.display = 'block';
   } else {
-    // Mode nouveau
+    // Mode nouveau — tout réinitialiser
     if (nameEl)  nameEl.value  = '';
     if (dateEl)  dateEl.value  = '';
     if (titleEl) titleEl.textContent = '🎓 Nouvel examen';
     if (delBtn)  delBtn.style.display = 'none';
     if (prepBtn) prepBtn.style.display = 'none';
     if (statsEl) statsEl.style.display = 'none';
+    // Décocher toutes les matières
+    if (catsEl) catsEl.querySelectorAll('input[name="exam-cat"]').forEach(cb => cb.checked = false);
   }
 
   overlay.style.display = 'flex';

@@ -116,20 +116,21 @@ App.Store = (() => {
 
   // ── Indicateur de stockage ─────────────────────────────────────
   function _notifyStorage() {
-    if (!navigator.storage || !navigator.storage.estimate) return;
-    navigator.storage.estimate().then(({ usage, quota }) => {
-      const el = document.getElementById('storage-indicator');
-      if (!el) return;
-      const usedMB  = (usage  / 1048576).toFixed(1);
-      const quotaMB = (quota  / 1048576).toFixed(0);
-      const pct     = Math.min(100, Math.round(usage / quota * 100));
-      const warn    = pct > 80;
-      el.title   = `Stockage : ${usedMB} Mo utilisés sur ${quotaMB} Mo`;
-      el.style.display    = 'inline-flex';
-      el.style.background = warn ? '#fee2e2' : '#f0fdf4';
-      el.style.color      = warn ? '#dc2626' : '#16a34a';
-      el.textContent      = warn ? `⚠ ${usedMB}Mo` : `💾 ${usedMB}Mo`;
-    });
+    const el = document.getElementById('storage-indicator');
+    if (!el) return;
+    // Mesure la taille réelle des données app depuis l'état en mémoire
+    // (navigator.storage.estimate inclut le cache SW et surreprésente de ×3)
+    let bytes = 0;
+    try { bytes += JSON.stringify(state.cards).length    * 2; } catch(e) {}
+    try { bytes += JSON.stringify(state.studyLog).length * 2; } catch(e) {}
+    try { bytes += JSON.stringify(state.catOrder).length * 2; } catch(e) {}
+    const usedMB = (bytes / 1048576).toFixed(1);
+    const warn   = bytes > 20 * 1048576; // alerte > 20 Mo
+    el.title            = `Données app : ${usedMB} Mo`;
+    el.style.display    = 'inline-flex';
+    el.style.background = warn ? '#fee2e2' : '#f0fdf4';
+    el.style.color      = warn ? '#dc2626' : '#16a34a';
+    el.textContent      = warn ? `⚠ ${usedMB}Mo` : `💾 ${usedMB}Mo`;
   }
 
   // ── Log des révisions ─────────────────────────────────────────
