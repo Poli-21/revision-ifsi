@@ -436,6 +436,14 @@
           <div class="qcm-question" id="qcm-question"></div>
         </div>
         <div class="qcm-choices" id="qcm-choices"></div>
+        <!-- Révélation bonne réponse après erreur -->
+        <div id="qcm-reveal" class="qcm-reveal" style="display:none">
+          <div class="qcm-reveal-block">
+            <div class="qcm-reveal-label">✓ Bonne réponse</div>
+            <div class="qcm-reveal-def" id="qcm-reveal-def"></div>
+          </div>
+          <button class="qcm-next-btn" onclick="App.Session.answer(0)">Suivant →</button>
+        </div>
       </div>
 
       <!-- Fin de session -->

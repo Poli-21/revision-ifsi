@@ -109,8 +109,7 @@ App.Session = (() => {
       chronoOnly: true
     };
     App.UI.showView('session');
-    _initAfkListeners();
-    _resetAfkTimer();
+    // Pas de détection AFK en chrono libre
     _startTicker();
     show();
   }
@@ -306,6 +305,9 @@ App.Session = (() => {
     document.getElementById('qcm-zone').style.display = 'block';
     document.getElementById('qcm-cat').textContent      = c.cat;
     document.getElementById('qcm-question').textContent = c.term;
+    // Cache le bloc révélation d'une éventuelle carte précédente
+    const reveal = document.getElementById('qcm-reveal');
+    if (reveal) reveal.style.display = 'none';
     const img = resolveImg(c);
     const qimg = document.getElementById('qcm-image');
     if (img) {
@@ -330,12 +332,24 @@ App.Session = (() => {
       btn.onclick = () => {
         if (container.dataset.answered === 'true') return;
         container.dataset.answered = 'true';
+        // Colore toujours la bonne réponse en vert
         container.querySelectorAll('.qcm-choice').forEach(b => {
           b.disabled = true;
           if (b.dataset.correct === '1') b.classList.add('qcm-correct');
         });
         btn.classList.add(correct ? 'qcm-correct' : 'qcm-wrong');
-        setTimeout(() => answer(correct ? 4 : 0), correct ? 500 : 1100);
+        if (correct) {
+          // Bonne réponse : avance automatiquement après un bref flash
+          setTimeout(() => answer(4), 700);
+        } else {
+          // Mauvaise réponse : affiche la définition complète + bouton Suivant
+          const revealEl  = document.getElementById('qcm-reveal');
+          const revealDef = document.getElementById('qcm-reveal-def');
+          if (revealDef) revealDef.textContent = c.def;
+          if (revealEl)  revealEl.style.display = 'block';
+          // scrolle pour que le bloc soit visible
+          if (revealEl)  revealEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
       };
       container.appendChild(btn);
     });
