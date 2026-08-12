@@ -29,14 +29,10 @@ App.UI = (() => {
     document.getElementById('stats-view').style.display  = tab === 'stats'   ? 'block' : 'none';
     document.getElementById('ortho-view').style.display  = tab === 'ortho'   ? 'block' : 'none';
     document.getElementById('games-view').style.display  = tab === 'games'   ? 'block' : 'none';
-    document.getElementById('bac-view').style.display    = tab === 'bac'     ? 'block' : 'none';
-    document.getElementById('oral-view').style.display    = tab === 'oral'    ? 'block' : 'none';
     document.getElementById('english-view').style.display = tab === 'english' ? 'block' : 'none';
     document.getElementById('session-view').style.display = 'none';
-    if (tab === 'bac')     App.Bac.init();
-    if (tab === 'oral')    App.Oral.init();
     if (tab === 'english') App.English.init();
-    ['home','browse','stats','ortho','games','bac','oral','english'].forEach(t => {
+    ['home','browse','stats','ortho','games','english'].forEach(t => {
       const btn = document.getElementById('tab-' + t);
       if (btn) btn.classList.toggle('active', t === tab);
     });
