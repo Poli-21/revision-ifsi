@@ -5,7 +5,12 @@ window.App = window.App || {};
 App.English = (() => {
 
   // ══════════════════════════════════════════════════════════════
-  //  VOCABULAIRE — 12 leçons × 8 mots = 96 mots IFSI
+  //  VOCABULAIRE — 14 leçons × 8 mots = 112 mots IFSI
+  //  Aligné sur la place de l'anglais dans le référentiel 2026 :
+  //  UE E.2 "Langue vivante étrangère", domaine E "Démarche
+  //  scientifique et méthodologie" → vocabulaire clinique (leçons
+  //  1-12) + présentation professionnelle/anamnèse et lecture
+  //  d'articles scientifiques (leçons 13-14).
   // ══════════════════════════════════════════════════════════════
   const LESSONS = [
     { id:1, name:'Les essentiels', emoji:'🏥', words:[
@@ -93,7 +98,7 @@ App.English = (() => {
       { en:'diabetes',     fr:'diabète',                       ph:'/ˌdaɪəˈbiːtɪs/' },
       { en:'asthma',       fr:'asthme',                        ph:'/ˈæsmə/' },
       { en:'epilepsy',     fr:'épilepsie',                     ph:'/ˈepɪlepsi/' },
-      { en:'arthritis',    fr:'arthrite / arthrose',           ph:'/ɑːˈθraɪtɪs/' },
+      { en:'arthritis',    fr:'arthrite (inflammation articulaire)', ph:'/ɑːˈθraɪtɪs/' },
       { en:'pneumonia',    fr:'pneumonie / pneumopathie',      ph:'/njuːˈməʊniə/' },
       { en:'fracture',     fr:'fracture',                      ph:'/ˈfræktʃər/' },
       { en:'infection',    fr:'infection',                     ph:'/ɪnˈfekʃən/' },
@@ -127,6 +132,26 @@ App.English = (() => {
       { en:'ultrasound',   fr:'échographie',            ph:'/ˈʌltrəsaʊnd/' },
       { en:'premature',    fr:'prématuré(e)',           ph:'/ˌpreməˈtʃʊər/' },
       { en:'placenta',     fr:'placenta',               ph:'/pləˈsentə/' },
+    ]},
+    { id:13, name:'Présentation & anamnèse', emoji:'🗂️', words:[
+      { en:'student nurse',       fr:'étudiant(e) infirmier / infirmière',       ph:'/ˈstuːdənt nɜːrs/' },
+      { en:'chief complaint',     fr:'motif de consultation',                    ph:'/tʃiːf kəmˈpleɪnt/' },
+      { en:'medical history',     fr:'antécédents médicaux',                     ph:'/ˈmedɪkəl ˈhɪstəri/' },
+      { en:'onset',               fr:'début / apparition (des symptômes)',       ph:'/ˈɒnset/' },
+      { en:'current medication',  fr:'traitement en cours',                      ph:'/ˈkʌrənt ˌmedɪˈkeɪʃən/' },
+      { en:'next of kin',         fr:'personne à prévenir / proche référent',    ph:'/nekst əv kɪn/' },
+      { en:'date of birth',       fr:'date de naissance',                        ph:'/deɪt əv bɜːrθ/' },
+      { en:'informed consent',    fr:'consentement éclairé',                     ph:'/ɪnˈfɔːrmd kənˈsent/' },
+    ]},
+    { id:14, name:'Lecture scientifique', emoji:'🔬', words:[
+      { en:'abstract',                  fr:'résumé (d\'article)',              ph:'/ˈæbstrækt/' },
+      { en:'findings',                  fr:'résultats / constats',             ph:'/ˈfaɪndɪŋz/' },
+      { en:'systematic review',         fr:'revue systématique',               ph:'/ˌsɪstəˈmætɪk rɪˈvjuː/' },
+      { en:'randomized controlled trial', fr:'essai contrôlé randomisé',       ph:'/ˈrændəmaɪzd kənˈtrəʊld ˈtraɪəl/' },
+      { en:'sample size',               fr:'taille de l\'échantillon',         ph:'/ˈsæmpəl saɪz/' },
+      { en:'evidence-based practice',   fr:'pratique fondée sur les preuves',  ph:'/ˈevɪdəns beɪst ˈpræktɪs/' },
+      { en:'peer-reviewed',             fr:'évalué par les pairs',             ph:'/pɪər rɪˈvjuːd/' },
+      { en:'significant',               fr:'significatif (statistiquement)',   ph:'/sɪɡˈnɪfɪkənt/' },
     ]},
   ];
 
