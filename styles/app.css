@@ -1354,6 +1354,15 @@ header, .sidebar, .modal, .card-face, .card-item { transition: background .25s, 
    PARTIELS — révision par UE (référentiel 2026)
    ══════════════════════════════════════════════════════════════ */
 .partiel-intro { margin-bottom: 1.1rem; }
+.partiel-annee-switch { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.partiel-annee-btn {
+  padding: 6px 14px; border-radius: 999px; border: 1.5px solid var(--gray-300);
+  background: var(--gray-50); color: var(--gray-600); font-size: .82rem; font-weight: 700;
+  font-family: inherit; cursor: pointer; transition: all .12s;
+}
+.partiel-annee-btn:hover { border-color: var(--primary); }
+.partiel-annee-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.partiel-annee-hint { font-size: .72rem; color: var(--gray-500); line-height: 1.5; margin-bottom: 1.2rem; }
 .partiel-global-avg {
   margin-top: 8px; display: inline-block; font-size: .82rem;
   color: var(--gray-600); background: var(--gray-100);
