@@ -18,34 +18,40 @@ App.UE = (() => {
   // C'est aussi le coefficient de pondération utilisé pour la moyenne de semestre
   // (le référentiel ne définit pas de coefficient distinct des ECTS).
   //
-  // annee = 1, 2, 3 ou 'transversale' — À QUEL POINT C'EST INDICATIF :
+  // semestre = 1 à 6, ou 'transversal' — À QUEL POINT C'EST INDICATIF :
   // l'arrêté du 20/02/2026 fixe les 15 UE, leurs ECTS et le fait qu'il y a 6 semestres
   // (30 ECTS chacun), mais NE PUBLIE PAS de tableau national UE→semestre : cette
   // répartition est arrêtée localement par la maquette pédagogique de chaque IFSI, qui
-  // peut varier d'un institut à l'autre. Le seul repère nommément confirmé par le texte :
+  // peut varier d'un institut à l'autre. Les seuls repères confirmés par le texte :
   // FGSU2, santé mentale et numérique (donc D.4) sont positionnés en 1re année, et la
   // spécialisation ("cadre de consolidation") démarre au semestre 4. Le champ ci-dessous
-  // est donc une séquence indicative et raisonnable (fondamentaux en premier, pratique
-  // avancée/recherche en fin de cursus), affichée comme telle dans l'appli — pas une
-  // donnée officielle. À vérifier avec le planning propre à l'IFSI de l'utilisateur·ice.
+  // est donc une estimation raisonnable au niveau du SEMESTRE (encore plus approximative
+  // que ne le serait un simple découpage par année) : fondamentaux/onboarding en S1,
+  // approfondissement en S2, montée en compétence S3-S4, pratique avancée/gestion/
+  // recherche en fin de cursus S5-S6 — affichée comme indicative dans l'appli, jamais
+  // comme une donnée officielle. À vérifier avec le planning propre à l'IFSI de l'utilisateur·ice.
   const LIST = [
-    { code: 'A.1', domain: 'A', name: 'Fondements des sciences infirmières et raisonnement clinique', ects: 9,  annee: 1 },
-    { code: 'A.2', domain: 'A', name: 'Législation, déontologie, éthique', ects: 6,  annee: 1 },
-    { code: 'B.1', domain: 'B', name: 'Sciences biomédicales', ects: 18, annee: 1 },
-    { code: 'B.2', domain: 'B', name: 'Sciences humaines et sociales', ects: 6,  annee: 1 },
-    { code: 'B.3', domain: 'B', name: 'Pratiques et interventions infirmières', ects: 18, annee: 'transversale' },
-    { code: 'B.4', domain: 'B', name: 'Démarche qualité et gestion des risques', ects: 3,  annee: 2 },
-    { code: 'C.1', domain: 'C', name: 'Santé publique, promotion de la santé et prévention, éducation thérapeutique', ects: 15, annee: 2 },
-    { code: 'C.2', domain: 'C', name: 'Santé environnementale et transition écologique', ects: 6,  annee: 1 },
-    { code: 'D.1', domain: 'D', name: 'Savoir-être, communication professionnelle et leadership', ects: 6,  annee: 1 },
-    { code: 'D.2', domain: 'D', name: "Coordination des activités et des soins et gestion d'une structure", ects: 2,  annee: 3 },
-    { code: 'D.3', domain: 'D', name: 'Formation, développement des compétences et analyse des pratiques', ects: 2,  annee: 'transversale' },
-    { code: 'D.4', domain: 'D', name: 'Numérique en santé', ects: 2,  annee: 1 },
-    { code: 'E.1', domain: 'E', name: 'Recherche, méthodes, analyse critique et données probantes', ects: 12, annee: 3 },
-    { code: 'E.2', domain: 'E', name: 'Langue vivante étrangère', ects: 6,  annee: 'transversale' },
-    { code: 'E.3', domain: 'E', name: 'Méthodes de travail et aide à la réussite', ects: 3,  annee: 1 },
+    { code: 'A.1', domain: 'A', name: 'Fondements des sciences infirmières et raisonnement clinique', ects: 9,  semestre: 1 },
+    { code: 'A.2', domain: 'A', name: 'Législation, déontologie, éthique', ects: 6,  semestre: 2 },
+    { code: 'B.1', domain: 'B', name: 'Sciences biomédicales', ects: 18, semestre: 1 },
+    { code: 'B.2', domain: 'B', name: 'Sciences humaines et sociales', ects: 6,  semestre: 2 },
+    { code: 'B.3', domain: 'B', name: 'Pratiques et interventions infirmières', ects: 18, semestre: 'transversal' },
+    { code: 'B.4', domain: 'B', name: 'Démarche qualité et gestion des risques', ects: 3,  semestre: 4 },
+    { code: 'C.1', domain: 'C', name: 'Santé publique, promotion de la santé et prévention, éducation thérapeutique', ects: 15, semestre: 3 },
+    { code: 'C.2', domain: 'C', name: 'Santé environnementale et transition écologique', ects: 6,  semestre: 2 },
+    { code: 'D.1', domain: 'D', name: 'Savoir-être, communication professionnelle et leadership', ects: 6,  semestre: 1 },
+    { code: 'D.2', domain: 'D', name: "Coordination des activités et des soins et gestion d'une structure", ects: 2,  semestre: 5 },
+    { code: 'D.3', domain: 'D', name: 'Formation, développement des compétences et analyse des pratiques', ects: 2,  semestre: 'transversal' },
+    { code: 'D.4', domain: 'D', name: 'Numérique en santé', ects: 2,  semestre: 1 },
+    { code: 'E.1', domain: 'E', name: 'Recherche, méthodes, analyse critique et données probantes', ects: 12, semestre: 6 },
+    { code: 'E.2', domain: 'E', name: 'Langue vivante étrangère', ects: 6,  semestre: 'transversal' },
+    { code: 'E.3', domain: 'E', name: 'Méthodes de travail et aide à la réussite', ects: 3,  semestre: 1 },
   ];
   const TOTAL_ECTS = LIST.reduce((s, u) => s + u.ects, 0);
+
+  // 6 semestres = 3 années. Utilisé pour l'affichage ("S1 · 1re année").
+  const SEMESTRES = [1,2,3,4,5,6].map(n => ({ n, annee: Math.ceil(n / 2) }));
+  function anneeOfSemestre(n) { return Math.ceil(n / 2); }
 
   const COMPETENCES = [
     { code: 'C1',  ue: 'A.1', name: 'Élaborer le diagnostic infirmier pour identifier les interventions adaptées' },
@@ -68,10 +74,10 @@ App.UE = (() => {
   function domainOfUE(code) { const u = byCode(code); return u ? domainInfo(u.domain) : null; }
   function label(code)      { const u = byCode(code); return u ? `${u.code} — ${u.name}` : code; }
 
-  // annee: 1, 2, 3 ou 'toutes'. Une UE 'transversale' apparaît dans les 3 années
+  // semestre: 1 à 6, ou 'toutes'. Une UE 'transversal' apparaît dans les 6 semestres
   // (répartition indicative — voir le commentaire au-dessus de LIST).
-  function grouped(annee) {
-    const list = (!annee || annee === 'toutes') ? LIST : LIST.filter(u => u.annee === annee || u.annee === 'transversale');
+  function grouped(semestre) {
+    const list = (!semestre || semestre === 'toutes') ? LIST : LIST.filter(u => u.semestre === semestre || u.semestre === 'transversal');
     return DOMAINS.map(d => ({ ...d, ues: list.filter(u => u.domain === d.code) })).filter(d => d.ues.length > 0);
   }
 
@@ -105,5 +111,5 @@ App.UE = (() => {
     return changed;
   }
 
-  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, byCode, domainInfo, domainOfUE, grouped, label, optionsHTML, migrateReferenceCards };
+  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards };
 })();

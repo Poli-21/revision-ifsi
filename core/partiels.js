@@ -7,28 +7,36 @@ window.App = window.App || {};
 
 App.Partiels = (() => {
   const HIST_KEY   = 'ifsi_partiel_history';
-  const ANNEE_KEY  = 'ifsi_partiel_annee';
+  const SEM_KEY    = 'ifsi_partiel_semestre';
   const QUIZ_SIZE  = 10;     // nb de questions max par quiz
   const QUIZ_SECS  = 40;     // secondes par question (budget total = QUIZ_SECS * nbQuestions)
+  const EXAM_DATE  = new Date('2027-01-25T00:00:00'); // dernière semaine de janvier (repère approximatif, à ajuster si besoin)
 
   let _view    = 'home';     // home | ue | quiz | result
   let _curUE   = null;
   let _quiz    = null;       // { queue, idx, correct, timer, secsLeft, totalSecs, log }
   let _writing = { suggestions: [], correction: null };
-  let _annee   = (() => { const v = localStorage.getItem(ANNEE_KEY); return v === '2' || v === '3' || v === 'toutes' ? (v === 'toutes' ? v : Number(v)) : 1; })();
+  let _sem     = (() => {
+    const v = localStorage.getItem(SEM_KEY);
+    if (v === 'toutes') return 'toutes';
+    const n = Number(v);
+    return (n >= 1 && n <= 6) ? n : 1;
+  })();
 
-  function setAnnee(a) {
-    _annee = a === 'toutes' ? 'toutes' : Number(a);
-    localStorage.setItem(ANNEE_KEY, String(_annee));
+  function setSemestre(s) {
+    _sem = s === 'toutes' ? 'toutes' : Number(s);
+    localStorage.setItem(SEM_KEY, String(_sem));
     _view = 'home';
     render();
   }
 
   // ── Utilitaires ────────────────────────────────────────────────
   function _esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-  function _anneeLabel(a) { return a === 'transversale' ? 'toutes années' : a === 1 ? '1ʳᵉ année' : a + 'ᵉ année'; }
+  function _anneeOrdinal(a) { return a === 1 ? '1ʳᵉ' : a + 'ᵉ'; }
+  function _semLabel(s) { return s === 'transversal' ? 'tous semestres' : `S${s} (${_anneeOrdinal(App.UE.anneeOfSemestre(s))} année)`; }
   function _el(id) { return document.getElementById(id); }
   function _root()  { return _el('partiels-root'); }
+  function _daysToExam() { return Math.ceil((EXAM_DATE - new Date()) / 86400000); }
 
   function _cardsForUE(code) {
     return App.Store.state.cards.filter(c => c.ue === code && !c.suspended);
@@ -54,7 +62,7 @@ App.Partiels = (() => {
   }
 
   function _priorityList(limit = 5) {
-    const pool = _annee === 'toutes' ? App.UE.LIST : App.UE.LIST.filter(u => u.annee === _annee || u.annee === 'transversale');
+    const pool = _sem === 'toutes' ? App.UE.LIST : App.UE.LIST.filter(u => u.semestre === _sem || u.semestre === 'transversal');
     return pool.map(u => {
       const hist = _historyForUE(u.code);
       const lastScore = hist.length ? hist[0].score : null;
@@ -88,14 +96,18 @@ App.Partiels = (() => {
 
   // ── Accueil : domaines A→E et leurs UE ─────────────────────────
   function _homeHTML() {
-    const domains = App.UE.grouped(_annee);
+    const domains = App.UE.grouped(_sem);
     const allHist = _history();
-    const anneeBtn = (val, label) => `<button class="partiel-annee-btn${_annee === val ? ' active' : ''}" onclick="App.Partiels.setAnnee('${val}')">${label}</button>`;
-    const anneeSwitcher = `
+    const semBtn = (val, label) => `<button class="partiel-annee-btn${_sem === val ? ' active' : ''}" onclick="App.Partiels.setSemestre('${val}')">${label}</button>`;
+    const semSwitcher = `
       <div class="partiel-annee-switch">
-        ${anneeBtn(1, '1ʳᵉ année')}${anneeBtn(2, '2ᵉ année')}${anneeBtn(3, '3ᵉ année')}${anneeBtn('toutes', 'Toutes')}
+        ${[1,2,3,4,5,6].map(n => semBtn(n, 'S' + n)).join('')}${semBtn('toutes', 'Toutes')}
       </div>
-      <p class="partiel-annee-hint">📍 Répartition par année <strong>indicative</strong> (fondamentaux d'abord, pratique avancée/recherche en fin de cursus) — le référentiel national ne fixe pas d'année précise par UE, ça dépend de la maquette de ton IFSI. Les UE transversales (Pratiques infirmières, Anglais, Analyse de pratiques) apparaissent dans les 3 années.</p>`;
+      <p class="partiel-annee-hint">📍 Répartition par semestre <strong>indicative</strong> (onboarding/fondamentaux en S1-S2, montée en compétence S3-S4, pratique avancée/gestion/recherche en S5-S6) — le référentiel national ne fixe pas de semestre précis par UE, ça dépend de la maquette de ton IFSI : vérifie avec ton planning si besoin. Les UE transversales (Pratiques infirmières, Anglais, Analyse de pratiques) apparaissent à tous les semestres.</p>`;
+    const days = _daysToExam();
+    const examBanner = days > 0
+      ? `<div class="partiel-exam-banner">🎯 Objectif partiels — dernière semaine de janvier <strong>J-${days}</strong></div>`
+      : '';
     const avg = allHist.length ? (allHist.reduce((s,h)=>s+h.score,0) / allHist.length).toFixed(1) : null;
 
     const priorityHTML = _priorityList(5).map(p => {
@@ -137,12 +149,13 @@ App.Partiels = (() => {
         <p style="margin:0;color:var(--gray-500);font-size:.85rem">Choisis une UE : quiz chronométré noté /20, entraînement rédigé corrigé par IA, ou questions générées à la volée.</p>
         ${avg ? `<div class="partiel-global-avg">Moyenne sur tes ${allHist.length} dernier(s) quiz : <strong>${avg}/20</strong></div>` : ''}
       </div>
-      ${anneeSwitcher}
+      ${examBanner}
+      ${semSwitcher}
       <div class="partiel-block partiel-priority-block">
         <h3>🎯 Priorité de révision <span class="partiel-priority-hint">(ECTS élevés + score faible ou UE jamais testée)</span></h3>
-        ${priorityHTML ? `<div class="partiel-prio-list">${priorityHTML}</div>` : `<p class="partiel-empty">Aucune UE dans cette année.</p>`}
+        ${priorityHTML ? `<div class="partiel-prio-list">${priorityHTML}</div>` : `<p class="partiel-empty">Aucune UE sur ce semestre.</p>`}
       </div>
-      ${domainBlocks || '<p class="partiel-empty">Aucune UE indicativement rattachée à cette année.</p>'}
+      ${domainBlocks || '<p class="partiel-empty">Aucune UE indicativement rattachée à ce semestre.</p>'}
       <p class="partiel-tag-hint">💡 Une UE sans fiche ? Tague tes cartes depuis <em>Toutes les cartes → Sélectionner → Assigner UE</em>, ou entraîne-toi directement à l'écrit avec l'IA ci-dessus. Le total des 15 UE représente ${App.UE.TOTAL_ECTS} ECTS académiques (hors stages).</p>
     `;
   }
@@ -161,7 +174,7 @@ App.Partiels = (() => {
         <span class="partiel-domain-badge">${u.code}</span>
         <div>
           <h2 style="margin:0;font-size:1.15rem">${_esc(u.name)}</h2>
-          <p style="margin:2px 0 0;font-size:.8rem;color:var(--gray-500)">Domaine ${dom.code} — ${_esc(dom.name)} · <strong>${u.ects} ECTS</strong> sur ${App.UE.TOTAL_ECTS} (coefficient dans la moyenne du semestre) · ${_anneeLabel(u.annee)} (indicatif)</p>
+          <p style="margin:2px 0 0;font-size:.8rem;color:var(--gray-500)">Domaine ${dom.code} — ${_esc(dom.name)} · <strong>${u.ects} ECTS</strong> sur ${App.UE.TOTAL_ECTS} (coefficient dans la moyenne du semestre) · ${_semLabel(u.semestre)} (indicatif)</p>
         </div>
       </div>
       ${comps.length ? `<div class="partiel-comp-list">${comps.map(c => `<span class="partiel-comp-chip" title="${_esc(c.name)}">${c.code}${c.nouvelle ? ' 🆕' : ''}</span>`).join('')}</div>` : ''}
@@ -373,7 +386,7 @@ App.Partiels = (() => {
   }
 
   return {
-    init, render, backToHome, selectUE, setAnnee,
+    init, render, backToHome, selectUE, setSemestre,
     suggestQuestions, useSuggestion, toggleExpected, correctWritten,
     startQuiz, answerQuiz, abortQuiz
   };

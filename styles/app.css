@@ -1363,6 +1363,12 @@ header, .sidebar, .modal, .card-face, .card-item { transition: background .25s, 
 .partiel-annee-btn:hover { border-color: var(--primary); }
 .partiel-annee-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .partiel-annee-hint { font-size: .72rem; color: var(--gray-500); line-height: 1.5; margin-bottom: 1.2rem; }
+.partiel-exam-banner {
+  background: linear-gradient(135deg,#2563eb 0%,#7c3aed 100%); color: #fff;
+  border-radius: 12px; padding: 10px 16px; margin-bottom: 12px;
+  font-size: .88rem; font-weight: 600; text-align: center;
+}
+.partiel-exam-banner strong { font-weight: 800; }
 .partiel-global-avg {
   margin-top: 8px; display: inline-block; font-size: .82rem;
   color: var(--gray-600); background: var(--gray-100);
