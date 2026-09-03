@@ -167,117 +167,117 @@ App.DEFAULT_CARDS = [
 
   // ── Synchronisé depuis Notion (base "Compétences") — libellés officiels des 13 compétences ──
   {
-    id: 'ref2026_024', term: 'Compétence C1 — Domaine A', def: "Élaborer le diagnostic infirmier pour identifier les interventions adaptées.",
+    id: 'ref2026_024', ue: 'A.1', term: 'Compétence C1 — Domaine A', def: "Élaborer le diagnostic infirmier pour identifier les interventions adaptées.",
     example: '', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_025', term: 'Compétence C2 — Domaine A', def: "Définir les interventions en co-construction, dans le respect de la déontologie et de l'éthique.",
+    id: 'ref2026_025', ue: 'A.2', term: 'Compétence C2 — Domaine A', def: "Définir les interventions en co-construction, dans le respect de la déontologie et de l'éthique.",
     example: '', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_026', term: 'Compétence C3 — Domaine B', def: "Réaliser des soins de dépistage, prévention, diagnostic, thérapeutique et palliatif.",
+    id: 'ref2026_026', ue: 'B.3', term: 'Compétence C3 — Domaine B', def: "Réaliser des soins de dépistage, prévention, diagnostic, thérapeutique et palliatif.",
     example: '', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_027', term: 'Compétence C4 — Domaine B', def: "Prescrire des produits de santé et des examens complémentaires.",
+    id: 'ref2026_027', ue: 'B.3', term: 'Compétence C4 — Domaine B', def: "Prescrire des produits de santé et des examens complémentaires.",
     example: 'Nouvelle compétence 2026 — créée par la loi du 27 juin 2025 (prescription infirmière).', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_028', term: 'Compétence C5 — Domaine C', def: "Concevoir et conduire une démarche de promotion de la santé.",
+    id: 'ref2026_028', ue: 'C.1', term: 'Compétence C5 — Domaine C', def: "Concevoir et conduire une démarche de promotion de la santé.",
     example: '', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_029', term: 'Compétence C6 — Domaine C', def: "Concevoir et conduire une démarche d'éducation thérapeutique, de prévention et de repérage.",
+    id: 'ref2026_029', ue: 'C.1', term: 'Compétence C6 — Domaine C', def: "Concevoir et conduire une démarche d'éducation thérapeutique, de prévention et de repérage.",
     example: '', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_030', term: 'Compétence C7 — Domaine C', def: "Conduire des actions sur les enjeux environnementaux en santé.",
+    id: 'ref2026_030', ue: 'C.2', term: 'Compétence C7 — Domaine C', def: "Conduire des actions sur les enjeux environnementaux en santé.",
     example: 'Nouvelle compétence 2026.', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_031', term: 'Compétence C8 — Domaine D', def: "Gérer ou organiser une structure d'exercice en optimisant les ressources.",
+    id: 'ref2026_031', ue: 'D.2', term: 'Compétence C8 — Domaine D', def: "Gérer ou organiser une structure d'exercice en optimisant les ressources.",
     example: '', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_032', term: 'Compétence C9 — Domaine D', def: "Organiser les soins et transmettre via les outils numériques en équipe pluri-professionnelle.",
+    id: 'ref2026_032', ue: 'D.4', term: 'Compétence C9 — Domaine D', def: "Organiser les soins et transmettre via les outils numériques en équipe pluri-professionnelle.",
     example: 'Nouvelle compétence 2026 (transmission numérique).', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_033', term: 'Compétence C10 — Domaine D', def: "Accompagner les pairs, les apprenants et les autres professionnels.",
+    id: 'ref2026_033', ue: 'D.3', term: 'Compétence C10 — Domaine D', def: "Accompagner les pairs, les apprenants et les autres professionnels.",
     example: '', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_034', term: 'Compétence C11 — Domaine E', def: "Mettre en œuvre l'amélioration continue des soins et de sa pratique.",
+    id: 'ref2026_034', ue: 'E.1', term: 'Compétence C11 — Domaine E', def: "Mettre en œuvre l'amélioration continue des soins et de sa pratique.",
     example: '', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_035', term: 'Compétence C12 — Domaine E', def: "Analyser des données scientifiques pour optimiser sa pratique.",
+    id: 'ref2026_035', ue: 'E.1', term: 'Compétence C12 — Domaine E', def: "Analyser des données scientifiques pour optimiser sa pratique.",
     example: '', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_036', term: 'Compétence C13 — Domaine E', def: "Formaliser des documents professionnels dans une démarche scientifique.",
+    id: 'ref2026_036', ue: 'E.1', term: 'Compétence C13 — Domaine E', def: "Formaliser des documents professionnels dans une démarche scientifique.",
     example: '', cat: 'Référentiel 2026 – Compétences', image: null, customImage: null, suspended: false
   },
 
   // ── Synchronisé depuis Notion (base "UE") — les 15 UE réparties dans les 5 domaines ──
   {
-    id: 'ref2026_037', term: 'UE A.1 — Domaine A', def: "Fondements des sciences infirmières et raisonnement clinique.",
+    id: 'ref2026_037', ue: 'A.1', term: 'UE A.1 — Domaine A', def: "Fondements des sciences infirmières et raisonnement clinique.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_038', term: 'UE A.2 — Domaine A', def: "Législation, déontologie, éthique.",
+    id: 'ref2026_038', ue: 'A.2', term: 'UE A.2 — Domaine A', def: "Législation, déontologie, éthique.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_039', term: 'UE B.1 — Domaine B', def: "Sciences biomédicales.",
+    id: 'ref2026_039', ue: 'B.1', term: 'UE B.1 — Domaine B', def: "Sciences biomédicales.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_040', term: 'UE B.2 — Domaine B', def: "Sciences humaines et sociales.",
+    id: 'ref2026_040', ue: 'B.2', term: 'UE B.2 — Domaine B', def: "Sciences humaines et sociales.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_041', term: 'UE B.3 — Domaine B', def: "Pratiques et interventions infirmières.",
+    id: 'ref2026_041', ue: 'B.3', term: 'UE B.3 — Domaine B', def: "Pratiques et interventions infirmières.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_042', term: 'UE B.4 — Domaine B', def: "Démarche qualité et gestion des risques.",
+    id: 'ref2026_042', ue: 'B.4', term: 'UE B.4 — Domaine B', def: "Démarche qualité et gestion des risques.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_043', term: 'UE C.1 — Domaine C', def: "Santé publique, promotion de la santé et prévention, éducation thérapeutique.",
+    id: 'ref2026_043', ue: 'C.1', term: 'UE C.1 — Domaine C', def: "Santé publique, promotion de la santé et prévention, éducation thérapeutique.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_044', term: 'UE C.2 — Domaine C', def: "Santé environnementale et transition écologique.",
+    id: 'ref2026_044', ue: 'C.2', term: 'UE C.2 — Domaine C', def: "Santé environnementale et transition écologique.",
     example: 'UE nouvelle en 2026.', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_045', term: 'UE D.1 — Domaine D', def: "Savoir-être, communication professionnelle et leadership.",
+    id: 'ref2026_045', ue: 'D.1', term: 'UE D.1 — Domaine D', def: "Savoir-être, communication professionnelle et leadership.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_046', term: 'UE D.2 — Domaine D', def: "Coordination des activités et des soins et gestion d'une structure.",
+    id: 'ref2026_046', ue: 'D.2', term: 'UE D.2 — Domaine D', def: "Coordination des activités et des soins et gestion d'une structure.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_047', term: 'UE D.3 — Domaine D', def: "Formation, développement des compétences et analyse des pratiques professionnelles.",
+    id: 'ref2026_047', ue: 'D.3', term: 'UE D.3 — Domaine D', def: "Formation, développement des compétences et analyse des pratiques professionnelles.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_048', term: 'UE D.4 — Domaine D', def: "Numérique en santé.",
+    id: 'ref2026_048', ue: 'D.4', term: 'UE D.4 — Domaine D', def: "Numérique en santé.",
     example: 'UE nouvelle en 2026.', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_049', term: 'UE E.1 — Domaine E', def: "Recherche, méthodes, analyse critique et données probantes.",
+    id: 'ref2026_049', ue: 'E.1', term: 'UE E.1 — Domaine E', def: "Recherche, méthodes, analyse critique et données probantes.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_050', term: 'UE E.2 — Domaine E', def: "Langue vivante étrangère.",
+    id: 'ref2026_050', ue: 'E.2', term: 'UE E.2 — Domaine E', def: "Langue vivante étrangère.",
     example: "C'est cette UE qui couvre l'anglais professionnel (ex-UE 6.2), désormais rattachée au domaine \"Démarche scientifique\".", cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   },
   {
-    id: 'ref2026_051', term: 'UE E.3 — Domaine E', def: "Méthodes de travail et aide à la réussite.",
+    id: 'ref2026_051', ue: 'E.3', term: 'UE E.3 — Domaine E', def: "Méthodes de travail et aide à la réussite.",
     example: '', cat: 'Référentiel 2026 – UE', image: null, customImage: null, suspended: false
   }
 ];

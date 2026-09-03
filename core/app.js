@@ -30,9 +30,13 @@ App.UI = (() => {
     document.getElementById('ortho-view').style.display  = tab === 'ortho'   ? 'block' : 'none';
     document.getElementById('games-view').style.display  = tab === 'games'   ? 'block' : 'none';
     document.getElementById('english-view').style.display = tab === 'english' ? 'block' : 'none';
+    document.getElementById('partiels-view').style.display = tab === 'partiels' ? 'block' : 'none';
+    document.getElementById('tuteur-view').style.display  = tab === 'tuteur'  ? 'block' : 'none';
     document.getElementById('session-view').style.display = 'none';
-    if (tab === 'english') App.English.init();
-    ['home','browse','stats','ortho','games','english'].forEach(t => {
+    if (tab === 'english')  App.English.init();
+    if (tab === 'partiels') App.Partiels.init();
+    if (tab === 'tuteur')   App.Tuteur.init();
+    ['home','browse','stats','ortho','games','english','partiels','tuteur'].forEach(t => {
       const btn = document.getElementById('tab-' + t);
       if (btn) btn.classList.toggle('active', t === tab);
     });
@@ -197,6 +201,7 @@ App.init = async function () {
   _initDarkMode();                  // Dark mode (avant tout rendu)
   _initSidebarState();             // Sidebar collapse
   await App.Store.load();
+  try { App.UE?.migrateReferenceCards?.(); } catch(e) { console.warn('UE migration failed:', e); }
   try { App.Sync?.init?.(); } catch(e) { console.warn('Sync init failed:', e); }
   App.Render.all();
   App.UI.switchTab('home');
@@ -354,6 +359,8 @@ function toggleSelectMode() {
         sel.innerHTML = '<option value="">— Changer de matière —</option>' +
           cats.map(c => `<option value="${c}">${c}</option>`).join('');
       }
+      const ueSel = document.getElementById('bulk-ue-select');
+      if (ueSel) ueSel.innerHTML = '<option value="">— Assigner UE —</option>' + App.UE.optionsHTML();
       bar.style.display = 'flex';
     }
     if (grid) grid.classList.add('select-mode');
@@ -404,6 +411,23 @@ function bulkChangeCat() {
   // Feedback
   const btn = document.getElementById('select-mode-btn');
   if (btn) { const o = btn.textContent; btn.textContent = `✓ ${count} carte(s) déplacée(s)`; setTimeout(() => btn.textContent = o, 2000); }
+}
+
+function bulkSetUE() {
+  if (_selectedCards.size === 0) return;
+  const ue = document.getElementById('bulk-ue-select')?.value;
+  if (!ue) { alert('Choisis une UE dans la liste.'); return; }
+  App.Store.state.cards.forEach(c => {
+    if (_selectedCards.has(c.id)) c.ue = ue;
+  });
+  App.Store.save();
+  const count = _selectedCards.size;
+  _selectedCards.clear();
+  toggleSelectMode();
+  App.Render.all();
+  // Feedback
+  const btn = document.getElementById('select-mode-btn');
+  if (btn) { const o = btn.textContent; btn.textContent = `✓ ${count} carte(s) taguée(s) ${ue}`; setTimeout(() => btn.textContent = o, 2000); }
 }
 
 function bulkDelete() {
@@ -553,6 +577,14 @@ function openSyncModal() {
   requestAnimationFrame(() => overlay.style.opacity = '1');
   try { _updateNotifUI(); } catch(e) {}
   try { _refreshBackupList(); } catch(e) {}
+  try {
+    const keyEl = document.getElementById('ai-key-input');
+    const modelEl = document.getElementById('ai-model-input');
+    if (keyEl)   keyEl.value   = App.AI.config.apiKey || '';
+    if (modelEl) modelEl.value = App.AI.getModel();
+    const testMsg = document.getElementById('ai-test-msg');
+    if (testMsg) testMsg.textContent = '';
+  } catch(e) {}
 }
 
 function closeSyncModal() {
@@ -560,6 +592,24 @@ function closeSyncModal() {
   if (!overlay) return;
   overlay.style.opacity = '0';
   setTimeout(() => overlay.style.display = 'none', 200);
+}
+
+// ── Réglages IA (Gemini) ───────────────────────────────────────
+function saveAIConfig() {
+  const key   = document.getElementById('ai-key-input')?.value.trim();
+  const model = document.getElementById('ai-model-input')?.value.trim();
+  App.AI.setKey(key || '');
+  App.AI.setModel(model || App.AI.DEFAULT_MODEL);
+  const msgEl = document.getElementById('ai-test-msg');
+  if (msgEl) { msgEl.style.color = 'var(--gray-500)'; msgEl.textContent = key ? '✅ Enregistré.' : 'Clé effacée.'; }
+}
+
+async function testAIConnection() {
+  saveAIConfig();
+  const msgEl = document.getElementById('ai-test-msg');
+  if (msgEl) { msgEl.style.color = 'var(--gray-500)'; msgEl.textContent = '⏳ Test en cours…'; }
+  const res = await App.AI.testConnection();
+  if (msgEl) { msgEl.style.color = res.ok ? '#16a34a' : '#dc2626'; msgEl.textContent = (res.ok ? '✅ ' : '❌ ') + res.msg; }
 }
 
 async function doSyncConnect() {

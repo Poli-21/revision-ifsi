@@ -23,6 +23,9 @@ App.Modal = (() => {
     sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('') +
       '<option value="__new__">+ Nouvelle matière…</option>';
     if (prefillCat && cats.includes(prefillCat)) sel.value = prefillCat;
+    // Populate UE (référentiel 2026, optionnel)
+    const ueSel = document.getElementById('new-ue');
+    if (ueSel) ueSel.innerHTML = '<option value="">— Aucune UE —</option>' + App.UE.optionsHTML();
     document.getElementById('modal-overlay').classList.add('open');
     setTimeout(() => document.getElementById('new-term').focus(), 80);
   }
@@ -43,7 +46,8 @@ App.Modal = (() => {
     }
     if (!cat)  { alert('Choisis ou crée une matière.'); return; }
     if (!term || !def) { alert('Le terme et la définition sont requis.'); return; }
-    App.Store.state.cards.push({ id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2), cat, term, def, example: ex || null, customImage: _pendingImg || null, suspended: false, progress: null });
+    const ue = document.getElementById('new-ue')?.value || null;
+    App.Store.state.cards.push({ id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2), cat, term, def, example: ex || null, ue, customImage: _pendingImg || null, suspended: false, progress: null });
     App.Store.save();
     App.Render.all();
     if (keepOpen) {
@@ -74,6 +78,7 @@ App.Modal = (() => {
     document.getElementById('detail-modal-body').innerHTML = `
       <div style="margin-bottom:12px">
         <span class="badge badge-blue">${_esc(c.cat)}</span>
+        ${c.ue ? `<span class="badge" style="background:${(App.UE.domainOfUE(c.ue)||{}).color||'#6366f1'}22;color:${(App.UE.domainOfUE(c.ue)||{}).color||'#6366f1'}" title="${_esc(App.UE.label(c.ue))}">${_esc(c.ue)}</span>` : ''}
         <span class="badge" style="background:${SRS.COLORS[level]}22;color:${SRS.COLORS[level]}">${SRS.LABELS[level]}</span>
         ${c.suspended ? '<span class="badge" style="background:#f3f4f6;color:#9ca3af">⏸ Suspendu</span>' : ''}
       </div>
@@ -128,6 +133,10 @@ App.Modal = (() => {
         <select id="edit-cat" onchange="App.Modal._editToggleCat()">${catOptions}</select>
         <input type="text" id="edit-cat-custom" placeholder="Nom de la nouvelle matière…"
           style="display:none;margin-top:5px;width:100%;padding:8px 11px;border:1px solid var(--primary);border-radius:8px;font-size:.88rem;font-family:inherit;box-shadow:0 0 0 3px var(--primary-light)">
+      </div>
+      <div class="form-group">
+        <label>UE (référentiel 2026, optionnel)</label>
+        <select id="edit-ue"><option value="">— Aucune UE —</option>${App.UE.optionsHTML(c.ue)}</select>
       </div>
       <div class="form-group">
         <label>Image</label>
@@ -216,6 +225,7 @@ App.Modal = (() => {
     c.def     = def;
     c.example = ex || null;
     c.cat     = cat;
+    c.ue      = document.getElementById('edit-ue')?.value || null;
     if (_editPendingImg) { c.customImage = _editPendingImg; _editPendingImg = null; }
     App.Store.save();
     App.Render.all();

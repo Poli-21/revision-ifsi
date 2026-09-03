@@ -85,6 +85,8 @@
       <button class="tab"        onclick="switchTab('ortho')"  id="tab-ortho">✏️ Orthographe</button>
       <button class="tab"        onclick="switchTab('games')"  id="tab-games">🎯 Entraînement</button>
       <button class="tab"        onclick="switchTab('english')" id="tab-english">🇬🇧 Anglais</button>
+      <button class="tab"        onclick="switchTab('partiels')" id="tab-partiels">📝 Partiels</button>
+      <button class="tab"        onclick="switchTab('tuteur')" id="tab-tuteur">🤖 Tuteur IA</button>
     </div>
 
     <!-- ── HOME ──────────────────────────────────────────────── -->
@@ -132,6 +134,10 @@
           <option value="">— Changer de matière —</option>
         </select>
         <button class="btn" style="background:white;color:#4f46e5;font-weight:700" onclick="bulkChangeCat()">Appliquer</button>
+        <select id="bulk-ue-select" style="padding:7px 11px;border:1px solid rgba(255,255,255,.4);border-radius:8px;font-size:.84rem;background:rgba(255,255,255,.15);color:white;font-family:inherit">
+          <option value="">— Assigner UE —</option>
+        </select>
+        <button class="btn" style="background:white;color:#4f46e5;font-weight:700" onclick="bulkSetUE()">Appliquer UE</button>
         <button class="btn" style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3)" onclick="bulkSelectAll()">Tout sélectionner</button>
         <button class="btn" id="bulk-delete-btn" style="background:rgba(220,38,38,.75);color:white;border:1px solid rgba(255,255,255,.3)" onclick="bulkDelete()">🗑 Supprimer</button>
         <button class="btn" style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3)" onclick="toggleSelectMode()">✕ Annuler</button>
@@ -549,6 +555,16 @@
 
     </div>
 
+    <!-- ══ PARTIELS (révision par UE, référentiel 2026) ═══════════ -->
+    <div id="partiels-view" style="display:none;padding:1.5rem 1rem">
+      <div id="partiels-root"></div>
+    </div>
+
+    <!-- ══ TUTEUR IA (chat Gemini) ═════════════════════════════════ -->
+    <div id="tuteur-view" style="display:none;padding:1.5rem 1rem">
+      <div id="tuteur-root"></div>
+    </div>
+
   </main>
 </div>
 
@@ -572,6 +588,10 @@
       <label>Matière</label>
       <select id="new-cat" onchange="toggleNewCat()"></select>
       <input type="text" id="new-cat-custom" placeholder="Nom de la nouvelle matière…" style="display:none;margin-top:5px;width:100%;padding:8px 11px;border:1px solid var(--primary);border-radius:8px;font-size:.88rem;font-family:inherit;box-shadow:0 0 0 3px var(--primary-light)">
+    </div>
+    <div class="form-group">
+      <label>UE (référentiel 2026, optionnel)</label>
+      <select id="new-ue"></select>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Annuler</button>
@@ -678,6 +698,28 @@
       <div style="font-size:.8rem;color:var(--gray-400)">Chargement…</div>
     </div>
     <button class="btn btn-ghost" style="width:100%" onclick="createBackupNow()">💾 Créer une sauvegarde maintenant</button>
+
+    <!-- Intelligence artificielle (Gemini) -->
+    <hr style="border:none;border-top:1px solid var(--gray-200);margin:20px 0">
+    <h3 style="margin:0 0 10px;font-size:.95rem">🤖 Intelligence artificielle (Gemini)</h3>
+    <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:10px">Alimente le Tuteur IA, la correction de réponses rédigées et la génération de questions d'entraînement (onglet Partiels).</p>
+    <div class="form-group" style="margin-bottom:10px">
+      <label style="font-size:.82rem;color:var(--gray-600)">Clé API Gemini</label>
+      <input type="password" id="ai-key-input" placeholder="AIza…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.78rem;font-family:monospace;box-sizing:border-box">
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label style="font-size:.82rem;color:var(--gray-600)">Modèle</label>
+      <input type="text" id="ai-model-input" placeholder="gemini-3.8-flash" style="width:100%;padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.82rem;font-family:inherit;box-sizing:border-box">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveAIConfig()">Enregistrer</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="testAIConnection()">🔌 Tester</button>
+    </div>
+    <div id="ai-test-msg" style="font-size:.8rem;margin-top:8px;color:var(--gray-500)"></div>
+    <p style="font-size:.74rem;color:var(--gray-400);margin-top:10px;line-height:1.5">
+      ⚠️ La clé est appelée directement depuis le navigateur (comme le token GitHub ci-dessus) et reste stockée en local sur cet appareil — elle n'est jamais envoyée ailleurs qu'à Google. Garde ce site privé et ne partage pas ton lien avec cette clé enregistrée.
+      Crée une clé gratuite sur <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a>.
+    </p>
   </div>
 </div>
 
@@ -735,6 +777,8 @@
 <script src="core/srs.js"></script>
 <script src="core/store.js"></script>
 <script src="core/distractor.js"></script>
+<script src="core/ue.js"></script>
+<script src="core/ai.js"></script>
 <script src="core/sync.js"></script>
 <script src="core/session.js"></script>
 <script src="ui/render.js"></script>
@@ -742,6 +786,8 @@
 <script src="core/ortho.js"></script>
 <script src="core/games.js"></script>
 <script src="core/english.js"></script>
+<script src="core/partiels.js"></script>
+<script src="core/tuteur.js"></script>
 <script src="core/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
