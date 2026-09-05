@@ -243,18 +243,6 @@ function _initKeyboard() {
         if (e.key === '3' || e.key === 'ArrowRight')  { e.preventDefault(); App.Session.answer(4); }
         if (e.key === '4')                            { e.preventDefault(); App.Session.answer(5); }
       }
-    } else {
-      // Hors session — désactiver les raccourcis en mode orthographe
-      const orthoVisible = document.getElementById('ortho-view')?.style.display !== 'none';
-      const gamesVisible = document.getElementById('games-view')?.style.display !== 'none';
-      if (orthoVisible || gamesVisible) return;
-
-      if ((e.key === '/' || (e.ctrlKey && e.key === 'k')) && !e.shiftKey) {
-        e.preventDefault();
-        App.UI.switchTab('browse');
-        setTimeout(() => document.getElementById('search-input')?.focus(), 80);
-      }
-      if (e.key === 'n' && !e.ctrlKey && !e.altKey) { App.Modal.openAdd(); }
     }
   });
 }
