@@ -202,6 +202,8 @@ App.init = async function () {
   _initSidebarState();             // Sidebar collapse
   await App.Store.load();
   try { App.UE?.migrateReferenceCards?.(); } catch(e) { console.warn('UE migration failed:', e); }
+  try { App.UE?.migrateReferenceCategories?.(); } catch(e) { console.warn('UE category migration failed:', e); }
+  try { _seedDefaultExamIfNeeded(); } catch(e) { console.warn('Exam seed failed:', e); }
   try { App.Sync?.init?.(); } catch(e) { console.warn('Sync init failed:', e); }
   App.Render.all();
   App.UI.switchTab('home');
@@ -1141,6 +1143,28 @@ function _saveExams(exams) {
 }
 function _examId() {
   return Math.random().toString(36).slice(2,10);
+}
+
+// Seed ponctuel (une seule fois, flag localStorage) : ajoute un examen "Partiels" à la
+// date indiquée par l'utilisateur·ice (dernière semaine de janvier), couvrant les 6
+// matières du référentiel 2026, pour que le compte à rebours apparaisse tout de suite
+// sur le tableau de bord — sans jamais le recréer si l'utilisateur·ice l'a supprimé.
+const EXAM_SEED_FLAG = 'ifsi_exam_seed_partiels_2027s1';
+function _seedDefaultExamIfNeeded() {
+  if (localStorage.getItem(EXAM_SEED_FLAG)) return;
+  localStorage.setItem(EXAM_SEED_FLAG, '1');
+  const exams = _loadExams();
+  if (exams.some(e => /partiel/i.test(e.name))) return; // déjà un examen "Partiels", on ne duplique pas
+  const cats = [
+    'Référentiel 2026 – A. Sciences infirmières et raisonnement clinique',
+    'Référentiel 2026 – B. Pratiques cliniques et gestion des risques',
+    'Référentiel 2026 – C. Prévention et promotion de la santé',
+    'Référentiel 2026 – D. Communication et leadership',
+    'Référentiel 2026 – E. Démarche scientifique et méthodologie',
+    'Référentiel 2026 – Contexte général',
+  ];
+  exams.push({ id: _examId(), name: 'Partiels (dernière semaine de janvier)', date: '2027-01-25', cats });
+  _saveExams(exams);
 }
 
 // ── Ouvrir modal (nouveau ou édition) ─────────────────────────

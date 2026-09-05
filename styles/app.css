@@ -1369,6 +1369,7 @@ header, .sidebar, .modal, .card-face, .card-item { transition: background .25s, 
   font-size: .88rem; font-weight: 600; text-align: center;
 }
 .partiel-exam-banner strong { font-weight: 800; }
+.partiel-exam-edit { font-weight: 400; opacity: .85; font-size: .78em; }
 .partiel-global-avg {
   margin-top: 8px; display: inline-block; font-size: .82rem;
   color: var(--gray-600); background: var(--gray-100);

@@ -111,5 +111,26 @@ App.UE = (() => {
     return changed;
   }
 
-  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards };
+  // Migration ponctuelle (une seule fois, flag localStorage) : les 51 fiches "Référentiel
+  // 2026" sont passées de 3 matières génériques (Référentiel 2026 / – Compétences / – UE)
+  // à 6 matières par domaine (A à E + Contexte général). Ne s'exécute qu'une fois pour ne
+  // jamais écraser un renommage manuel fait ensuite par l'utilisateur·ice.
+  const CAT_MIGRATION_FLAG = 'ifsi_ue_cat_migration_v1';
+  function migrateReferenceCategories() {
+    if (localStorage.getItem(CAT_MIGRATION_FLAG)) return false;
+    localStorage.setItem(CAT_MIGRATION_FLAG, '1');
+    if (!App.Store?.state?.cards || !App.DEFAULT_CARDS) return false;
+    const defaultsById = new Map(App.DEFAULT_CARDS.map(c => [c.id, c]));
+    let changed = false;
+    App.Store.state.cards.forEach(c => {
+      if (c.id && c.id.startsWith('ref2026_')) {
+        const def = defaultsById.get(c.id);
+        if (def && def.cat && c.cat !== def.cat) { c.cat = def.cat; changed = true; }
+      }
+    });
+    if (changed) App.Store.save();
+    return changed;
+  }
+
+  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards, migrateReferenceCategories };
 })();

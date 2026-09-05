@@ -10,7 +10,7 @@ App.Partiels = (() => {
   const SEM_KEY    = 'ifsi_partiel_semestre';
   const QUIZ_SIZE  = 10;     // nb de questions max par quiz
   const QUIZ_SECS  = 40;     // secondes par question (budget total = QUIZ_SECS * nbQuestions)
-  const EXAM_DATE  = new Date('2027-01-25T00:00:00'); // dernière semaine de janvier (repère approximatif, à ajuster si besoin)
+  const EXAM_DATE_FALLBACK = '2027-01-25'; // dernière semaine de janvier (repère par défaut si aucun examen "Partiels" n'est enregistré)
 
   let _view    = 'home';     // home | ue | quiz | result
   let _curUE   = null;
@@ -36,7 +36,17 @@ App.Partiels = (() => {
   function _semLabel(s) { return s === 'transversal' ? 'tous semestres' : `S${s} (${_anneeOrdinal(App.UE.anneeOfSemestre(s))} année)`; }
   function _el(id) { return document.getElementById(id); }
   function _root()  { return _el('partiels-root'); }
-  function _daysToExam() { return Math.ceil((EXAM_DATE - new Date()) / 86400000); }
+  // Lit la date du prochain examen "Partiels" enregistré via 🎓 Examens (barre latérale) ;
+  // retombe sur la date par défaut si aucun n'existe encore ou en cas d'erreur de lecture.
+  function _examInfo() {
+    try {
+      const exams = JSON.parse(localStorage.getItem('ifsi_exams_v2') || '[]');
+      const match = exams.find(e => /partiel/i.test(e.name || ''));
+      return { date: new Date((match?.date || EXAM_DATE_FALLBACK) + 'T00:00:00'), fromUser: !!match };
+    } catch(e) {
+      return { date: new Date(EXAM_DATE_FALLBACK + 'T00:00:00'), fromUser: false };
+    }
+  }
 
   function _cardsForUE(code) {
     return App.Store.state.cards.filter(c => c.ue === code && !c.suspended);
@@ -104,9 +114,10 @@ App.Partiels = (() => {
         ${[1,2,3,4,5,6].map(n => semBtn(n, 'S' + n)).join('')}${semBtn('toutes', 'Toutes')}
       </div>
       <p class="partiel-annee-hint">📍 Répartition par semestre <strong>indicative</strong> (onboarding/fondamentaux en S1-S2, montée en compétence S3-S4, pratique avancée/gestion/recherche en S5-S6) — le référentiel national ne fixe pas de semestre précis par UE, ça dépend de la maquette de ton IFSI : vérifie avec ton planning si besoin. Les UE transversales (Pratiques infirmières, Anglais, Analyse de pratiques) apparaissent à tous les semestres.</p>`;
-    const days = _daysToExam();
+    const examInfo = _examInfo();
+    const days = Math.ceil((examInfo.date - new Date()) / 86400000);
     const examBanner = days > 0
-      ? `<div class="partiel-exam-banner">🎯 Objectif partiels — dernière semaine de janvier <strong>J-${days}</strong></div>`
+      ? `<div class="partiel-exam-banner">🎯 Objectif partiels — dernière semaine de janvier <strong>J-${days}</strong>${examInfo.fromUser ? '' : ' <span class="partiel-exam-edit">(date à ajuster dans 🎓 Examens si besoin)</span>'}</div>`
       : '';
     const avg = allHist.length ? (allHist.reduce((s,h)=>s+h.score,0) / allHist.length).toFixed(1) : null;
 
