@@ -132,5 +132,25 @@ App.UE = (() => {
     return changed;
   }
 
-  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards, migrateReferenceCategories };
+  // Migration ponctuelle (une seule fois, flag localStorage) : les 51 fiches "Référentiel
+  // 2026" ont été retirées d'App.DEFAULT_CARDS à la demande de l'utilisateur·ice — elles ne
+  // décrivaient que la réforme elle-même (compétences, UE, contexte), pas le contenu réel
+  // des cours. Comme App.Store ne fait qu'AJOUTER les nouveaux ids par défaut (il ne
+  // supprime jamais), les personnes qui avaient déjà ces 51 cartes en local (IndexedDB)
+  // les garderaient indéfiniment sans cette étape. Elle ne supprime que les cartes dont
+  // l'id commence par 'ref2026_' — jamais une carte créée ou importée par l'utilisateur·ice
+  // — et ne s'exécute qu'une seule fois pour ne rien re-supprimer plus tard.
+  const REMOVE_REF_CARDS_FLAG = 'ifsi_ue_remove_ref2026_v1';
+  function removeReferenceCards() {
+    if (localStorage.getItem(REMOVE_REF_CARDS_FLAG)) return false;
+    localStorage.setItem(REMOVE_REF_CARDS_FLAG, '1');
+    if (!App.Store?.state?.cards) return false;
+    const before = App.Store.state.cards.length;
+    App.Store.state.cards = App.Store.state.cards.filter(c => !(c.id && c.id.startsWith('ref2026_')));
+    const changed = App.Store.state.cards.length !== before;
+    if (changed) App.Store.save();
+    return changed;
+  }
+
+  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards, migrateReferenceCategories, removeReferenceCards };
 })();
