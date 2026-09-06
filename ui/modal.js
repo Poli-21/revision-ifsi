@@ -23,6 +23,13 @@ App.Modal = (() => {
     sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('') +
       '<option value="__new__">+ Nouvelle matière…</option>';
     if (prefillCat && cats.includes(prefillCat)) sel.value = prefillCat;
+    // S'il n'y a encore aucune matière (ex. juste après une suppression en masse),
+    // "__new__" devient la SEULE option et donc la valeur par défaut du <select> —
+    // l'événement "onchange" ne se déclenche alors jamais tout seul, ce qui laissait
+    // le champ de saisie du nom caché et rendait impossible la création d'une
+    // première matière. On force l'affichage du champ dans ce cas (et à chaque
+    // ouverture de la modale, sans effet si une matière normale est sélectionnée).
+    toggleNewCat();
     // Populate UE (référentiel 2026, optionnel)
     const ueSel = document.getElementById('new-ue');
     if (ueSel) ueSel.innerHTML = '<option value="">— Aucune UE —</option>' + App.UE.optionsHTML();
