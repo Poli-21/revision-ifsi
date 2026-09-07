@@ -5,15 +5,37 @@ window.App = window.App || {};
 App.English = (() => {
 
   // ══════════════════════════════════════════════════════════════
-  //  VOCABULAIRE — 14 leçons × 8 mots = 112 mots IFSI
-  //  Aligné sur la place de l'anglais dans le référentiel 2026 :
-  //  UE E.2 "Langue vivante étrangère", domaine E "Démarche
-  //  scientifique et méthodologie" → vocabulaire clinique (leçons
-  //  1-12) + présentation professionnelle/anamnèse et lecture
-  //  d'articles scientifiques (leçons 13-14).
+  //  VOCABULAIRE — 18 leçons × 8 mots = 144 mots IFSI
+  //
+  //  Les 11 premières leçons (chapitres 1, 2, 4, 6) sont calées sur le
+  //  programme OFFICIEL de l'UE E2 "Langue vivante étrangère" du semestre 1,
+  //  d'après la fiche pédagogique 2026-2027 fournie par l'utilisateur·ice
+  //  (Université Paris Cité — coordonnatrices R. Nohra & V. Guilohel) :
+  //    Chapitre 1 — Anatomy            (basic english, the body, actions
+  //                                      & movements, physical appearance, systems)
+  //    Chapitre 2 — Symptoms, injuries & conditions (pain, symptoms,
+  //                                      injuries, medical conditions)
+  //    Chapitre 4 — Medical equipment & procedures  (equipment, patient
+  //                                      care, vital signs)
+  //    Chapitre 6 — Medication & prescription       (medication &
+  //                                      treatments, prescription & instructions)
+  //  (Les chapitres 3 et 5 n'apparaissent pas dans la fiche fournie — la
+  //  grammaire/prononciation de chaque chapitre, elle, se travaille sur la
+  //  plateforme Mischool de l'IFSI, pas ici.)
+  //  Les 7 dernières leçons vont au-delà de ce programme S1 (communication,
+  //  psychiatrie, maternité, anamnèse, lecture d'articles scientifiques —
+  //  utile pour les semestres suivants) et sont regroupées à part.
   // ══════════════════════════════════════════════════════════════
+  const CHAPTERS = [
+    { id: 1,       title: 'Chapitre 1 — Anatomy',                          badge: '📗 UE E2 · S1' },
+    { id: 2,       title: 'Chapitre 2 — Symptoms, injuries & conditions',  badge: '📗 UE E2 · S1' },
+    { id: 4,       title: 'Chapitre 4 — Medical equipment & procedures',   badge: '📗 UE E2 · S1' },
+    { id: 6,       title: 'Chapitre 6 — Medication & prescription',        badge: '📗 UE E2 · S1' },
+    { id: 'bonus', title: 'Pour aller plus loin',                          badge: '🚀 Hors programme S1' },
+  ];
+
   const LESSONS = [
-    { id:1, name:'Les essentiels', emoji:'🏥', words:[
+    { id:'basics', chapter:1, name:'Les essentiels', emoji:'🏥', words:[
       { en:'nurse',        fr:'infirmier / infirmière',   ph:'/nɜːrs/' },
       { en:'patient',      fr:'patient(e)',               ph:'/ˈpeɪʃənt/' },
       { en:'doctor',       fr:'médecin',                  ph:'/ˈdɒktər/' },
@@ -23,7 +45,7 @@ App.English = (() => {
       { en:'assessment',   fr:'évaluation / bilan',       ph:'/əˈsesmənt/' },
       { en:'prescription', fr:'ordonnance',               ph:'/prɪˈskrɪpʃən/' },
     ]},
-    { id:2, name:'Corps humain', emoji:'🫀', words:[
+    { id:'body', chapter:1, name:'Corps humain', emoji:'🫀', words:[
       { en:'heart',   fr:'cœur',                 ph:'/hɑːrt/' },
       { en:'lung',    fr:'poumon',                ph:'/lʌŋ/' },
       { en:'kidney',  fr:'rein',                  ph:'/ˈkɪdni/' },
@@ -33,17 +55,17 @@ App.English = (() => {
       { en:'vein',    fr:'veine',                 ph:'/veɪn/' },
       { en:'artery',  fr:'artère',                ph:'/ˈɑːrtəri/' },
     ]},
-    { id:3, name:'Signes vitaux', emoji:'📊', words:[
-      { en:'blood pressure',    fr:'tension artérielle',     ph:'/blʌd ˈpreʃər/' },
-      { en:'heart rate',        fr:'fréquence cardiaque',    ph:'/hɑːrt reɪt/' },
-      { en:'temperature',       fr:'température',            ph:'/ˈtemprətʃər/' },
-      { en:'oxygen saturation', fr:'saturation en oxygène',  ph:'/ˈɒksɪdʒən sætʃəˈreɪʃən/' },
-      { en:'respiratory rate',  fr:'fréquence respiratoire', ph:'/rɪˈspɪrətɔːri reɪt/' },
-      { en:'pulse',             fr:'pouls',                  ph:'/pʌls/' },
-      { en:'fever',             fr:'fièvre',                 ph:'/ˈfiːvər/' },
-      { en:'hypotension',       fr:'hypotension',            ph:'/ˌhaɪpəˈtenʃən/' },
+    { id:'actions', chapter:1, name:'Actions & apparence', emoji:'🚶', words:[
+      { en:'walk',       fr:'marcher',                       ph:'/wɔːk/' },
+      { en:'stand up',   fr:'se lever / se tenir debout',    ph:'/stænd ʌp/' },
+      { en:'sit down',   fr:"s'asseoir",                     ph:'/sɪt daʊn/' },
+      { en:'lie down',   fr:"s'allonger",                    ph:'/laɪ daʊn/' },
+      { en:'bend',       fr:'se pencher / plier',            ph:'/bend/' },
+      { en:'tall',       fr:'grand(e) (de taille)',          ph:'/tɔːl/' },
+      { en:'overweight', fr:'en surpoids',                   ph:'/ˌəʊvərˈweɪt/' },
+      { en:'pale',       fr:'pâle',                          ph:'/peɪl/' },
     ]},
-    { id:4, name:'Symptômes', emoji:'🤒', words:[
+    { id:'symptoms', chapter:2, name:'Symptômes', emoji:'🤒', words:[
       { en:'pain',                fr:'douleur',                   ph:'/peɪn/' },
       { en:'nausea',              fr:'nausée',                    ph:'/ˈnɔːziə/' },
       { en:'dizziness',           fr:'vertige / étourdissement',  ph:'/ˈdɪzinəs/' },
@@ -53,47 +75,17 @@ App.English = (() => {
       { en:'bleeding',            fr:'saignement / hémorragie',   ph:'/ˈbliːdɪŋ/' },
       { en:'unconscious',         fr:'inconscient(e)',             ph:'/ʌnˈkɒnʃəs/' },
     ]},
-    { id:5, name:'Soins infirmiers', emoji:'💉', words:[
-      { en:'administer', fr:'administrer',               ph:'/ədˈmɪnɪstər/' },
-      { en:'injection',  fr:'injection / piqûre',        ph:'/ɪnˈdʒekʃən/' },
-      { en:'catheter',   fr:'cathéter',                  ph:'/ˈkæθɪtər/' },
-      { en:'dressing',   fr:'pansement',                 ph:'/ˈdresɪŋ/' },
-      { en:'infusion',   fr:'perfusion',                 ph:'/ɪnˈfjuːʒən/' },
-      { en:'monitoring', fr:'surveillance / monitorage', ph:'/ˈmɒnɪtərɪŋ/' },
-      { en:'discharge',  fr:'sortie / congé (médical)',  ph:'/dɪsˈtʃɑːrdʒ/' },
-      { en:'consent',    fr:'consentement',              ph:'/kənˈsent/' },
+    { id:'injuries', chapter:2, name:'Blessures', emoji:'🩹', words:[
+      { en:'wound',  fr:'plaie',                ph:'/wuːnd/' },
+      { en:'bruise', fr:'bleu / ecchymose',     ph:'/bruːz/' },
+      { en:'sprain', fr:'entorse',              ph:'/spreɪn/' },
+      { en:'burn',   fr:'brûlure',              ph:'/bɜːrn/' },
+      { en:'cut',    fr:'coupure',              ph:'/kʌt/' },
+      { en:'scar',   fr:'cicatrice',            ph:'/skɑːr/' },
+      { en:'sting',  fr:'piqûre (insecte)',     ph:'/stɪŋ/' },
+      { en:'graze',  fr:'éraflure',             ph:'/ɡreɪz/' },
     ]},
-    { id:6, name:'Médicaments', emoji:'💊', words:[
-      { en:'antibiotic',    fr:'antibiotique',             ph:'/ˌæntɪbaɪˈɒtɪk/' },
-      { en:'analgesic',     fr:'analgésique / antidouleur',ph:'/ˌænəlˈdʒiːzɪk/' },
-      { en:'anticoagulant', fr:'anticoagulant',            ph:'/ˌæntɪkəʊˈæɡjʊlənt/' },
-      { en:'dosage',        fr:'posologie / dose',         ph:'/ˈdəʊsɪdʒ/' },
-      { en:'side effect',   fr:'effet secondaire',         ph:'/saɪd ɪˈfekt/' },
-      { en:'allergy',       fr:'allergie',                 ph:'/ˈælərdʒi/' },
-      { en:'overdose',      fr:'surdosage / overdose',     ph:'/ˈəʊvərˌdəʊs/' },
-      { en:'intravenous',   fr:'intraveineux',             ph:'/ˌɪntrəˈviːnəs/' },
-    ]},
-    { id:7, name:'Urgences', emoji:'🚨', words:[
-      { en:'cardiac arrest', fr:'arrêt cardiaque',                    ph:'/ˈkɑːrdiæk əˈrest/' },
-      { en:'CPR',            fr:'réanimation cardio-pulmonaire',      ph:'/siː piː ɑːr/' },
-      { en:'stroke',         fr:'AVC (accident vasculaire cérébral)', ph:'/strəʊk/' },
-      { en:'trauma',         fr:'traumatisme',                        ph:'/ˈtrɔːmə/' },
-      { en:'triage',         fr:'triage',                             ph:'/ˈtriːɑːʒ/' },
-      { en:'resuscitation',  fr:'réanimation',                        ph:'/rɪˌsʌsɪˈteɪʃən/' },
-      { en:'defibrillator',  fr:'défibrillateur',                     ph:'/dɪˈfɪbrɪleɪtər/' },
-      { en:'shock',          fr:'état de choc',                       ph:'/ʃɒk/' },
-    ]},
-    { id:8, name:'Communication', emoji:'💬', words:[
-      { en:'Are you in pain?',                    fr:'Avez-vous mal ?',                                   ph:'' },
-      { en:'Take a deep breath.',                 fr:'Respirez profondément.',                            ph:'' },
-      { en:'Do you have any allergies?',          fr:'Avez-vous des allergies ?',                         ph:'' },
-      { en:'I need to take your blood pressure.', fr:'Je dois prendre votre tension.',                    ph:'' },
-      { en:'How are you feeling?',                fr:'Comment vous sentez-vous ?',                        ph:'' },
-      { en:'You need to rest.',                   fr:'Vous devez vous reposer.',                          ph:'' },
-      { en:'The doctor will see you shortly.',    fr:'Le médecin vous verra bientôt.',                    ph:'' },
-      { en:'Please call if you need anything.',   fr:'Appelez si vous avez besoin de quoi que ce soit.', ph:'' },
-    ]},
-    { id:9, name:'Pathologies', emoji:'🩺', words:[
+    { id:'conditions', chapter:2, name:'Pathologies', emoji:'🩺', words:[
       { en:'hypertension', fr:'hypertension artérielle (HTA)', ph:'/ˌhaɪpəˈtenʃən/' },
       { en:'diabetes',     fr:'diabète',                       ph:'/ˌdaɪəˈbiːtɪs/' },
       { en:'asthma',       fr:'asthme',                        ph:'/ˈæsmə/' },
@@ -103,7 +95,77 @@ App.English = (() => {
       { en:'fracture',     fr:'fracture',                      ph:'/ˈfræktʃər/' },
       { en:'infection',    fr:'infection',                     ph:'/ɪnˈfekʃən/' },
     ]},
-    { id:10, name:'Chirurgie', emoji:'⚕️', words:[
+    { id:'equipment', chapter:4, name:'Matériel médical', emoji:'🧰', words:[
+      { en:'stethoscope', fr:'stéthoscope',           ph:'/ˈsteθəskoʊp/' },
+      { en:'thermometer', fr:'thermomètre',           ph:'/θərˈmɒmɪtər/' },
+      { en:'wheelchair',  fr:'fauteuil roulant',      ph:'/ˈwiːltʃeər/' },
+      { en:'stretcher',   fr:'brancard',              ph:'/ˈstretʃər/' },
+      { en:'syringe',     fr:'seringue',              ph:'/sɪˈrɪndʒ/' },
+      { en:'bandage',     fr:'bandage',               ph:'/ˈbændɪdʒ/' },
+      { en:'gloves',      fr:'gants',                 ph:'/ɡlʌvz/' },
+      { en:'drip stand',  fr:'pied à perfusion',      ph:'/drɪp stænd/' },
+    ]},
+    { id:'care', chapter:4, name:'Soins infirmiers', emoji:'💉', words:[
+      { en:'administer', fr:'administrer',               ph:'/ədˈmɪnɪstər/' },
+      { en:'injection',  fr:'injection / piqûre',        ph:'/ɪnˈdʒekʃən/' },
+      { en:'catheter',   fr:'cathéter',                  ph:'/ˈkæθɪtər/' },
+      { en:'dressing',   fr:'pansement',                 ph:'/ˈdresɪŋ/' },
+      { en:'infusion',   fr:'perfusion',                 ph:'/ɪnˈfjuːʒən/' },
+      { en:'monitoring', fr:'surveillance / monitorage', ph:'/ˈmɒnɪtərɪŋ/' },
+      { en:'discharge',  fr:'sortie / congé (médical)',  ph:'/dɪsˈtʃɑːrdʒ/' },
+      { en:'consent',    fr:'consentement',              ph:'/kənˈsent/' },
+    ]},
+    { id:'vitals', chapter:4, name:'Signes vitaux', emoji:'📊', words:[
+      { en:'blood pressure',    fr:'tension artérielle',     ph:'/blʌd ˈpreʃər/' },
+      { en:'heart rate',        fr:'fréquence cardiaque',    ph:'/hɑːrt reɪt/' },
+      { en:'temperature',       fr:'température',            ph:'/ˈtemprətʃər/' },
+      { en:'oxygen saturation', fr:'saturation en oxygène',  ph:'/ˈɒksɪdʒən sætʃəˈreɪʃən/' },
+      { en:'respiratory rate',  fr:'fréquence respiratoire', ph:'/rɪˈspɪrətɔːri reɪt/' },
+      { en:'pulse',             fr:'pouls',                  ph:'/pʌls/' },
+      { en:'fever',             fr:'fièvre',                 ph:'/ˈfiːvər/' },
+      { en:'hypotension',       fr:'hypotension',            ph:'/ˌhaɪpəˈtenʃən/' },
+    ]},
+    { id:'meds', chapter:6, name:'Médicaments', emoji:'💊', words:[
+      { en:'antibiotic',    fr:'antibiotique',             ph:'/ˌæntɪbaɪˈɒtɪk/' },
+      { en:'analgesic',     fr:'analgésique / antidouleur',ph:'/ˌænəlˈdʒiːzɪk/' },
+      { en:'anticoagulant', fr:'anticoagulant',            ph:'/ˌæntɪkəʊˈæɡjʊlənt/' },
+      { en:'dosage',        fr:'posologie / dose',         ph:'/ˈdəʊsɪdʒ/' },
+      { en:'side effect',   fr:'effet secondaire',         ph:'/saɪd ɪˈfekt/' },
+      { en:'allergy',       fr:'allergie',                 ph:'/ˈælərdʒi/' },
+      { en:'overdose',      fr:'surdosage / overdose',     ph:'/ˈəʊvərˌdəʊs/' },
+      { en:'intravenous',   fr:'intraveineux',             ph:'/ˌɪntrəˈviːnəs/' },
+    ]},
+    { id:'prescriptions', chapter:6, name:'Prescriptions & consignes', emoji:'📋', words:[
+      { en:'prescribe',      fr:'prescrire',                    ph:'/prɪˈskraɪb/' },
+      { en:'refill',         fr:"renouvellement (d'ordonnance)",ph:'/ˈriːfɪl/' },
+      { en:'twice a day',    fr:'deux fois par jour',           ph:'/twaɪs ə deɪ/' },
+      { en:'before meals',   fr:'avant les repas',              ph:'/bɪˈfɔːr miːlz/' },
+      { en:'as needed',      fr:'si besoin / au besoin',        ph:'/æz ˈniːdɪd/' },
+      { en:'tablet',         fr:'comprimé',                     ph:'/ˈtæblɪt/' },
+      { en:'pill',           fr:'pilule',                       ph:'/pɪl/' },
+      { en:'oral route',     fr:'voie orale',                   ph:'/ˈɔːrəl ruːt/' },
+    ]},
+    { id:'emergency', chapter:'bonus', name:'Urgences', emoji:'🚨', words:[
+      { en:'cardiac arrest', fr:'arrêt cardiaque',                    ph:'/ˈkɑːrdiæk əˈrest/' },
+      { en:'CPR',            fr:'réanimation cardio-pulmonaire',      ph:'/siː piː ɑːr/' },
+      { en:'stroke',         fr:'AVC (accident vasculaire cérébral)', ph:'/strəʊk/' },
+      { en:'trauma',         fr:'traumatisme',                        ph:'/ˈtrɔːmə/' },
+      { en:'triage',         fr:'triage',                             ph:'/ˈtriːɑːʒ/' },
+      { en:'resuscitation',  fr:'réanimation',                        ph:'/rɪˌsʌsɪˈteɪʃən/' },
+      { en:'defibrillator',  fr:'défibrillateur',                     ph:'/dɪˈfɪbrɪleɪtər/' },
+      { en:'shock',          fr:'état de choc',                       ph:'/ʃɒk/' },
+    ]},
+    { id:'communication', chapter:'bonus', name:'Communication', emoji:'💬', words:[
+      { en:'Are you in pain?',                    fr:'Avez-vous mal ?',                                   ph:'' },
+      { en:'Take a deep breath.',                 fr:'Respirez profondément.',                            ph:'' },
+      { en:'Do you have any allergies?',          fr:'Avez-vous des allergies ?',                         ph:'' },
+      { en:'I need to take your blood pressure.', fr:'Je dois prendre votre tension.',                    ph:'' },
+      { en:'How are you feeling?',                fr:'Comment vous sentez-vous ?',                        ph:'' },
+      { en:'You need to rest.',                   fr:'Vous devez vous reposer.',                          ph:'' },
+      { en:'The doctor will see you shortly.',    fr:'Le médecin vous verra bientôt.',                    ph:'' },
+      { en:'Please call if you need anything.',   fr:'Appelez si vous avez besoin de quoi que ce soit.', ph:'' },
+    ]},
+    { id:'surgery', chapter:'bonus', name:'Chirurgie', emoji:'⚕️', words:[
       { en:'surgery',         fr:'chirurgie / intervention',    ph:'/ˈsɜːrdʒəri/' },
       { en:'incision',        fr:'incision',                    ph:'/ɪnˈsɪʒən/' },
       { en:'suture',          fr:'suture / point de suture',    ph:'/ˈsuːtʃər/' },
@@ -113,7 +175,7 @@ App.English = (() => {
       { en:'scalpel',         fr:'scalpel',                     ph:'/ˈskælpəl/' },
       { en:'postoperative',   fr:'post-opératoire',             ph:'/pəʊstˈɒpərətɪv/' },
     ]},
-    { id:11, name:'Psychiatrie', emoji:'🧠', words:[
+    { id:'psychiatry', chapter:'bonus', name:'Psychiatrie', emoji:'🧠', words:[
       { en:'anxiety',     fr:'anxiété',                     ph:'/æŋˈzaɪəti/' },
       { en:'depression',  fr:'dépression',                  ph:'/dɪˈpreʃən/' },
       { en:'hallucination',fr:'hallucination',             ph:'/həˌluːsɪˈneɪʃən/' },
@@ -123,7 +185,7 @@ App.English = (() => {
       { en:'self-harm',   fr:'automutilation',              ph:'/self hɑːrm/' },
       { en:'crisis',      fr:'crise (psychiatrique)',       ph:'/ˈkraɪsɪs/' },
     ]},
-    { id:12, name:'Maternité', emoji:'👶', words:[
+    { id:'maternity', chapter:'bonus', name:'Maternité', emoji:'👶', words:[
       { en:'pregnancy',    fr:'grossesse',              ph:'/ˈpreɡnənsi/' },
       { en:'newborn',      fr:'nouveau-né',             ph:'/ˈnjuːbɔːrn/' },
       { en:'breastfeeding',fr:'allaitement maternel',  ph:'/ˈbrestfiːdɪŋ/' },
@@ -133,7 +195,7 @@ App.English = (() => {
       { en:'premature',    fr:'prématuré(e)',           ph:'/ˌpreməˈtʃʊər/' },
       { en:'placenta',     fr:'placenta',               ph:'/pləˈsentə/' },
     ]},
-    { id:13, name:'Présentation & anamnèse', emoji:'🗂️', words:[
+    { id:'intake', chapter:'bonus', name:'Présentation & anamnèse', emoji:'🗂️', words:[
       { en:'student nurse',       fr:'étudiant(e) infirmier / infirmière',       ph:'/ˈstuːdənt nɜːrs/' },
       { en:'chief complaint',     fr:'motif de consultation',                    ph:'/tʃiːf kəmˈpleɪnt/' },
       { en:'medical history',     fr:'antécédents médicaux',                     ph:'/ˈmedɪkəl ˈhɪstəri/' },
@@ -143,7 +205,7 @@ App.English = (() => {
       { en:'date of birth',       fr:'date de naissance',                        ph:'/deɪt əv bɜːrθ/' },
       { en:'informed consent',    fr:'consentement éclairé',                     ph:'/ɪnˈfɔːrmd kənˈsent/' },
     ]},
-    { id:14, name:'Lecture scientifique', emoji:'🔬', words:[
+    { id:'research', chapter:'bonus', name:'Lecture scientifique', emoji:'🔬', words:[
       { en:'abstract',                  fr:'résumé (d\'article)',              ph:'/ˈæbstrækt/' },
       { en:'findings',                  fr:'résultats / constats',             ph:'/ˈfaɪndɪŋz/' },
       { en:'systematic review',         fr:'revue systématique',               ph:'/ˌsɪstəˈmætɪk rɪˈvjuː/' },
@@ -306,24 +368,37 @@ App.English = (() => {
     const revWrap = _el('eng-review-btn-wrap');
     if (revWrap) revWrap.style.display = weakWords.length >= 4 ? 'block' : 'none';
 
-    // Grille des leçons
+    // Grille des leçons, groupées par chapitre (chapitres 1/2/4/6 = programme
+    // officiel UE E2 · S1 d'après la fiche pédagogique fournie ; le reste est
+    // du vocabulaire complémentaire pour la suite du cursus). Le verrouillage
+    // reste séquentiel sur l'ensemble des 18 leçons, dans cet ordre.
     const grid = _el('english-lessons-grid');
     if (!grid) return;
     let html = '';
-    LESSONS.forEach((lesson, i) => {
-      const prog   = _progress[lesson.id] || { stars:0, xp:0 };
-      const prevOk = i === 0 || (_progress[LESSONS[i-1].id]?.stars||0) > 0;
-      const locked = !prevOk;
-      const stars  = prog.stars || 0;
-      const starsHTML = '⭐'.repeat(stars) + `<span style="opacity:.2">⭐</span>`.repeat(3-stars);
-      html += `<div class="eng-lesson-card${locked?' eng-locked':''}${stars>0?' eng-completed':''}"
-        ${locked ? '' : `onclick="App.English.startLesson(${lesson.id})"`}
-        title="${locked ? 'Termine la leçon précédente' : lesson.name}">
-        <div class="eng-lesson-emoji">${locked ? '🔒' : lesson.emoji}</div>
-        <div class="eng-lesson-name">${_esc(lesson.name)}</div>
-        <div class="eng-lesson-stars">${locked ? '' : starsHTML}</div>
-        ${prog.xp ? `<div class="eng-lesson-xp">+${prog.xp} XP</div>` : ''}
-      </div>`;
+    CHAPTERS.forEach(chap => {
+      const chapLessons = LESSONS.filter(l => l.chapter === chap.id);
+      if (!chapLessons.length) return;
+      html += `<div class="eng-chapter-header">
+        <span class="eng-chapter-title">${_esc(chap.title)}</span>
+        <span class="eng-chapter-badge">${_esc(chap.badge)}</span>
+      </div><div class="eng-lessons-grid">`;
+      chapLessons.forEach(lesson => {
+        const i      = LESSONS.indexOf(lesson);
+        const prog   = _progress[lesson.id] || { stars:0, xp:0 };
+        const prevOk = i === 0 || (_progress[LESSONS[i-1].id]?.stars||0) > 0;
+        const locked = !prevOk;
+        const stars  = prog.stars || 0;
+        const starsHTML = '⭐'.repeat(stars) + `<span style="opacity:.2">⭐</span>`.repeat(3-stars);
+        html += `<div class="eng-lesson-card${locked?' eng-locked':''}${stars>0?' eng-completed':''}"
+          ${locked ? '' : `onclick="App.English.startLesson('${lesson.id}')"`}
+          title="${locked ? 'Termine la leçon précédente' : lesson.name}">
+          <div class="eng-lesson-emoji">${locked ? '🔒' : lesson.emoji}</div>
+          <div class="eng-lesson-name">${_esc(lesson.name)}</div>
+          <div class="eng-lesson-stars">${locked ? '' : starsHTML}</div>
+          ${prog.xp ? `<div class="eng-lesson-xp">+${prog.xp} XP</div>` : ''}
+        </div>`;
+      });
+      html += `</div>`;
     });
     grid.innerHTML = html;
   }
@@ -354,7 +429,7 @@ App.English = (() => {
       lessonId : 'review',
       lesson   : { id: 'review', name: 'Révision', emoji: '🔄', words },
       queue    : _buildQueue(words, true),
-      idx      : 0, hearts : 3, xp : 0,
+      idx      : 0, hearts : 5, xp : 0,
       answered : false, failed : false, isReview : true
     };
     _startGame();
@@ -370,7 +445,7 @@ App.English = (() => {
     _game = {
       lessonId : id, lesson,
       queue    : _buildQueue(lesson.words, false),
-      idx      : 0, hearts : 3, xp : 0,
+      idx      : 0, hearts : 5, xp : 0,
       answered : false, failed : false, isReview : false
     };
     _startGame();
@@ -542,7 +617,7 @@ App.English = (() => {
   function _updateHearts(n) {
     const el = _el('eng-hearts');
     if (!el) return;
-    el.innerHTML = '❤️'.repeat(n) + '<span style="opacity:.2">❤️</span>'.repeat(3-n);
+    el.innerHTML = '❤️'.repeat(n) + '<span style="opacity:.2">❤️</span>'.repeat(5-n);
     el.classList.add('eng-hearts-shake');
     setTimeout(() => el.classList.remove('eng-hearts-shake'), 400);
   }
@@ -572,7 +647,9 @@ App.English = (() => {
   // ══════════════════════════════════════════════════════════════
   function _endLesson(failed) {
     const { lessonId, hearts, xp, isReview } = _game;
-    const stars = failed ? 0 : hearts >= 3 ? 3 : hearts >= 2 ? 2 : 1;
+    // Barème réajusté pour 5 vies (au lieu de 3) : 5 vies restantes (sans faute)
+    // = 3 étoiles, 3-4 = 2 étoiles, 1-2 = 1 étoile.
+    const stars = failed ? 0 : hearts >= 5 ? 3 : hearts >= 3 ? 2 : 1;
     if (!failed && !isReview) {
       const prev = _progress[lessonId] || { stars:0, xp:0 };
       const newMistakes = Object.fromEntries(

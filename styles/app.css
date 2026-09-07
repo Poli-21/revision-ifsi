@@ -1214,7 +1214,21 @@ header, .sidebar, .modal, .card-face, .card-item { transition: background .25s, 
 .eng-daily-bar   { height: 10px; background: var(--border); border-radius: 999px; overflow: hidden; }
 .eng-daily-fill  { height: 100%; background: linear-gradient(90deg,#f59e0b,#fbbf24); border-radius:999px; transition: width .5s ease; }
 
-/* Grille leçons */
+/* Sections par chapitre (programme officiel UE E2 vs. hors-programme) */
+.eng-lessons-wrap { display: flex; flex-direction: column; gap: 1.5rem; }
+.eng-chapter-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: .6rem; flex-wrap: wrap; margin-bottom: .6rem;
+  padding-bottom: .4rem; border-bottom: 1px solid var(--border);
+}
+.eng-chapter-title { font-size: .92rem; font-weight: 700; color: var(--text); }
+.eng-chapter-badge {
+  font-size: .72rem; font-weight: 700; color: var(--text-secondary);
+  background: var(--gray-50); padding: 2px 9px; border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Grille leçons (une par chapitre) */
 .eng-lessons-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
