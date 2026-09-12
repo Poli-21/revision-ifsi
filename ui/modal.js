@@ -349,10 +349,19 @@ App.Modal = (() => {
         if (!Array.isArray(imported)) throw new Error();
         const existIds = new Set(App.Store.state.cards.map(c => c.id));
         let added = 0;
-        imported.forEach(c => { if (!existIds.has(c.id)) { App.Store.state.cards.push(c); added++; } });
+        const newIds = [];
+        imported.forEach(c => { if (!existIds.has(c.id)) { App.Store.state.cards.push(c); added++; newIds.push(c.id); } });
         App.Store.save();
         App.Render.all();
         alert(`✅ ${added} carte(s) importée(s) (${imported.length - added} déjà présente(s))`);
+        // Si des cartes importées n'ont pas d'UE (le fichier importé n'en précisait
+        // pas), on ouvre directement la sélection multiple dessus pour pouvoir en
+        // assigner une à tout le lot d'un coup, plutôt que carte par carte.
+        const needUE = newIds.filter(id => {
+          const c = App.Store.state.cards.find(x => x.id === id);
+          return c && !c.ue;
+        });
+        if (needUE.length) _selectImportedForUE(needUE);
       } catch { alert('Fichier invalide.'); }
     };
     reader.readAsText(file);

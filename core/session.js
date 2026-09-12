@@ -224,6 +224,7 @@ App.Session = (() => {
     fc.style.height = '';
     document.getElementById('card-container').style.display = 'block';
     document.getElementById('answer-btns').style.display    = 'none';
+    document.getElementById('discovery-btns').style.display = 'none';
     document.getElementById('card-cat').textContent      = c.cat;
     document.getElementById('card-cat-back').textContent = c.cat;
     document.getElementById('card-term').textContent     = c.term;
@@ -233,7 +234,14 @@ App.Session = (() => {
     else ex.style.display = 'none';
     const img = resolveImg(c);
     setCardImages(img);
+    // Carte jamais étudiée (pas encore de progrès SRS) → mode "découverte" :
+    // pas de bouton "raté/difficile" qui n'aurait pas de sens sur un premier
+    // contact, juste "je découvre" (revu bientôt) ou "je savais déjà" (long).
+    const isNew = !c.progress;
+    const badge = document.getElementById('new-card-badge');
+    if (badge) badge.style.display = isNew ? 'block' : 'none';
     updateIntervalPreviews(c, ['int-nope','int-hard','int-ok','int-easy'], [0,3,4,5]);
+    updateIntervalPreviews(c, ['dint-nope','dint-ok'], [0,4]);
     document.getElementById('card-hint').style.display = 'block';
     setTimeout(() => {
       const h = Math.max(document.getElementById('card-front-face').scrollHeight,
@@ -247,7 +255,9 @@ App.Session = (() => {
     if (!fc.classList.contains('flipped')) {
       fc.classList.add('flipped');
       document.getElementById('card-hint').style.display = 'none';
-      document.getElementById('answer-btns').style.display = 'flex';
+      const c = current.queue[current.idx];
+      const isNew = !c.progress;
+      document.getElementById(isNew ? 'discovery-btns' : 'answer-btns').style.display = 'flex';
     }
   }
 

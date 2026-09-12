@@ -304,6 +304,12 @@ App.Render = (() => {
     const efBadge    = c.progress ? `<span class="ef-badge" title="Ease factor · ${lapses} échec(s)">${c.progress.easeFactor}</span>` : '';
     const suspBadge  = c.suspended ? `<span class="badge" style="background:#f3f4f6;color:#9ca3af">⏸ Suspendu</span>` : '';
     const leechBadge = isLeech ? `<span class="badge badge-leech" title="${lapses} échecs · carte à retravailler">🩸 Difficile</span>` : '';
+    // Sélecteur UE rapide : change l'UE de CETTE carte en un clic, sans ouvrir
+    // la fiche complète — plus besoin de passer par "Modifier" à chaque fois.
+    const ueQuick = App.UE ? `<select class="ue-quick-select" title="Changer l'UE de cette carte"
+        onclick="event.stopPropagation()" onchange="event.stopPropagation();quickSetUE('${c.id}',this.value)">
+        <option value="">— Aucune UE —</option>${App.UE.optionsHTML(c.ue)}
+      </select>` : '';
     return `<div class="card-item ${c.suspended ? 'suspended' : ''}${isLeech ? ' is-leech' : ''}" data-id="${c.id}" onclick="event.currentTarget.closest('.select-mode')?toggleCardSelect('${c.id}',event):openCardDetail('${c.id}')">
       <button class="card-delete-btn" onclick="deleteCard('${c.id}',event)" title="Supprimer">✕</button>
       ${imgHtml}
@@ -317,6 +323,7 @@ App.Render = (() => {
         ${efBadge}
         <span class="next-review">${nextStr}</span>
       </div>
+      ${ueQuick}
     </div>`;
   }
 

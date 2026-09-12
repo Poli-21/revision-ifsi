@@ -76,6 +76,12 @@ App.Sync = (() => {
     // Données Grand Oral
     let oralEvals = [];
     try { oralEvals = JSON.parse(localStorage.getItem('ifsi_oral_evals') || '[]'); } catch(e) {}
+    // Progression du module Anglais (étoiles/XP par leçon + série de jours) —
+    // sans ça elle ne se retrouve pas d'un appareil à l'autre, contrairement
+    // aux cartes/flashcards qui, elles, sont déjà synchronisées ci-dessus.
+    let englishProgress = {}, englishStreak = {};
+    try { englishProgress = JSON.parse(localStorage.getItem('ifsi_english_progress') || '{}'); } catch(e) {}
+    try { englishStreak   = JSON.parse(localStorage.getItem('ifsi_english_streak')   || '{}'); } catch(e) {}
     return JSON.stringify({
       v: 2,
       updatedAt: new Date().toISOString(),
@@ -84,7 +90,9 @@ App.Sync = (() => {
       catOrder: state.catOrder,
       oralEvals,
       oralPlanP1: localStorage.getItem('ifsi_oral_plan_p1') || '',
-      oralPlanP2: localStorage.getItem('ifsi_oral_plan_p2') || ''
+      oralPlanP2: localStorage.getItem('ifsi_oral_plan_p2') || '',
+      englishProgress,
+      englishStreak
     }, null, 0);
   }
 
@@ -96,7 +104,9 @@ App.Sync = (() => {
       updatedAt:  data.updatedAt || '',
       oralEvals:  Array.isArray(data.oralEvals) ? data.oralEvals : [],
       oralPlanP1: typeof data.oralPlanP1 === 'string' ? data.oralPlanP1 : null,
-      oralPlanP2: typeof data.oralPlanP2 === 'string' ? data.oralPlanP2 : null
+      oralPlanP2: typeof data.oralPlanP2 === 'string' ? data.oralPlanP2 : null,
+      englishProgress: data.englishProgress && typeof data.englishProgress === 'object' ? data.englishProgress : null,
+      englishStreak:   data.englishStreak   && typeof data.englishStreak   === 'object' ? data.englishStreak   : null
     };
   }
 
@@ -238,6 +248,37 @@ App.Sync = (() => {
         }
       });
 
+      // ── Merge Anglais (étoiles/XP par leçon + série de jours) ──────
+      // Par leçon : garde le meilleur des deux appareils (étoiles et XP max),
+      // fusionne les mots à revoir. Jamais de perte, juste le meilleur des 2.
+      if (remote.englishProgress) {
+        let localEng = {};
+        try { localEng = JSON.parse(localStorage.getItem('ifsi_english_progress') || '{}'); } catch(e) {}
+        const mergedEng = { ...remote.englishProgress };
+        Object.entries(localEng).forEach(([lid, loc]) => {
+          const rem = mergedEng[lid];
+          if (!rem) { mergedEng[lid] = loc; return; }
+          mergedEng[lid] = {
+            stars:    Math.max(loc.stars||0, rem.stars||0),
+            xp:       Math.max(loc.xp||0,    rem.xp||0),
+            mistakes: { ...(rem.mistakes||{}), ...(loc.mistakes||{}) }
+          };
+        });
+        localStorage.setItem('ifsi_english_progress', JSON.stringify(mergedEng));
+      }
+      // Série de jours : garde la date la plus récente (et le compteur le
+      // plus grand en cas d'égalité de date).
+      if (remote.englishStreak) {
+        let localStreak = {};
+        try { localStreak = JSON.parse(localStorage.getItem('ifsi_english_streak') || '{}'); } catch(e) {}
+        const r = remote.englishStreak, l = localStreak;
+        let winner = l;
+        if (!l.lastDate) winner = r;
+        else if (r.lastDate > l.lastDate) winner = r;
+        else if (r.lastDate === l.lastDate) winner = (r.count||0) > (l.count||0) ? r : l;
+        localStorage.setItem('ifsi_english_streak', JSON.stringify(winner));
+      }
+
       prog(80, 'Sauvegarde…');
       App.Store.save();
       App.Store.saveLog();
@@ -246,6 +287,15 @@ App.Sync = (() => {
       // Rafraîchit l'historique Grand Oral si le module est visible
       if (window.App?.Oral) {
         try { App.Oral.refreshHistory && App.Oral.refreshHistory(); } catch(e) {}
+      }
+      // Rafraîchit l'écran d'accueil Anglais si c'est bien ce qui est affiché
+      // (nouvelles étoiles/XP fusionnées) — jamais si une leçon est en cours,
+      // pour ne pas interrompre l'utilisateur·ice en pleine partie.
+      if (window.App?.English) {
+        const engHome = document.getElementById('english-home');
+        if (engHome && engHome.style.display !== 'none') {
+          try { App.English.showHome(); } catch(e) {}
+        }
       }
       prog(100, 'Synchronisé !');
       _setStatus('ok');

@@ -421,6 +421,35 @@ function bulkSetUE() {
   if (btn) { const o = btn.textContent; btn.textContent = `✓ ${count} carte(s) taguée(s) ${ue}`; setTimeout(() => btn.textContent = o, 2000); }
 }
 
+// Change l'UE d'UNE seule carte directement depuis la liste "Toutes les cartes"
+// (sélecteur rapide sur chaque carte), sans ouvrir la fiche complète.
+function quickSetUE(id, ue) {
+  const c = App.Store.state.cards.find(x => x.id === id);
+  if (!c) return;
+  c.ue = ue || null;
+  App.Store.save();
+  App.Render.all();
+}
+
+// Après un import JSON, présélectionne les cartes nouvellement importées et
+// ouvre le mode sélection avec le bandeau "Assigner UE" prêt à l'emploi —
+// pour ne pas avoir à retagger chaque carte importée une par une.
+function _selectImportedForUE(ids) {
+  if (!ids || !ids.length) return;
+  App.UI.switchTab('browse');
+  if (!_selectMode) toggleSelectMode();
+  ids.forEach(id => _selectedCards.add(id));
+  requestAnimationFrame(() => {
+    ids.forEach(id => {
+      const el = document.querySelector(`.card-item[data-id="${id}"]`);
+      if (el) el.classList.add('selected');
+    });
+    _updateBulkCount();
+    const bar = document.getElementById('bulk-bar');
+    if (bar) bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
+
 function bulkDelete() {
   const n = _selectedCards.size;
   if (n === 0) return;
