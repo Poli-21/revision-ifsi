@@ -431,6 +431,16 @@ App.Render = (() => {
       }
     });
 
+    // BUG corrigé : une carte encore taguée avec juste "B3" (sans " > ") alors
+    // qu'un dossier "B3 > …" existe déjà se retrouvait invisible — ni comptée
+    // ni affichée nulle part (elle n'est ni dans groups['B3'] ni affichée seule
+    // puisque le nom "B3" est traité comme un groupe). On l'intègre au groupe
+    // comme premier enfant spécial "(Général)" pour qu'elle reste accessible.
+    simples = simples.filter(cat => {
+      if (groups[cat]) { groups[cat].unshift(cat); return false; }
+      return true;
+    });
+
     let html = '';
     let flatIdx = 0; // pour ▲▼ sur les éléments de premier niveau
     const topLevel = []; // ordre des éléments top-level (simples + parents de groupes)
@@ -474,11 +484,19 @@ App.Render = (() => {
             const n  = state.cards.filter(c => c.cat === cat).length;
             const nd = state.cards.filter(c => c.cat === cat && SRS.isDue(c)).length;
             const badge = nd > 0 ? `<span class="due-badge">${nd}</span>` : '';
-            const label = cat.slice(top.length + 3);
-            return `<div class="cat-pill-row" draggable="true" data-drag-top="${_esc(top)}" data-drag-child="${_esc(cat)}">
-              <span class="cat-drag-handle" title="Glisser">⠿</span>
-              <button class="cat-pill ${App.UI.activeCategory === cat ? 'active' : ''}" onclick="handleCatClick('${_esc(cat)}',event,this)" title="Double-clic pour renommer">${_esc(label)}${badge}<span class="cat-count">${n}</span></button>
-              <button class="cat-unnest-btn" onclick="unnestCat('${_esc(cat)}')" title="Retirer du groupe">↑</button>
+            // Cas particulier : "cat" est le nom du groupe lui-même (carte pas
+            // encore rangée dans une sous-matière) → pas de vrai nom d'enfant,
+            // pas de glisser-déposer ambigu avec le groupe entier, pas de
+            // bouton "retirer du groupe" (déjà au niveau le plus haut possible).
+            const isGeneral = cat === top;
+            const label = isGeneral ? '(Général)' : cat.slice(top.length + 3);
+            const dragAttrs = isGeneral ? '' : `draggable="true" data-drag-top="${_esc(top)}" data-drag-child="${_esc(cat)}"`;
+            const dragHandle = isGeneral ? '' : `<span class="cat-drag-handle" title="Glisser">⠿</span>`;
+            const unnestBtn  = isGeneral ? '' : `<button class="cat-unnest-btn" onclick="unnestCat('${_esc(cat)}')" title="Retirer du groupe">↑</button>`;
+            return `<div class="cat-pill-row" ${dragAttrs}>
+              ${dragHandle}
+              <button class="cat-pill ${App.UI.activeCategory === cat ? 'active' : ''}" onclick="handleCatClick('${_esc(cat)}',event,this)" title="${isGeneral ? '' : 'Double-clic pour renommer'}">${_esc(label)}${badge}<span class="cat-count">${n}</span></button>
+              ${unnestBtn}
               <button class="cat-delete-btn" data-cat="${_esc(cat)}" title="Supprimer cette matière">🗑</button>
             </div>`;
           }).join('')}
