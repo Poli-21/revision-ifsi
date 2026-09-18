@@ -407,10 +407,12 @@
         <button class="btn-answer btn-ok"   onclick="answer(4)">✓ Su !<span class="interval" id="int-ok"></span><span class="shortcut">3 / →</span></button>
         <button class="btn-answer btn-easy" onclick="answer(5)">⚡ Facile<span class="interval" id="int-easy"></span><span class="shortcut">4</span></button>
       </div>
-      <!-- Boutons simplifiés pour une carte jamais vue : pas de "raté/difficile",
-           juste "je découvre" (à revoir bientôt) ou "je savais déjà" (intervalle long) -->
+      <!-- Boutons simplifiés pour une carte jamais vue : "je découvre" (à revoir
+           bientôt), "partiellement su" (vu passer / vaguement familier), ou
+           "je savais déjà" (intervalle long) -->
       <div class="answer-btns discovery-btns" id="discovery-btns" style="display:none">
         <button class="btn-answer btn-nope" onclick="answer(0)">🆕 Je découvre<span class="interval" id="dint-nope"></span><span class="shortcut">1 / ←</span></button>
+        <button class="btn-answer btn-hard" onclick="answer(3)">🤔 Partiellement su<span class="interval" id="dint-hard"></span><span class="shortcut">2</span></button>
         <button class="btn-answer btn-ok"   onclick="answer(4)">✅ Je savais déjà<span class="interval" id="dint-ok"></span><span class="shortcut">3 / →</span></button>
       </div>
 

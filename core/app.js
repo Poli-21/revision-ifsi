@@ -174,6 +174,18 @@ App.UI = (() => {
     App.Render.all();
   }
 
+  // Sort une sous-matière précise de son groupe ET la place à un endroit donné
+  // du niveau supérieur (utilisé quand on glisse une sous-matière entre deux
+  // lignes du niveau supérieur, plutôt que de la déposer sur un groupe pour
+  // l'y imbriquer — voir nestCatInto).
+  function moveChildToTopLevel(fullChildCat, dropTopKey) {
+    const sep = fullChildCat.indexOf(' > ');
+    if (sep === -1) return; // ce n'est déjà pas une sous-matière, rien à faire
+    const childName = fullChildCat.slice(sep + 3);
+    unnestCat(fullChildCat);
+    moveCatTo(childName, dropTopKey);
+  }
+
   // Conserve moveCat pour compatibilité (▲▼ éventuels)
   function moveCat(cat, dir) {
     const cats = App.Render.orderedCats();
@@ -192,7 +204,7 @@ App.UI = (() => {
     get currentTab()       { return currentTab; },
     get selectedCats()     { return selectedCats; },
     get openedGroups()     { return openedGroups; },
-    showView, switchTab, setCategory, toggleCatSelection, startSelectedCats, moveCat, moveCatTo, nestCatInto, unnestCat, toggleGroup
+    showView, switchTab, setCategory, toggleCatSelection, startSelectedCats, moveCat, moveCatTo, moveChildToTopLevel, nestCatInto, unnestCat, toggleGroup
   };
 })();
 

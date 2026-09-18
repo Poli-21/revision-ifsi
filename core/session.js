@@ -241,7 +241,7 @@ App.Session = (() => {
     const badge = document.getElementById('new-card-badge');
     if (badge) badge.style.display = isNew ? 'block' : 'none';
     updateIntervalPreviews(c, ['int-nope','int-hard','int-ok','int-easy'], [0,3,4,5]);
-    updateIntervalPreviews(c, ['dint-nope','dint-ok'], [0,4]);
+    updateIntervalPreviews(c, ['dint-nope','dint-hard','dint-ok'], [0,3,4]);
     document.getElementById('card-hint').style.display = 'block';
     setTimeout(() => {
       const h = Math.max(document.getElementById('card-front-face').scrollHeight,

@@ -331,7 +331,8 @@ App.Render = (() => {
   function _initCatDrag() {
     const list = document.getElementById('cat-list');
     if (!list) return;
-    let dragTop = null;
+    let dragTop   = null; // top-level (groupe ou matière simple) qu'on déplace
+    let dragChild = null; // si on déplace UNE sous-matière précise dans un groupe
 
     const clearAll = () => {
       list.querySelectorAll('.cat-drop-line').forEach(l => l.classList.remove('active'));
@@ -341,14 +342,20 @@ App.Render = (() => {
     // ── Départ du drag ──
     list.querySelectorAll('.cat-pill-row[draggable]').forEach(row => {
       row.addEventListener('dragstart', e => {
-        dragTop = row.dataset.dragTop;
+        dragTop   = row.dataset.dragTop;
+        // BUG corrigé : une ligne de sous-matière porte AUSSI data-drag-top (le nom
+        // de son groupe parent, pour le highlight "même groupe = pas de dépôt").
+        // Sans capturer data-drag-child ici, on perdait laquelle des sous-matières
+        // était réellement glissée et on déplaçait TOUT le groupe parent à la place.
+        dragChild = row.dataset.dragChild || null;
         e.dataTransfer.effectAllowed = 'move';
         setTimeout(() => row.classList.add('dragging'), 0);
       });
       row.addEventListener('dragend', () => {
         row.classList.remove('dragging');
         clearAll();
-        dragTop = null;
+        dragTop   = null;
+        dragChild = null;
       });
 
       // ── Dépôt SUR une ligne = imbriquer ──
@@ -370,11 +377,18 @@ App.Render = (() => {
         row.classList.remove('drop-nest');
         if (!dragTop) return;
         const targetTop = row.dataset.dragTop;
-        if (targetTop && targetTop !== dragTop) App.UI.nestCatInto(dragTop, targetTop);
+        if (!targetTop) return;
+        if (dragChild) {
+          // On déplace UNE sous-matière précise vers un autre groupe (ou vers
+          // une matière simple, qui devient alors un groupe).
+          if (targetTop !== dragChild) App.UI.nestCatInto(dragChild, targetTop);
+        } else if (targetTop !== dragTop) {
+          App.UI.nestCatInto(dragTop, targetTop);
+        }
       });
     });
 
-    // ── Dépôt ENTRE les lignes = réordonner ──
+    // ── Dépôt ENTRE les lignes = réordonner (niveau supérieur) ──
     list.querySelectorAll('.cat-drop-line').forEach(line => {
       line.addEventListener('dragover', e => {
         e.preventDefault();
@@ -386,7 +400,14 @@ App.Render = (() => {
         e.preventDefault();
         line.classList.remove('active');
         if (!dragTop) return;
-        App.UI.moveCatTo(dragTop, line.dataset.dropTop);
+        if (dragChild) {
+          // Glisser une sous-matière entre deux éléments du niveau supérieur
+          // = la sortir de son groupe et la placer à cet endroit (et non
+          // déplacer tout le groupe parent, comme avant le correctif).
+          App.UI.moveChildToTopLevel(dragChild, line.dataset.dropTop);
+        } else {
+          App.UI.moveCatTo(dragTop, line.dataset.dropTop);
+        }
       });
     });
   }
