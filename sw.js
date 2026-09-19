@@ -1,5 +1,5 @@
 // Service Worker — cache offline + mises à jour automatiques
-const CACHE = 'ifsi-v4';
+const CACHE = 'ifsi-v5';
 const STATIC = [
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -40,7 +40,10 @@ self.addEventListener('fetch', e => {
     );
   } else {
     e.respondWith(
-      fetch(e.request)
+      // cache:'no-store' force le navigateur à ignorer son propre cache HTTP
+      // (au-delà du cache du service worker) — sinon un fichier JS/CSS déjà
+      // téléchargé une fois peut rester servi tel quel même en "network-first".
+      fetch(e.request, { cache: 'no-store' })
         .then(res => {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
