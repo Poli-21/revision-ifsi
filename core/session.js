@@ -337,7 +337,7 @@ App.Session = (() => {
     choices.forEach(({ def, correct }) => {
       const btn = document.createElement('button');
       btn.className     = 'qcm-choice';
-      btn.textContent   = def.length > 110 ? def.slice(0, 107) + '…' : def;
+      btn.textContent   = def;
       btn.dataset.correct = correct ? '1' : '0';
       btn.onclick = () => {
         if (container.dataset.answered === 'true') return;
