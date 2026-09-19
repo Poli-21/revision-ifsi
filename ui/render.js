@@ -418,7 +418,7 @@ App.Render = (() => {
 
     // Sépare les cats groupées ("Parent > Enfant") des cats simples
     const groups  = {};   // parent → [fullCatName, ...]
-    const simples = [];   // cats sans " > "
+    let   simples = [];   // cats sans " > " (réaffecté plus bas, doit être "let")
 
     cats.forEach(cat => {
       const sep = cat.indexOf(' > ');

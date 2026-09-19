@@ -295,7 +295,10 @@ Object.assign(window, {
   unnestCat          : (cat)      => App.UI.unnestCat(cat),
   toggleGroup        : (p)        => App.UI.toggleGroup(p),
   startGroupSession  : (p)        => App.Session.start(
-      App.Store.state.cards.filter(c => c.cat.startsWith(p + ' > ')).map(c => c.cat).filter((v,i,a) => a.indexOf(v)===i)
+      // Inclut aussi les cartes rangées directement sous le nom du groupe
+      // (affichées comme "(Général)"), sinon un groupe sans vraies sous-
+      // matières se retrouvait avec 0 carte trouvée → "Aucune carte à réviser".
+      App.Store.state.cards.filter(c => c.cat === p || c.cat.startsWith(p + ' > ')).map(c => c.cat).filter((v,i,a) => a.indexOf(v)===i)
     ),
   startRenameCat     : (cat, btn) => _startRenameCat(cat, btn),
   deleteCat          : (cat)      => _deleteCat(cat),
