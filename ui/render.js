@@ -141,11 +141,11 @@ App.Render = (() => {
             const nd  = state.cards.filter(c => c.cat === cat && SRS.isDue(c)).length;
             const lbl = cat.slice(top.length + 3);
             const sel = selCats.has(cat) ? ' selected' : '';
-            return `<button class="cat-due-chip chip-child${sel}" data-cat="${_esc(cat)}" onclick="toggleCatSelection('${_esc(cat)}')">${_esc(lbl)}<span class="chip-n">${nd}</span></button>`;
+            return `<button class="cat-due-chip chip-child${sel}" data-cat="${_esc(cat)}" onclick="toggleCatSelection('${_escJs(cat)}')">${_esc(lbl)}<span class="chip-n">${nd}</span></button>`;
           }).join('');
           return `<div class="chip-group">
             <div class="chip-group-header">
-              <button class="cat-due-chip chip-parent${groupSel}" data-cat="${_esc(top)}" onclick="toggleGroupChips('${_esc(top)}')">${_esc(top)}<span class="chip-n">${totalDue}</span><span class="chip-arrow">▾</span></button>
+              <button class="cat-due-chip chip-parent${groupSel}" data-cat="${_esc(top)}" onclick="toggleGroupChips('${_escJs(top)}')">${_esc(top)}<span class="chip-n">${totalDue}</span><span class="chip-arrow">▾</span></button>
             </div>
             <div class="chip-group-children" id="chipg-${_esc(top)}">${childrenHTML}</div>
           </div>`;
@@ -153,7 +153,7 @@ App.Render = (() => {
           // ── Simple ──
           const nd  = state.cards.filter(c => c.cat === top && SRS.isDue(c)).length;
           const sel = selCats.has(top) ? ' selected' : '';
-          return `<button class="cat-due-chip${sel}" data-cat="${_esc(top)}" onclick="toggleCatSelection('${_esc(top)}')">${_esc(top)}<span class="chip-n">${nd}</span></button>`;
+          return `<button class="cat-due-chip${sel}" data-cat="${_esc(top)}" onclick="toggleCatSelection('${_escJs(top)}')">${_esc(top)}<span class="chip-n">${nd}</span></button>`;
         }
       }).join('');
 
@@ -469,7 +469,7 @@ App.Render = (() => {
 
         html += `<div class="cat-pill-row" draggable="true" data-drag-top="${_esc(top)}">
           ${handle}
-          <button id="cgh-${_esc(top)}" class="cat-group-header ${isOpen ? 'open' : ''}" onclick="toggleGroup('${_esc(top)}')">
+          <button id="cgh-${_esc(top)}" class="cat-group-header ${isOpen ? 'open' : ''}" onclick="toggleGroup('${_escJs(top)}')">
             <span class="cgh-arrow">▶</span>
             <span class="cgh-name">${_esc(top)}</span>
             <span class="cgh-badges">
@@ -492,10 +492,10 @@ App.Render = (() => {
             const label = isGeneral ? '(Général)' : cat.slice(top.length + 3);
             const dragAttrs = isGeneral ? '' : `draggable="true" data-drag-top="${_esc(top)}" data-drag-child="${_esc(cat)}"`;
             const dragHandle = isGeneral ? '' : `<span class="cat-drag-handle" title="Glisser">⠿</span>`;
-            const unnestBtn  = isGeneral ? '' : `<button class="cat-unnest-btn" onclick="unnestCat('${_esc(cat)}')" title="Retirer du groupe">↑</button>`;
+            const unnestBtn  = isGeneral ? '' : `<button class="cat-unnest-btn" onclick="unnestCat('${_escJs(cat)}')" title="Retirer du groupe">↑</button>`;
             return `<div class="cat-pill-row" ${dragAttrs}>
               ${dragHandle}
-              <button class="cat-pill ${App.UI.activeCategory === cat ? 'active' : ''}" onclick="handleCatClick('${_esc(cat)}',event,this)" title="${isGeneral ? '' : 'Double-clic pour renommer'}">${_esc(label)}${badge}<span class="cat-count">${n}</span></button>
+              <button class="cat-pill ${App.UI.activeCategory === cat ? 'active' : ''}" onclick="handleCatClick('${_escJs(cat)}',event,this)" title="${isGeneral ? '' : 'Double-clic pour renommer'}">${_esc(label)}${badge}<span class="cat-count">${n}</span></button>
               ${unnestBtn}
               <button class="cat-delete-btn" data-cat="${_esc(cat)}" title="Supprimer cette matière">🗑</button>
             </div>`;
@@ -508,7 +508,7 @@ App.Render = (() => {
         const badge = nd > 0 ? `<span class="due-badge">${nd}</span>` : '';
         html += `<div class="cat-pill-row" draggable="true" data-drag-top="${_esc(cat)}">
           ${handle}
-          <button class="cat-pill ${App.UI.activeCategory === cat ? 'active' : ''}" onclick="handleCatClick('${_esc(cat)}',event,this)" title="Double-clic pour renommer">${_esc(cat)}${badge}<span class="cat-count">${n}</span></button>
+          <button class="cat-pill ${App.UI.activeCategory === cat ? 'active' : ''}" onclick="handleCatClick('${_escJs(cat)}',event,this)" title="Double-clic pour renommer">${_esc(cat)}${badge}<span class="cat-count">${n}</span></button>
           <button class="cat-delete-btn" data-cat="${_esc(cat)}" title="Supprimer cette matière">🗑</button>
         </div>`;
       }
@@ -521,6 +521,11 @@ App.Render = (() => {
 
   function _setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
   function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  // Pour une valeur insérée dans un argument entre apostrophes d'un onclick="fn('...')" :
+  // il faut en plus échapper les apostrophes et antislashs, sinon un nom de
+  // catégorie contenant une apostrophe (ex: "Bases d'anatomie") casse le
+  // JavaScript généré et le clic ne fait plus rien (bouton "mort").
+  function _escJs(s) { return _esc(String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
 
 
   // ── Heatmap / Prévision ────────────────────────────────────────

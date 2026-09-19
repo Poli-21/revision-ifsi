@@ -75,13 +75,34 @@ App.Distractor = (() => {
     const result  = [];
     const usedDef = new Set([_key(correctCard.def)]);
 
-    // ── Niveau 1 : mutations médicales de la vraie réponse ──────
+    // ── Niveau 1 : mutations médicales de la vraie réponse (antonymes) ──
     const mutations = _mutate(correctCard.def);
     // Préfère les mutations avec peu de mots swappés (plus proches)
     for (const m of mutations) {
       if (result.length >= n) break;
       const k = _key(m);
       if (!usedDef.has(k)) { result.push({ text: m, src: 'mutation' }); usedDef.add(k); }
+    }
+
+    // ── Niveau 1bis : mutation générique (nombres et/ou mots-clés changés) ──
+    // Le dictionnaire d'antonymes ci-dessus ne couvre qu'un vocabulaire
+    // médical précis : beaucoup de cartes (relation de soin, pharmaco,
+    // qualité des soins...) n'ont aucun mot dedans. Plutôt que de sauter
+    // direct sur la réponse d'une AUTRE carte, on garde le principe demandé
+    // ("la vraie réponse mais avec des mots changés") en modifiant les
+    // nombres présents et/ou en remplaçant 1-2 mots-clés par d'autres mots-
+    // clés puisés dans les cartes de la même matière.
+    if (result.length < n) {
+      const sameSubjectDefs = allCards
+        .filter(c => c.id !== correctCard.id && c.cat.split(' > ')[0] === correctCard.cat.split(' > ')[0])
+        .map(c => c.def)
+        .filter(Boolean);
+      const generic = _mutateGeneric(correctCard.def, sameSubjectDefs);
+      for (const m of generic) {
+        if (result.length >= n) break;
+        const k = _key(m);
+        if (!usedDef.has(k)) { result.push({ text: m, src: 'mutation-generic' }); usedDef.add(k); }
+      }
     }
 
     // ── Niveau 2 : cartes de la même catégorie, proches en sens ─
@@ -171,6 +192,72 @@ App.Distractor = (() => {
       const nSwaps = (def.match(new RegExp('(?<![a-zA-ZÀ-ÿ])' + escaped + '(?![a-zA-ZÀ-ÿ])', 'gi')) || []).length;
       map.set(mutated, nSwaps);
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // Mutation générique (repli quand aucun antonyme du dictionnaire
+  // SWAPS ne correspond) : altère un nombre présent dans la réponse,
+  // et/ou remplace un mot-clé par un autre mot-clé pris dans les
+  // définitions de la même matière — la phrase garde sa structure,
+  // seuls 1-2 éléments changent, ce qui donne un distracteur plausible
+  // plutôt qu'une réponse totalement différente.
+  // ══════════════════════════════════════════════════════════════
+  const _STOP_FR = new Set([
+    'dans','avec','pour','être','sont','plus','leur','leurs','cette','celui',
+    'celle','tout','tous','toute','toutes','entre','ainsi','donc','mais',
+    'sans','chez','lors','elle','elles','vers','sous','peut','peuvent',
+    'apres','après','avant','pendant','depuis','comme','aussi','alors',
+    'quand','dont','ceux','celles','notamment','plusieurs','certains',
+    'certaines','permet','permettent','doit','doivent','ainsi'
+  ]);
+
+  function _mutateGeneric(def, sameSubjectDefs) {
+    const results = [];
+
+    // 1) Nombre présent dans la réponse → valeur voisine mais fausse
+    const numMatches = [...def.matchAll(/\d+(?:[.,]\d+)?/g)];
+    for (const m of numMatches) {
+      const raw = m[0];
+      const val = parseFloat(raw.replace(',', '.'));
+      if (isNaN(val)) continue;
+      const step  = Math.max(1, Math.round(Math.abs(val) * 0.25 || 1));
+      [step, -step].forEach(delta => {
+        let newVal = val + delta;
+        if (newVal < 0) newVal = val + Math.abs(delta); // évite un nombre négatif absurde
+        const newStr = raw.includes('.') || raw.includes(',')
+          ? newVal.toFixed(1).replace('.', raw.includes(',') ? ',' : '.')
+          : String(Math.round(newVal));
+        if (newStr === raw) return;
+        const mutated = def.slice(0, m.index) + newStr + def.slice(m.index + raw.length);
+        if (mutated !== def) results.push(mutated);
+      });
+      if (results.length >= 2) break; // pas la peine de muter tous les nombres du texte
+    }
+
+    // 2) Mot-clé de la réponse remplacé par un mot-clé d'une autre carte
+    //    de la même matière (garde la phrase, change le sens)
+    const keywords = [...new Set((def.match(/[a-zA-ZÀ-ÿ]{5,}/g) || [])
+      .filter(w => !_STOP_FR.has(w.toLowerCase())))];
+    if (keywords.length && sameSubjectDefs.length) {
+      const ownWords = new Set(keywords.map(w => w.toLowerCase()));
+      const pool = [...new Set(sameSubjectDefs.flatMap(d => (d.match(/[a-zA-ZÀ-ÿ]{5,}/g) || [])))]
+        .filter(w => !_STOP_FR.has(w.toLowerCase()) && !ownWords.has(w.toLowerCase()));
+      if (pool.length) {
+        const shuffledKw = [...keywords].sort(() => Math.random() - .5).slice(0, 4);
+        for (const kw of shuffledKw) {
+          const repl = pool[Math.floor(Math.random() * pool.length)];
+          const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const re = new RegExp('(?<![a-zA-ZÀ-ÿ])' + escaped + '(?![a-zA-ZÀ-ÿ])');
+          const mutated = def.replace(re, match => {
+            const isCap = match[0] === match[0].toUpperCase() && match[0] !== match[0].toLowerCase();
+            return isCap ? (repl.charAt(0).toUpperCase() + repl.slice(1)) : repl;
+          });
+          if (mutated !== def) results.push(mutated);
+        }
+      }
+    }
+
+    return results;
   }
 
   // ══════════════════════════════════════════════════════════════
