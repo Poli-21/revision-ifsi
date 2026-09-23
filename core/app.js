@@ -465,6 +465,25 @@ function _selectImportedForUE(ids) {
   });
 }
 
+// Remet à zéro la progression SRS des cartes sélectionnées (progress = null,
+// donc "jamais étudiée" → immédiatement due). Utile pour des cartes
+// importées/générées avec une progression déjà programmée à une date future,
+// ce qui les rend invisibles dans "à réviser" tant que cette date n'est pas
+// arrivée alors qu'elles n'ont en réalité jamais été vues.
+function bulkResetProgress() {
+  const n = _selectedCards.size;
+  if (n === 0) return;
+  if (!confirm(`Réinitialiser la progression de ${n} carte${n > 1 ? 's' : ''} ? Elles redeviendront "jamais étudiées" et donc à réviser immédiatement.`)) return;
+  App.Store.state.cards.forEach(c => {
+    if (_selectedCards.has(c.id)) c.progress = null;
+  });
+  App.Store.save();
+  _selectedCards.clear();
+  toggleSelectMode();
+  App.Render.all();
+  _showToast('↺ ' + n + ' carte' + (n > 1 ? 's' : '') + ' réinitialisée' + (n > 1 ? 's' : ''));
+}
+
 function bulkDelete() {
   const n = _selectedCards.size;
   if (n === 0) return;
