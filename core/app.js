@@ -302,7 +302,7 @@ Object.assign(window, {
     ),
   startRenameCat     : (cat, btn) => _startRenameCat(cat, btn),
   deleteCat          : (cat)      => _deleteCat(cat),
-  bulkDelete         : ()         => bulkDelete(),
+  bulkDelete         : ()         => _bulkDelete(),
   handleCatClick     : (cat, e, btn) => _handleCatClick(cat, e, btn),
   renderBrowse   : ()     => App.Render.browseDebounced(),
   // Modales
@@ -473,7 +473,6 @@ function _selectImportedForUE(ids) {
 function bulkResetProgress() {
   const n = _selectedCards.size;
   if (n === 0) return;
-  if (!confirm(`Réinitialiser la progression de ${n} carte${n > 1 ? 's' : ''} ? Elles redeviendront "jamais étudiées" et donc à réviser immédiatement.`)) return;
   App.Store.state.cards.forEach(c => {
     if (_selectedCards.has(c.id)) c.progress = null;
   });
@@ -484,7 +483,13 @@ function bulkResetProgress() {
   _showToast('↺ ' + n + ' carte' + (n > 1 ? 's' : '') + ' réinitialisée' + (n > 1 ? 's' : ''));
 }
 
-function bulkDelete() {
+// Nommée avec un underscore comme _deleteCat/_startRenameCat plus haut : la
+// version SANS underscore ("bulkDelete") est réservée à l'alias exposé dans
+// Object.assign(window, {...}) ci-dessus. Avant ce correctif, cette fonction
+// s'appelait aussi "bulkDelete" — comme l'alias écrase window.bulkDelete au
+// chargement, l'alias finissait par s'appeler LUI-MÊME en boucle infinie dès
+// qu'on cliquait "Supprimer" (RangeError silencieux, bouton mort).
+function _bulkDelete() {
   const n = _selectedCards.size;
   if (n === 0) return;
   const ids = new Set(_selectedCards);
