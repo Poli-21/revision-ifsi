@@ -36,8 +36,30 @@
     <button class="btn btn-ghost btn-sm" onclick="exportJSON()">💾 JSON</button>
     <button class="btn btn-ghost btn-sm" onclick="importJSON()">📂 Importer</button>
     <button class="btn btn-primary" onclick="openAddModal()">+ Carte</button>
+    <button class="more-btn" id="more-menu-btn" onclick="toggleMoreMenu(event)" aria-label="Plus d'options" aria-haspopup="true" aria-expanded="false">⋮</button>
   </div>
 </header>
+<div class="more-menu" id="more-menu" role="menu" style="display:none">
+  <div class="more-menu-title">Aller à</div>
+  <button role="menuitem" onclick="moreGo('home')">🏠 Tableau de bord</button>
+  <button role="menuitem" onclick="moreGo('browse')">📚 Toutes les cartes</button>
+  <button role="menuitem" onclick="moreGo('stats')">📊 Statistiques</button>
+  <button role="menuitem" onclick="moreGo('ortho')">✏️ Orthographe</button>
+  <button role="menuitem" onclick="moreGo('games')">🎯 Entraînement</button>
+  <button role="menuitem" onclick="moreGo('english')">🇬🇧 Anglais</button>
+  <button role="menuitem" onclick="moreGo('partiels')">📝 Partiels</button>
+  <button role="menuitem" onclick="moreGo('tuteur')">🤖 Tuteur IA</button>
+  <div class="more-menu-title">Données</div>
+  <button role="menuitem" onclick="moreDo('openSyncModal')">☁️ Synchronisation</button>
+  <button role="menuitem" onclick="moreDo('exportJSON')">💾 Exporter (JSON)</button>
+  <button role="menuitem" onclick="moreDo('exportCSV')">📊 Exporter (CSV)</button>
+  <button role="menuitem" onclick="moreDo('importJSON')">📂 Importer un fichier</button>
+  <div class="more-menu-title">Autre</div>
+  <button role="menuitem" onclick="moreDo('startChrono')">⏱ Chrono libre</button>
+  <button role="menuitem" onclick="moreDo('toggleDarkMode')">🌙 Mode nuit / jour</button>
+  <button role="menuitem" onclick="moreDo('showQRCode')">📱 QR code d'accès</button>
+  <div class="more-menu-foot" id="more-menu-foot"></div>
+</div>
 
 <!-- ══ LAYOUT ═══════════════════════════════════════════════════ -->
 <div class="app">

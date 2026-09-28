@@ -40,6 +40,7 @@ App.UI = (() => {
       const btn = document.getElementById('tab-' + t);
       if (btn) btn.classList.toggle('active', t === tab);
     });
+    try { document.getElementById('tab-' + tab)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); } catch (e) {}
     if (tab === 'browse') App.Render.browse();
     if (tab === 'stats')  App.Render.stats();
     if (tab === 'ortho')  App.Ortho.populateCatSelect();
@@ -374,8 +375,8 @@ Object.assign(window, {
   removeImg      : (e)    => App.Modal.removeImg(e),
   toggleNewCat   : ()     => App.Modal.toggleNewCat(),
   // Export / Import
-  toggleSidebar  : ()     => toggleSidebar(),
-  closeSidebar   : ()     => closeSidebar(),
+  toggleSidebar  : ()     => _toggleSidebar(),
+  closeSidebar   : ()     => _closeSidebar(),
   exportJSON     : ()     => App.Modal.exportJSON(),
   exportCSV      : ()     => App.Modal.exportCSV(),
   importJSON     : ()     => App.Modal.importJSON(),
@@ -590,14 +591,46 @@ function _updateBulkCount() {
 }
 
 // ── Sidebar mobile ─────────────────────────────────────────────
-function toggleSidebar() {
+function _toggleSidebar() {
   document.querySelector('.sidebar')?.classList.toggle('open');
   document.getElementById('sidebar-overlay')?.classList.toggle('open');
 }
-function closeSidebar() {
+function _closeSidebar() {
   document.querySelector('.sidebar')?.classList.remove('open');
   document.getElementById('sidebar-overlay')?.classList.remove('open');
 }
+
+// ── Menu ⋮ (3 points) ─────────────────────────────────────────
+function _moreMenuEl() { return document.getElementById('more-menu'); }
+function closeMoreMenu() {
+  const m = _moreMenuEl(); if (m) m.style.display = 'none';
+  document.getElementById('more-menu-btn')?.setAttribute('aria-expanded', 'false');
+}
+function toggleMoreMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const m = _moreMenuEl(); if (!m) return;
+  const open = m.style.display !== 'none';
+  if (open) { closeMoreMenu(); return; }
+  _closeSidebar();
+  try { const t = document.getElementById('storage-indicator')?.textContent?.trim(); const f = document.getElementById('more-menu-foot'); if (f) f.textContent = t ? 'Stockage utilisé : ' + t.replace(/^\S+\s*/, '') : ''; } catch (e) {}
+  m.style.display = 'block';
+  document.getElementById('more-menu-btn')?.setAttribute('aria-expanded', 'true');
+}
+function moreGo(tab) {
+  closeMoreMenu(); _closeSidebar();
+  App.UI.switchTab(tab);
+  window.scrollTo(0, 0);
+}
+function moreDo(fnName) {
+  closeMoreMenu();
+  const fn = window[fnName];
+  if (typeof fn === 'function') fn(); else console.warn('Action introuvable :', fnName);
+}
+document.addEventListener('click', e => {
+  const m = _moreMenuEl();
+  if (m && m.style.display !== 'none' && !m.contains(e.target)) closeMoreMenu();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMoreMenu(); });
 
 // ── QR Code accès tablette ─────────────────────────────────────
 function showQRCode() {

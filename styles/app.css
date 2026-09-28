@@ -1590,3 +1590,42 @@ button, .btn-answer, .qcm-choice, .tab, .mode-btn, .flashcard { touch-action: ma
   .mode-toggle { width: 100%; order: 5; }
   .mode-toggle .mode-btn { flex: 1; }
 }
+
+
+/* ══ Menu ⋮ (3 points) — accès à toutes les fonctions sur téléphone ══ */
+.more-btn{display:none;width:40px;height:40px;border-radius:10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-700);font-size:1.5rem;font-weight:800;line-height:1;cursor:pointer;align-items:center;justify-content:center;}
+.more-menu{position:fixed;top:56px;right:8px;z-index:400;width:min(300px,calc(100vw - 16px));max-height:calc(100dvh - 72px);overflow-y:auto;background:white;border:1px solid var(--gray-200);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.22);padding:6px;-webkit-overflow-scrolling:touch;}
+.more-menu button{display:block;width:100%;text-align:left;padding:13px 14px;min-height:46px;border:none;background:transparent;border-radius:9px;font-size:.95rem;font-weight:600;color:var(--gray-700);font-family:inherit;cursor:pointer;}
+.more-menu button:active{background:var(--primary-light);color:var(--primary);}
+.more-menu-title{font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gray-400);padding:10px 14px 4px;}
+@media (hover:hover){.more-menu button:hover{background:var(--gray-100);}}
+@media (max-width:700px){
+  .more-btn{display:flex;}
+  header{height:52px;}
+  .more-menu{top:54px;}
+  .hamburger-btn{min-width:40px;min-height:40px;justify-content:center;}
+  #dark-toggle{min-width:40px;min-height:40px;}
+  /* indice visuel : les onglets défilent, le dernier est coupé volontairement */
+  .tabs{scroll-snap-type:x proximity;}
+  .tab{scroll-snap-align:start;min-height:40px;}
+}
+body.dark .more-menu{background:#1e293b;border-color:#334155;}
+body.dark .more-menu button{color:#e2e8f0;}
+body.dark .more-menu button:active{background:#1e3a8a;}
+body.dark .more-btn{color:#e2e8f0;border-color:#475569;}
+
+/* En-tête mobile : une seule ligne, jamais de retour à la ligne */
+@media (max-width:700px){
+  header{flex-wrap:nowrap;overflow:hidden;}
+  header > div:first-of-type{min-width:0;flex:0 1 auto;}
+  header h1{font-size:.95rem;overflow:hidden;text-overflow:ellipsis;}
+  .header-right{flex-wrap:nowrap;flex-shrink:0;gap:6px;}
+  #storage-indicator{display:none !important;}
+  .more-menu-foot{font-size:.75rem;color:var(--gray-400);padding:10px 14px 6px;}
+}
+
+/* Boutons des fenêtres (détail carte, ajout, sync…) : assez grands pour le doigt */
+@media (max-width:700px){
+  #detail-overlay .btn, #modal-overlay .btn, #sync-overlay .btn, #exam-overlay .btn{min-height:42px;padding:9px 14px;font-size:.88rem;}
+  #modal-overlay input, #modal-overlay select, #modal-overlay textarea{font-size:16px;} /* évite le zoom auto */
+}
