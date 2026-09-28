@@ -229,6 +229,30 @@ function _guessCardTypes() {
   return changed;
 }
 
+// Sur téléphone, si le navigateur est en "version ordinateur" (Brave/Chrome
+// Android), la mise en page mobile ne s'applique jamais : la page se calcule
+// sur ~980px puis est réduite. Ce n'est pas détectable par la largeur seule,
+// mais l'écran physique est petit alors que la fenêtre de rendu est large.
+// On prévient alors l'utilisateur·ice (une seule fois par session).
+function _warnDesktopSiteOnPhone() {
+  const smallScreen = Math.min(screen.width, screen.height) <= 600;
+  const touch = (navigator.maxTouchPoints || 0) > 0;
+  if (!(smallScreen && touch && window.innerWidth >= 800)) return;
+  try { if (sessionStorage.getItem('ifsi_desktop_warn_seen')) return; } catch (e) {}
+  const bar = document.createElement('div');
+  bar.id = 'desktop-site-warning';
+  bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#f59e0b;color:#1f2937;'
+    + 'padding:18px 24px;font:600 26px/1.35 system-ui,sans-serif;display:flex;gap:18px;align-items:center;box-shadow:0 4px 18px rgba(0,0,0,.35)';
+  bar.innerHTML = '<div style="flex:1">📱 Ton téléphone affiche la <u>version ordinateur</u> du site. '
+    + 'Ouvre le menu de Brave (≡ ou ⋮) et <b>décoche « Version ordinateur »</b> (Desktop site) : l\'affichage mobile s\'activera.</div>'
+    + '<button style="font:700 24px system-ui;padding:12px 20px;border:0;border-radius:12px;background:#1f2937;color:#fff">Compris</button>';
+  bar.querySelector('button').onclick = () => {
+    bar.remove();
+    try { sessionStorage.setItem('ifsi_desktop_warn_seen', '1'); } catch (e) {}
+  };
+  document.body.appendChild(bar);
+}
+
 // ── Initialisation ─────────────────────────────────────────────
 App.init = async function () {
   _initDarkMode();                  // Dark mode (avant tout rendu)
@@ -243,6 +267,7 @@ App.init = async function () {
   App.Render.all();
   App.UI.switchTab('home');
   _initKeyboard();
+  try { _warnDesktopSiteOnPhone(); } catch(e) {}
   App.Store.save();
   try { initNotifications(); } catch(e) {}
   try { _initBackup(); } catch(e) {}  // Sauvegarde quotidienne
