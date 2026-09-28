@@ -229,22 +229,29 @@ function _guessCardTypes() {
   return changed;
 }
 
-// Sur téléphone, si le navigateur est en "version ordinateur" (Brave/Chrome
-// Android), la mise en page mobile ne s'applique jamais : la page se calcule
-// sur ~980px puis est réduite. Ce n'est pas détectable par la largeur seule,
-// mais l'écran physique est petit alors que la fenêtre de rendu est large.
-// On prévient alors l'utilisateur·ice (une seule fois par session).
+// Sur téléphone, la mise en page mobile ne s'applique que si la fenêtre de rendu
+// fait < 700px. Elle reste en mode "ordinateur" (sidebar, boutons CSV/JSON...)
+// quand le navigateur est en "version ordinateur" OU quand le zoom de page est
+// réduit (ex. 50 % → 800+ px de large). On repère ce cas — écran tactile de
+// téléphone mais fenêtre de rendu large — et on affiche les vraies mesures.
 function _warnDesktopSiteOnPhone() {
-  const smallScreen = Math.min(screen.width, screen.height) <= 600;
-  const touch = (navigator.maxTouchPoints || 0) > 0;
-  if (!(smallScreen && touch && window.innerWidth >= 800)) return;
+  const touch    = (navigator.maxTouchPoints || 0) > 0;
+  const phoneUA  = /Mobi/i.test(navigator.userAgent);
+  const smallScr = Math.min(screen.width, screen.height) <= 600;
+  const wide     = window.innerWidth >= 700;
+  if (!(touch && wide && (phoneUA || smallScr))) return;
   try { if (sessionStorage.getItem('ifsi_desktop_warn_seen')) return; } catch (e) {}
+  const vv   = window.visualViewport;
+  const diag = `fenêtre ${window.innerWidth}px · écran ${screen.width}×${screen.height} · dpr ${window.devicePixelRatio}`
+             + (vv ? ` · échelle ${Math.round(vv.scale * 100)}%` : '');
   const bar = document.createElement('div');
   bar.id = 'desktop-site-warning';
   bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#f59e0b;color:#1f2937;'
     + 'padding:18px 24px;font:600 26px/1.35 system-ui,sans-serif;display:flex;gap:18px;align-items:center;box-shadow:0 4px 18px rgba(0,0,0,.35)';
-  bar.innerHTML = '<div style="flex:1">📱 Ton téléphone affiche la <u>version ordinateur</u> du site. '
-    + 'Ouvre le menu de Brave (≡ ou ⋮) et <b>décoche « Version ordinateur »</b> (Desktop site) : l\'affichage mobile s\'activera.</div>'
+  bar.innerHTML = '<div style="flex:1">📱 Le site s\'affiche en <u>trop petit</u> sur ton téléphone (mode ordinateur ou zoom réduit). '
+    + 'Dans le menu de Brave (⋮) : <b>touche « Zoom » et mets 100 %</b>, et décoche « Version ordinateur ». '
+    + 'Réglages → Accessibilité → « Zoom par défaut » = 100 %.'
+    + '<div style="font:500 20px/1.3 monospace;margin-top:8px;opacity:.85">' + diag + '</div></div>'
     + '<button style="font:700 24px system-ui;padding:12px 20px;border:0;border-radius:12px;background:#1f2937;color:#fff">Compris</button>';
   bar.querySelector('button').onclick = () => {
     bar.remove();
