@@ -231,6 +231,7 @@ App.Session = (() => {
     document.getElementById('card-container').style.display = 'block';
     document.getElementById('answer-btns').style.display    = 'none';
     document.getElementById('discovery-btns').style.display = 'none';
+    _initCardSwipe();
     document.getElementById('card-cat').textContent      = c.cat;
     document.getElementById('card-cat-back').textContent = c.cat;
     document.getElementById('card-term').textContent     = c.term;
@@ -263,8 +264,58 @@ App.Session = (() => {
       document.getElementById('card-hint').style.display = 'none';
       const c = current.queue[current.idx];
       const isNew = !c.progress;
-      document.getElementById(isNew ? 'discovery-btns' : 'answer-btns').style.display = 'flex';
+      // Vide (au lieu de forcer 'flex') pour laisser le CSS décider : flex sur
+      // grand écran, grille 2x2 sur mobile via la media query — un display
+      // inline aurait toujours gagné sur la media query et cassé la grille
+      // pensée pour les gros pouces au doigt.
+      document.getElementById(isNew ? 'discovery-btns' : 'answer-btns').style.display = '';
     }
+  }
+
+  // ── Balayage tactile (mobile) une fois la carte retournée ────────
+  // Balayer à droite = "Su !" (answer(4)), à gauche = "Raté" (answer(0)) —
+  // plus rapide et plus facile à faire d'une main que d'aller taper un petit
+  // bouton. Limité au mode standard à 4 boutons (pas le mode découverte, où
+  // 3 issues possibles ne se prêtent pas à un simple geste gauche/droite) ;
+  // les boutons restent de toute façon utilisables en plus du balayage.
+  let _swipeInit = false;
+  function _initCardSwipe() {
+    if (_swipeInit) return;
+    _swipeInit = true;
+    const fc = document.getElementById('flashcard');
+    if (!fc) return;
+    let startX = 0, startY = 0, dragging = false;
+    const THRESHOLD = 90;
+
+    fc.addEventListener('touchstart', e => {
+      const answerBtns = document.getElementById('answer-btns');
+      if (!fc.classList.contains('flipped') || !answerBtns || answerBtns.style.display === 'none') return;
+      const t = e.touches[0];
+      startX = t.clientX; startY = t.clientY;
+      dragging = true;
+      fc.style.transition = 'none';
+    }, { passive: true });
+
+    fc.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX, dy = t.clientY - startY;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        fc.style.transform = `rotateY(180deg) translateX(${dx}px) rotate(${dx / 18}deg)`;
+      }
+    }, { passive: true });
+
+    fc.addEventListener('touchend', e => {
+      if (!dragging) return;
+      dragging = false;
+      fc.style.transition = '';
+      fc.style.transform  = '';
+      const t  = e.changedTouches[0];
+      const dx = t.clientX - startX, dy = t.clientY - startY;
+      if (Math.abs(dx) > THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        if (dx > 0) answer(4); else answer(0);
+      }
+    });
   }
 
   // ── Mode Écriture ──────────────────────────────────────────────
@@ -311,7 +362,7 @@ App.Session = (() => {
     if (c.example) { wex.textContent = c.example; wex.style.display = 'block'; }
     else wex.style.display = 'none';
     document.getElementById('write-reveal').style.display      = 'block';
-    document.getElementById('write-answer-btns').style.display = 'flex';
+    document.getElementById('write-answer-btns').style.display = ''; // idem : laisse le CSS/media query décider
     document.querySelector('#write-zone .write-verify-btn').style.display = 'none';
     document.getElementById('write-reveal').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }

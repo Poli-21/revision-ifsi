@@ -180,6 +180,7 @@ span.cat-move-btn{pointer-events:none;visibility:hidden;}
 .card-face .cat-tag{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-400);margin-bottom:8px;}
 .card-face .term-big{font-size:1.45rem;font-weight:800;color:var(--gray-900);line-height:1.2;}
 .card-face .hint{font-size:.8rem;color:var(--gray-400);margin-top:12px;}
+.swipe-hint{display:none;}
 .card-face .definition{font-size:.93rem;color:var(--gray-700);line-height:1.65;white-space:pre-wrap;}
 .card-face .example{margin-top:10px;font-size:.83rem;color:var(--gray-500);font-style:italic;border-left:3px solid var(--primary-light);padding-left:10px;}
 .card-face .card-image{width:100%;max-height:320px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;border-radius:10px;background:white;overflow:hidden;border:1px solid var(--gray-200);}
@@ -581,6 +582,22 @@ body.dark .qcm-reveal-def{color:#bbf7d0;}
   }
   .btn-answer .interval { font-size: .72rem; }
   .btn-answer .shortcut { display: none; } /* masque les touches clavier inutiles */
+
+  /* Mode découverte = 3 boutons, pas 4 : en grille 2 colonnes ça laisserait
+     un trou vide sur la 2e ligne. On empile en 1 colonne à la place, avec
+     des boutons bien hauts pour rester faciles à taper du pouce. */
+  .discovery-btns {
+    display: flex !important;
+    flex-direction: column;
+  }
+  .discovery-btns .btn-answer { max-width: 100%; }
+
+  /* Indice de balayage, visible seulement au dos de la carte (donc seulement
+     une fois retournée) et seulement sur mobile où le geste est proposé. */
+  .swipe-hint {
+    display: block; text-align: center; margin-top: 10px;
+    font-size: .78rem; color: var(--gray-400); font-weight: 600;
+  }
 
   /* ── Mode écriture ── */
   #write-zone { max-width: 100%; }
