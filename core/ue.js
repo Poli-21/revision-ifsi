@@ -49,6 +49,44 @@ App.UE = (() => {
   ];
   const TOTAL_ECTS = LIST.reduce((s, u) => s + u.ects, 0);
 
+  // ── ECTS PAR SEMESTRE ────────────────────────────────────────────
+  // `ects` ci-dessus = total de l'UE sur tout le cursus. Or une UE est répartie sur
+  // plusieurs semestres (ex. B.1 = 4 ECTS au S1, B.3 = 4 ECTS au S1). Ces valeurs
+  // par semestre servent de coefficient quand un semestre précis est sélectionné.
+  // Valeurs par défaut confirmées par l'utilisateur·ice ; les autres se règlent
+  // dans l'appli (onglet Partiels → UE → "ECTS ce semestre") et sont mémorisées
+  // localement (elles priment sur ces défauts).
+  const ECTS_SEM_DEFAULTS = { 'B.1': { 1: 4 }, 'B.3': { 1: 4 } };
+  const ECTS_SEM_KEY = 'ifsi_ects_sem_v1';
+  function _ectsOverrides() { try { return JSON.parse(localStorage.getItem(ECTS_SEM_KEY) || '{}') || {}; } catch (e) { return {}; } }
+  // ECTS effectifs d'une UE pour un semestre (nombre 1-6) ; retombe sur le total
+  // si aucune valeur par semestre n'est connue ou si sem = 'toutes'.
+  function ectsFor(u, sem) {
+    if (typeof u === 'string') u = LIST.find(x => x.code === u);
+    if (!u) return 0;
+    if (typeof sem === 'number') {
+      const ov = _ectsOverrides()[u.code];
+      if (ov && ov[sem] != null && ov[sem] !== '') return Number(ov[sem]);
+      const df = ECTS_SEM_DEFAULTS[u.code];
+      if (df && df[sem] != null) return df[sem];
+    }
+    return u.ects;
+  }
+  // true si une valeur propre à ce semestre existe (défaut ou réglée par l'utilisateur·ice)
+  function hasSemEcts(u, sem) {
+    if (typeof u === 'string') u = LIST.find(x => x.code === u);
+    if (!u || typeof sem !== 'number') return false;
+    const ov = (_ectsOverrides()[u.code] || {})[sem];
+    return (ov != null && ov !== '') || (ECTS_SEM_DEFAULTS[u.code] || {})[sem] != null;
+  }
+  function setEctsSem(code, sem, val) {
+    const o = _ectsOverrides();
+    o[code] = o[code] || {};
+    if (val === '' || val == null || isNaN(Number(val))) delete o[code][sem];
+    else o[code][sem] = Math.max(0, Math.min(60, Number(val)));
+    localStorage.setItem(ECTS_SEM_KEY, JSON.stringify(o));
+  }
+
   // 6 semestres = 3 années. Utilisé pour l'affichage ("S1 · 1re année").
   const SEMESTRES = [1,2,3,4,5,6].map(n => ({ n, annee: Math.ceil(n / 2) }));
   function anneeOfSemestre(n) { return Math.ceil(n / 2); }
@@ -152,5 +190,5 @@ App.UE = (() => {
     return changed;
   }
 
-  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards, migrateReferenceCategories, removeReferenceCards };
+  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, ectsFor, hasSemEcts, setEctsSem, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards, migrateReferenceCategories, removeReferenceCards };
 })();

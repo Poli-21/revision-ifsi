@@ -219,15 +219,12 @@ App.Render = (() => {
     const q   = (document.getElementById('search-input')?.value || '').toLowerCase();
     const cat = document.getElementById('filter-cat')?.value || '';
     const lv  = document.getElementById('filter-level')?.value;
-    const type = document.getElementById('filter-type')?.value;
     const showSuspended = document.getElementById('filter-suspended')?.checked;
     let cards = App.Store.state.cards;
     if (App.UI.activeCategory) cards = cards.filter(c => c.cat === App.UI.activeCategory);
     if (cat)  cards = cards.filter(c => c.cat === cat);
     if (!showSuspended) cards = cards.filter(c => !c.suspended);
     if (lv !== '' && lv !== undefined) cards = cards.filter(c => App.SRS.getLevel(c) === parseInt(lv));
-    if (type === 'CM' || type === 'TD') cards = cards.filter(c => c.type === type);
-    else if (type === 'none') cards = cards.filter(c => !c.type);
     if (q)    cards = cards.filter(c => c.term.toLowerCase().includes(q) || c.def.toLowerCase().includes(q));
     const grid = document.getElementById('browse-grid');
     if (grid) grid.innerHTML = cards.length

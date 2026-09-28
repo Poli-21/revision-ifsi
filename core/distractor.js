@@ -170,26 +170,28 @@ App.Distractor = (() => {
       .map(e => e[0]);
   }
 
-  function _applySwap(def, from, to, map) {
-    // Regex insensible à la casse, frontières de mots (supporte accents via \b étendu)
-    const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp('(?<![a-zA-ZÀ-ÿ])' + escaped + '(?![a-zA-ZÀ-ÿ])', 'gi');
-    if (!re.test(def)) return;
+  // Mot entier (accents compris) SANS lookbehind : "(?<!...)" plante sur les
+  // navigateurs WebKit anciens (iPhone < iOS 16.4, y compris Brave iOS).
+  // On capture donc le caractère précédent (groupe 1) et on le remet tel quel.
+  function _wordRe(word, flags) {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(^|[^a-zA-ZÀ-ÿ])(' + escaped + ')(?![a-zA-ZÀ-ÿ])', flags);
+  }
 
-    const mutated = def.replace(
-      new RegExp('(?<![a-zA-ZÀ-ÿ])' + escaped + '(?![a-zA-ZÀ-ÿ])', 'gi'),
-      match => {
-        // Préserve la casse (Majuscule si le mot original commence par une majuscule)
-        if (match[0] === match[0].toUpperCase() && match[0] !== match[0].toLowerCase()) {
-          return to.charAt(0).toUpperCase() + to.slice(1);
-        }
-        return to;
+  function _applySwap(def, from, to, map) {
+    if (!_wordRe(from, 'i').test(def)) return;
+
+    const mutated = def.replace(_wordRe(from, 'gi'), (m, pre, match) => {
+      // Préserve la casse (Majuscule si le mot original commence par une majuscule)
+      if (match[0] === match[0].toUpperCase() && match[0] !== match[0].toLowerCase()) {
+        return pre + to.charAt(0).toUpperCase() + to.slice(1);
       }
-    );
+      return pre + to;
+    });
 
     if (mutated !== def && !map.has(mutated)) {
       // Compte le nombre de remplacements
-      const nSwaps = (def.match(new RegExp('(?<![a-zA-ZÀ-ÿ])' + escaped + '(?![a-zA-ZÀ-ÿ])', 'gi')) || []).length;
+      const nSwaps = (def.match(_wordRe(from, 'gi')) || []).length;
       map.set(mutated, nSwaps);
     }
   }
@@ -246,11 +248,9 @@ App.Distractor = (() => {
         const shuffledKw = [...keywords].sort(() => Math.random() - .5).slice(0, 4);
         for (const kw of shuffledKw) {
           const repl = pool[Math.floor(Math.random() * pool.length)];
-          const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const re = new RegExp('(?<![a-zA-ZÀ-ÿ])' + escaped + '(?![a-zA-ZÀ-ÿ])');
-          const mutated = def.replace(re, match => {
+          const mutated = def.replace(_wordRe(kw, 'i'), (m, pre, match) => {
             const isCap = match[0] === match[0].toUpperCase() && match[0] !== match[0].toLowerCase();
-            return isCap ? (repl.charAt(0).toUpperCase() + repl.slice(1)) : repl;
+            return pre + (isCap ? (repl.charAt(0).toUpperCase() + repl.slice(1)) : repl);
           });
           if (mutated !== def) results.push(mutated);
         }

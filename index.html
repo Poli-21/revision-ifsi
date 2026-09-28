@@ -93,7 +93,7 @@
     <div id="home-view">
       <div class="due-alert" id="due-alert">
         <div style="flex:1">
-          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <div class="due-count-row" style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
             <div class="big" id="due-count">0</div>
             <span id="due-est-inline" style="font-size:.9rem;font-weight:600;color:rgba(255,255,255,.75);display:none"></span>
           </div>
@@ -101,12 +101,8 @@
           <div id="exam-alerts-home" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
           <div class="cat-due-chips" id="cat-due-chips"></div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px;align-self:flex-start">
+        <div class="due-actions">
           <button class="btn btn-start" onclick="startSession()">Tout réviser →</button>
-          <div style="display:flex;gap:6px">
-            <button class="btn" style="flex:1;background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3);font-size:.78rem;padding:6px 10px" onclick="startSession(undefined,'CM')" title="Ne réviser que les cartes taguées CM">📘 CM</button>
-            <button class="btn" style="flex:1;background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3);font-size:.78rem;padding:6px 10px" onclick="startSession(undefined,'TD')" title="Ne réviser que les cartes taguées TD">📗 TD</button>
-          </div>
         </div>
       </div>
       <p class="section-title">Prochaines révisions</p>
@@ -123,12 +119,6 @@
           <option value="0">Nouveau</option><option value="1">J+1</option><option value="2">J+6</option>
           <option value="3">J+14</option><option value="4">J+30</option><option value="5">J+60</option>
           <option value="6">J+90</option><option value="7">Maîtrisé</option>
-        </select>
-        <select id="filter-type" onchange="renderBrowse()" style="padding:8px 11px;border:1px solid var(--gray-300);border-radius:8px;font-size:.83rem;font-family:inherit">
-          <option value="">CM + TD</option>
-          <option value="CM">📘 CM</option>
-          <option value="TD">📗 TD</option>
-          <option value="none">— Non classé —</option>
         </select>
         <label style="font-size:.82rem;color:var(--gray-600);display:flex;align-items:center;gap:5px;white-space:nowrap;">
           <input type="checkbox" id="filter-suspended" onchange="renderBrowse()"> Voir suspendus

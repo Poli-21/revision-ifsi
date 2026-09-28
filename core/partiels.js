@@ -35,6 +35,21 @@ App.Partiels = (() => {
   function _anneeOrdinal(a) { return a === 1 ? '1ʳᵉ' : a + 'ᵉ'; }
   function _semLabel(s) { return s === 'transversal' ? 'tous semestres' : `S${s} (${_anneeOrdinal(App.UE.anneeOfSemestre(s))} année)`; }
   function _el(id) { return document.getElementById(id); }
+  // ECTS affichés : ceux du semestre sélectionné (S1..S6) si connus, sinon le total de l'UE.
+  function _ectsLabel(u) {
+    const e = App.UE.ectsFor(u, _sem);
+    return App.UE.hasSemEcts(u, _sem) ? `${e} ECTS · S${_sem}` : `${e} ECTS`;
+  }
+  // Bloc ECTS de la fiche UE, avec champ pour régler la valeur du semestre affiché.
+  function _ectsDetailHTML(u) {
+    if (typeof _sem !== 'number') return `<strong>${u.ects} ECTS</strong> au total sur le cursus (coefficient dans la moyenne du semestre)`;
+    const e = App.UE.ectsFor(u, _sem);
+    return `<strong>${e} ECTS</strong> au S${_sem} (coefficient dans la moyenne du semestre)${App.UE.hasSemEcts(u, _sem) ? '' : ` — <em>total UE, à ajuster :</em>`}
+      <label style="margin-left:6px;font-size:.78rem">ECTS ce semestre
+        <input type="number" min="0" max="30" step="0.5" value="${e}" style="width:64px;padding:3px 6px;border:1px solid var(--gray-300);border-radius:6px;font-family:inherit"
+          onchange="App.Partiels.setEcts('${u.code}', this.value)"></label>`;
+  }
+  function setEcts(code, val) { App.UE.setEctsSem(code, _sem, val); render(); }
   function _root()  { return _el('partiels-root'); }
   // Lit la date du prochain examen "Partiels" enregistré via 🎓 Examens (barre latérale) ;
   // retombe sur la date par défaut si aucun n'existe encore ou en cas d'erreur de lecture.
@@ -77,7 +92,7 @@ App.Partiels = (() => {
       const hist = _historyForUE(u.code);
       const lastScore = hist.length ? hist[0].score : null;
       const factor = _priorityFactor(lastScore);
-      return { ue: u, lastScore, attempts: hist.length, score: u.ects * factor };
+      return { ue: u, lastScore, attempts: hist.length, score: App.UE.ectsFor(u, _sem) * factor };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
@@ -127,20 +142,20 @@ App.Partiels = (() => {
         ? 'jamais testée'
         : `dernier score ${p.lastScore}/20`;
       return `<button class="partiel-prio-card" style="--ue-color:${dom.color}" onclick="App.Partiels.selectUE('${p.ue.code}')">
-        <span class="partiel-prio-ects">${p.ue.ects} ECTS</span>
+        <span class="partiel-prio-ects">${_ectsLabel(p.ue)}</span>
         <span class="partiel-prio-name"><strong>${p.ue.code}</strong> — ${_esc(p.ue.name)}</span>
         <span class="partiel-prio-why">${why}</span>
       </button>`;
     }).join('');
 
     const domainBlocks = domains.map(d => {
-      const ueSorted = [...d.ues].sort((a, b) => b.ects - a.ects);
+      const ueSorted = [...d.ues].sort((a, b) => App.UE.ectsFor(b, _sem) - App.UE.ectsFor(a, _sem));
       const ueCards = ueSorted.map(u => {
         const n = _cardsForUE(u.code).length;
         const hist = _historyForUE(u.code);
         const lastScore = hist.length ? hist[0].score : null;
         return `<button class="partiel-ue-card" style="--ue-color:${d.color}" onclick="App.Partiels.selectUE('${u.code}')">
-          <div class="partiel-ue-code">${u.code} <span class="partiel-ue-ects">${u.ects} ECTS</span></div>
+          <div class="partiel-ue-code">${u.code} <span class="partiel-ue-ects">${_ectsLabel(u)}</span></div>
           <div class="partiel-ue-name">${_esc(u.name)}</div>
           <div class="partiel-ue-meta">
             <span>${n} fiche${n>1?'s':''}</span>
@@ -185,7 +200,7 @@ App.Partiels = (() => {
         <span class="partiel-domain-badge">${u.code}</span>
         <div>
           <h2 style="margin:0;font-size:1.15rem">${_esc(u.name)}</h2>
-          <p style="margin:2px 0 0;font-size:.8rem;color:var(--gray-500)">Domaine ${dom.code} — ${_esc(dom.name)} · <strong>${u.ects} ECTS</strong> sur ${App.UE.TOTAL_ECTS} (coefficient dans la moyenne du semestre) · ${_semLabel(u.semestre)} (indicatif)</p>
+          <p style="margin:2px 0 0;font-size:.8rem;color:var(--gray-500)">Domaine ${dom.code} — ${_esc(dom.name)} · ${_ectsDetailHTML(u)} · ${_semLabel(u.semestre)} (indicatif)</p>
         </div>
       </div>
       ${comps.length ? `<div class="partiel-comp-list">${comps.map(c => `<span class="partiel-comp-chip" title="${_esc(c.name)}">${c.code}${c.nouvelle ? ' 🆕' : ''}</span>`).join('')}</div>` : ''}
@@ -397,7 +412,7 @@ App.Partiels = (() => {
   }
 
   return {
-    init, render, backToHome, selectUE, setSemestre,
+    init, render, backToHome, selectUE, setSemestre, setEcts,
     suggestQuestions, useSuggestion, toggleExpected, correctWritten,
     startQuiz, answerQuiz, abortQuiz
   };

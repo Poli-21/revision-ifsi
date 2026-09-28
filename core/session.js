@@ -190,6 +190,8 @@ App.Session = (() => {
     if (!current) return;
     document.getElementById('card-container').style.display  = 'none';
     document.getElementById('answer-btns').style.display     = 'none';
+    const _disc = document.getElementById('discovery-btns');
+    if (_disc) _disc.style.display = 'none';   // sinon reste affiché en changeant de mode (QCM/Écriture)
     document.getElementById('write-zone').style.display      = 'none';
     document.getElementById('qcm-zone').style.display        = 'none';
     document.getElementById('write-answer-btns').style.display = 'none';
@@ -251,8 +253,11 @@ App.Session = (() => {
     updateIntervalPreviews(c, ['dint-nope','dint-hard','dint-ok'], [0,3,4]);
     document.getElementById('card-hint').style.display = 'block';
     setTimeout(() => {
+      // 300px mini sur grand écran ; sur téléphone on laisse la carte épouser son
+      // contenu (sinon grand vide sous la carte qui repousse les boutons hors de portée du pouce)
+      const minH = window.innerWidth <= 700 ? 190 : 300;
       const h = Math.max(document.getElementById('card-front-face').scrollHeight,
-                         document.getElementById('card-back-face').scrollHeight, 300);
+                         document.getElementById('card-back-face').scrollHeight, minH);
       fc.style.height = h + 'px';
     }, 40);
   }
@@ -304,6 +309,10 @@ App.Session = (() => {
         fc.style.transform = `rotateY(180deg) translateX(${dx}px) rotate(${dx / 18}deg)`;
       }
     }, { passive: true });
+
+    fc.addEventListener('touchcancel', () => {
+      dragging = false; fc.style.transition = ''; fc.style.transform = '';
+    });
 
     fc.addEventListener('touchend', e => {
       if (!dragging) return;

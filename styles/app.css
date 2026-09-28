@@ -174,7 +174,7 @@ span.cat-move-btn{pointer-events:none;visibility:hidden;}
 .flashcard-wrap{perspective:1200px;max-width:660px;margin:0 auto;}
 .flashcard{width:100%;min-height:300px;position:relative;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.4,0,.2,1);cursor:pointer;}
 .flashcard.flipped{transform:rotateY(180deg);}
-.card-face{position:absolute;top:0;left:0;width:100%;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px;padding:26px 32px;display:flex;flex-direction:column;justify-content:center;border:1px solid var(--gray-200);}
+.card-face{position:absolute;top:0;left:0;width:100%;height:100%;box-sizing:border-box;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px;padding:26px 32px;display:flex;flex-direction:column;justify-content:center;border:1px solid var(--gray-200);}
 .card-front{background:white;box-shadow:var(--shadow);}
 .card-back{background:#f0f7ff;transform:rotateY(180deg);box-shadow:var(--shadow);}
 .card-face .cat-tag{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--gray-400);margin-bottom:8px;}
@@ -194,10 +194,10 @@ span.cat-move-btn{pointer-events:none;visibility:hidden;}
 .btn-answer{flex:1;padding:13px 8px;border-radius:12px;border:none;cursor:pointer;font-size:.88rem;font-weight:700;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:2px;}
 .btn-answer .interval{font-size:.7rem;font-weight:400;opacity:.75;}
 .btn-answer .shortcut{font-size:.65rem;opacity:.5;font-family:monospace;}
-.btn-nope{background:var(--danger-light);color:var(--danger);}   .btn-nope:hover{background:#fecaca;}
-.btn-hard{background:var(--warning-light);color:var(--warning);} .btn-hard:hover{background:#fde68a;}
-.btn-ok{background:var(--success-light);color:var(--success);}   .btn-ok:hover{background:#bbf7d0;}
-.btn-easy{background:var(--easy-light);color:var(--easy);}       .btn-easy:hover{background:#ddd6fe;}
+.btn-nope{background:var(--danger-light);color:var(--danger);}   @media (hover:hover){.btn-nope:hover{background:#fecaca;}}
+.btn-hard{background:var(--warning-light);color:var(--warning);} @media (hover:hover){.btn-hard:hover{background:#fde68a;}}
+.btn-ok{background:var(--success-light);color:var(--success);}   @media (hover:hover){.btn-ok:hover{background:#bbf7d0;}}
+.btn-easy{background:var(--easy-light);color:var(--easy);}       @media (hover:hover){.btn-easy:hover{background:#ddd6fe;}}
 
 /* ── Mode Écriture ── */
 #write-zone{max-width:660px;margin:0 auto;display:none;}
@@ -223,7 +223,7 @@ textarea#write-input:focus{outline:none;border-color:var(--primary);box-shadow:0
 .qcm-card .qcm-img{width:100%;max-height:260px;display:flex;align-items:center;justify-content:center;margin-top:12px;border-radius:10px;background:#f8fafc;overflow:hidden;}
 .qcm-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .qcm-choice{padding:14px 16px;border-radius:12px;border:2px solid var(--gray-200);background:white;cursor:pointer;font-size:.85rem;line-height:1.45;text-align:left;transition:all .15s;font-family:inherit;}
-.qcm-choice:hover:not(:disabled){border-color:var(--primary);background:var(--primary-light);}
+@media (hover:hover){.qcm-choice:hover:not(:disabled){border-color:var(--primary);background:var(--primary-light);}}
 .qcm-choice.qcm-correct{border-color:var(--success);background:var(--success-light);color:var(--success);font-weight:600;}
 .qcm-choice.qcm-wrong{border-color:var(--danger);background:var(--danger-light);color:var(--danger);}
 .qcm-choice:disabled{cursor:default;}
@@ -586,10 +586,7 @@ body.dark .qcm-reveal-def{color:#bbf7d0;}
   /* Mode découverte = 3 boutons, pas 4 : en grille 2 colonnes ça laisserait
      un trou vide sur la 2e ligne. On empile en 1 colonne à la place, avec
      des boutons bien hauts pour rester faciles à taper du pouce. */
-  .discovery-btns {
-    display: flex !important;
-    flex-direction: column;
-  }
+  .discovery-btns { grid-template-columns: 1fr; }   /* PAS de display ici : le JS masque/affiche via style.display */
   .discovery-btns .btn-answer { max-width: 100%; }
 
   /* Indice de balayage, visible seulement au dos de la carte (donc seulement
@@ -1117,7 +1114,7 @@ body.dark .kbd-pill { background: var(--gray-100) !important; border-color: var(
 
 /* QCM choices */
 body.dark .qcm-choice { background: var(--gray-100) !important; border-color: var(--gray-200) !important; color: var(--gray-700) !important; }
-body.dark .qcm-choice:hover { border-color: var(--primary) !important; background: var(--primary-light) !important; }
+@media (hover:hover){ body.dark .qcm-choice:hover { border-color: var(--primary) !important; background: var(--primary-light) !important; } }
 
 /* Sync modal zones */
 body.dark #sync-setup-zone ol,
@@ -1559,4 +1556,37 @@ header, .sidebar, .modal, .card-face, .card-item { transition: background .25s, 
 @media (max-width: 700px) {
   .tuteur-log { height: 60vh; }
   .tuteur-bubble { max-width: 90%; }
+}
+
+
+/* ── Confort tactile (téléphone / tablette) ─────────────────────── */
+button, .btn-answer, .qcm-choice, .tab, .mode-btn, .flashcard { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+/* la carte laisse passer le défilement vertical mais réserve le glissé horizontal au balayage */
+.flashcard { touch-action: pan-y; }
+@media (pointer: coarse) {
+  .flashcard { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+}
+.due-actions { display: flex; flex-direction: column; gap: 6px; align-self: flex-start; }
+.due-actions .due-row { display: flex; gap: 6px; }
+@media (max-width: 700px) {
+  /* Bandeau du jour : le nombre + les boutons "Réviser" d'abord, la longue liste de matières ensuite */
+  .due-alert > div:first-child { display: contents; }
+  .due-alert .due-count-row   { order: 1; }
+  .due-alert .label           { order: 2; }
+  #exam-alerts-home           { order: 3; }
+  .due-actions                { order: 4; align-self: stretch; }
+  .due-actions .btn-start     { width: 100%; }
+  .due-actions .due-row .btn  { padding: 12px 10px !important; font-size: .9rem !important; }
+  #cat-due-chips              { order: 5; }
+  /* Filtres "Toutes les cartes" : ne jamais dépasser la largeur de l'écran */
+  #browse-view select, #browse-view input[type=text] { max-width: 100%; min-width: 0; box-sizing: border-box; }
+  #filter-cat { width: 100%; }
+  #browse-view > div:first-child { min-width: 0; }
+}
+
+/* Très petits téléphones (≤ 420px) : la barre de modes passe sous "Quitter/compteur" au lieu de déborder */
+@media (max-width: 420px) {
+  .session-header { flex-wrap: wrap; }
+  .mode-toggle { width: 100%; order: 5; }
+  .mode-toggle .mode-btn { flex: 1; }
 }
