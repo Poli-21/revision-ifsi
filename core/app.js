@@ -208,6 +208,27 @@ App.UI = (() => {
   };
 })();
 
+// Migration ponctuelle (flag localStorage, une seule fois) : devine un type
+// CM/TD de départ pour les cartes qui n'en ont pas encore, à partir du nom de
+// la matière (contient "TD" → TD, sinon CM par défaut). Simple point de
+// départ à corriger ensuite à la main (sélecteur rapide sur chaque carte, ou
+// action groupée "Assigner CM/TD") — n'écrase jamais un type déjà choisi.
+const GUESS_TYPE_FLAG = 'ifsi_guess_type_v1';
+function _guessCardTypes() {
+  if (localStorage.getItem(GUESS_TYPE_FLAG)) return false;
+  localStorage.setItem(GUESS_TYPE_FLAG, '1');
+  if (!App.Store?.state?.cards) return false;
+  let changed = false;
+  App.Store.state.cards.forEach(c => {
+    if (!c.type) {
+      c.type = /\btd\b/i.test(c.cat || '') ? 'TD' : 'CM';
+      changed = true;
+    }
+  });
+  if (changed) App.Store.save();
+  return changed;
+}
+
 // ── Initialisation ─────────────────────────────────────────────
 App.init = async function () {
   _initDarkMode();                  // Dark mode (avant tout rendu)
@@ -216,6 +237,7 @@ App.init = async function () {
   try { App.UE?.migrateReferenceCards?.(); } catch(e) { console.warn('UE migration failed:', e); }
   try { App.UE?.migrateReferenceCategories?.(); } catch(e) { console.warn('UE category migration failed:', e); }
   try { App.UE?.removeReferenceCards?.(); } catch(e) { console.warn('UE reference-card removal failed:', e); }
+  try { _guessCardTypes(); } catch(e) { console.warn('Type guess migration failed:', e); }
   try { _seedDefaultExamIfNeeded(); } catch(e) { console.warn('Exam seed failed:', e); }
   try { App.Sync?.init?.(); } catch(e) { console.warn('Sync init failed:', e); }
   App.Render.all();
@@ -263,7 +285,7 @@ function _initKeyboard() {
 // ── Exposition globale pour les onclick HTML ───────────────────
 Object.assign(window, {
   // Session
-  startSession   : (cat)  => App.Session.start(cat),
+  startSession   : (cat, type)  => App.Session.start(cat, type),
   startChrono    : ()     => App.Session.startChrono(),
   endSession     : ()     => App.Session.end(),
   flipCard       : ()     => App.Session.flip(),
@@ -436,12 +458,40 @@ function bulkSetUE() {
   if (btn) { const o = btn.textContent; btn.textContent = `✓ ${count} carte(s) taguée(s) ${ue}`; setTimeout(() => btn.textContent = o, 2000); }
 }
 
+function bulkSetType() {
+  if (_selectedCards.size === 0) return;
+  const type = document.getElementById('bulk-type-select')?.value;
+  if (!type) { alert('Choisis CM ou TD dans la liste.'); return; }
+  App.Store.state.cards.forEach(c => {
+    if (_selectedCards.has(c.id)) c.type = type === 'none' ? null : type;
+  });
+  App.Store.save();
+  const count = _selectedCards.size;
+  _selectedCards.clear();
+  toggleSelectMode();
+  App.Render.all();
+  // Feedback
+  const btn = document.getElementById('select-mode-btn');
+  if (btn) { const o = btn.textContent; btn.textContent = `✓ ${count} carte(s) taguée(s) ${type === 'none' ? '(non classé)' : type}`; setTimeout(() => btn.textContent = o, 2000); }
+}
+
 // Change l'UE d'UNE seule carte directement depuis la liste "Toutes les cartes"
 // (sélecteur rapide sur chaque carte), sans ouvrir la fiche complète.
 function quickSetUE(id, ue) {
   const c = App.Store.state.cards.find(x => x.id === id);
   if (!c) return;
   c.ue = ue || null;
+  App.Store.save();
+  App.Render.all();
+}
+
+// Même principe que quickSetUE, mais pour le type CM (Cours Magistral) /
+// TD (Travaux Dirigés) — un tag indépendant des matières/sous-matières,
+// pour pouvoir filtrer et réviser séparément sur un gros volume de cartes.
+function quickSetType(id, type) {
+  const c = App.Store.state.cards.find(x => x.id === id);
+  if (!c) return;
+  c.type = type || null;
   App.Store.save();
   App.Render.all();
 }

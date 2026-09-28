@@ -33,6 +33,8 @@ App.Modal = (() => {
     // Populate UE (référentiel 2026, optionnel)
     const ueSel = document.getElementById('new-ue');
     if (ueSel) ueSel.innerHTML = '<option value="">— Aucune UE —</option>' + App.UE.optionsHTML();
+    const typeSel = document.getElementById('new-type');
+    if (typeSel) typeSel.value = '';
     document.getElementById('modal-overlay').classList.add('open');
     setTimeout(() => document.getElementById('new-term').focus(), 80);
   }
@@ -53,8 +55,9 @@ App.Modal = (() => {
     }
     if (!cat)  { alert('Choisis ou crée une matière.'); return; }
     if (!term || !def) { alert('Le terme et la définition sont requis.'); return; }
-    const ue = document.getElementById('new-ue')?.value || null;
-    App.Store.state.cards.push({ id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2), cat, term, def, example: ex || null, ue, customImage: _pendingImg || null, suspended: false, progress: null });
+    const ue   = document.getElementById('new-ue')?.value || null;
+    const type = document.getElementById('new-type')?.value || null;
+    App.Store.state.cards.push({ id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2), cat, term, def, example: ex || null, ue, type, customImage: _pendingImg || null, suspended: false, progress: null });
     App.Store.save();
     App.Render.all();
     if (keepOpen) {
@@ -146,6 +149,14 @@ App.Modal = (() => {
         <select id="edit-ue"><option value="">— Aucune UE —</option>${App.UE.optionsHTML(c.ue)}</select>
       </div>
       <div class="form-group">
+        <label>Type (optionnel)</label>
+        <select id="edit-type">
+          <option value="" ${!c.type ? 'selected' : ''}>— Non classé —</option>
+          <option value="CM" ${c.type === 'CM' ? 'selected' : ''}>📘 CM (Cours Magistral)</option>
+          <option value="TD" ${c.type === 'TD' ? 'selected' : ''}>📗 TD (Travaux Dirigés)</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Image</label>
         ${c.customImage
           ? `<div style="margin-bottom:8px"><img src="${c.customImage}" style="max-height:120px;max-width:100%;object-fit:contain;border-radius:6px;display:block;margin-bottom:6px">
@@ -233,6 +244,7 @@ App.Modal = (() => {
     c.example = ex || null;
     c.cat     = cat;
     c.ue      = document.getElementById('edit-ue')?.value || null;
+    c.type    = document.getElementById('edit-type')?.value || null;
     if (_editPendingImg) { c.customImage = _editPendingImg; _editPendingImg = null; }
     App.Store.save();
     App.Render.all();
@@ -327,9 +339,9 @@ App.Modal = (() => {
   }
 
   function exportCSV() {
-    const rows = [['id','cat','terme','definition','exemple','easeFactor','interval','nextReview']];
+    const rows = [['id','cat','type','terme','definition','exemple','easeFactor','interval','nextReview']];
     App.Store.state.cards.forEach(c => {
-      rows.push([c.id, c.cat, c.term, c.def, c.example||'',
+      rows.push([c.id, c.cat, c.type||'', c.term, c.def, c.example||'',
         c.progress?.easeFactor||'', c.progress?.interval||'', c.progress?.nextReview||'']);
     });
     const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');

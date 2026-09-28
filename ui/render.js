@@ -219,12 +219,15 @@ App.Render = (() => {
     const q   = (document.getElementById('search-input')?.value || '').toLowerCase();
     const cat = document.getElementById('filter-cat')?.value || '';
     const lv  = document.getElementById('filter-level')?.value;
+    const type = document.getElementById('filter-type')?.value;
     const showSuspended = document.getElementById('filter-suspended')?.checked;
     let cards = App.Store.state.cards;
     if (App.UI.activeCategory) cards = cards.filter(c => c.cat === App.UI.activeCategory);
     if (cat)  cards = cards.filter(c => c.cat === cat);
     if (!showSuspended) cards = cards.filter(c => !c.suspended);
     if (lv !== '' && lv !== undefined) cards = cards.filter(c => App.SRS.getLevel(c) === parseInt(lv));
+    if (type === 'CM' || type === 'TD') cards = cards.filter(c => c.type === type);
+    else if (type === 'none') cards = cards.filter(c => !c.type);
     if (q)    cards = cards.filter(c => c.term.toLowerCase().includes(q) || c.def.toLowerCase().includes(q));
     const grid = document.getElementById('browse-grid');
     if (grid) grid.innerHTML = cards.length
@@ -310,6 +313,14 @@ App.Render = (() => {
         onclick="event.stopPropagation()" onchange="event.stopPropagation();quickSetUE('${c.id}',this.value)">
         <option value="">— Aucune UE —</option>${App.UE.optionsHTML(c.ue)}
       </select>` : '';
+    // Sélecteur CM/TD rapide : même principe que l'UE, pour classer une carte
+    // en Cours Magistral ou Travaux Dirigés sans ouvrir la fiche complète.
+    const typeQuick = `<select class="ue-quick-select" title="Changer le type (CM/TD) de cette carte"
+        onclick="event.stopPropagation()" onchange="event.stopPropagation();quickSetType('${c.id}',this.value)">
+        <option value="" ${!c.type ? 'selected' : ''}>— Non classé —</option>
+        <option value="CM" ${c.type === 'CM' ? 'selected' : ''}>📘 CM</option>
+        <option value="TD" ${c.type === 'TD' ? 'selected' : ''}>📗 TD</option>
+      </select>`;
     return `<div class="card-item ${c.suspended ? 'suspended' : ''}${isLeech ? ' is-leech' : ''}" data-id="${c.id}" onclick="event.currentTarget.closest('.select-mode')?toggleCardSelect('${c.id}',event):openCardDetail('${c.id}')">
       <button class="card-delete-btn" onclick="deleteCard('${c.id}',event)" title="Supprimer">✕</button>
       ${imgHtml}
@@ -318,12 +329,15 @@ App.Render = (() => {
       <div class="meta">
         <span class="badge badge-blue">${_esc(c.cat)}</span>
         <span class="badge" style="background:${App.SRS.COLORS[level]}22;color:${App.SRS.COLORS[level]}">${App.SRS.LABELS[level]}</span>
+        ${c.type === 'CM' ? '<span class="badge" style="background:#e0e7ff;color:#4338ca">📘 CM</span>' : ''}
+        ${c.type === 'TD' ? '<span class="badge" style="background:#dcfce7;color:#15803d">📗 TD</span>' : ''}
         ${due && !c.suspended ? '<span class="badge badge-red">À réviser</span>' : ''}
         ${suspBadge}${leechBadge}
         ${efBadge}
         <span class="next-review">${nextStr}</span>
       </div>
       ${ueQuick}
+      ${typeQuick}
     </div>`;
   }
 

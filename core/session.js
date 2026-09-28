@@ -115,7 +115,9 @@ App.Session = (() => {
   }
 
   // ── Démarrage ──────────────────────────────────────────────────
-  function start(cat) {
+  // type (optionnel) : 'CM' ou 'TD' → ne garde que les cartes taguées ainsi,
+  // en plus du filtre de matière habituel (cat).
+  function start(cat, type) {
     const { state } = App.Store;
     let cards = state.cards.filter(c => App.SRS.isDue(c));
     let sessionLabel = '';
@@ -127,6 +129,10 @@ App.Session = (() => {
       const targetCat = (cat !== undefined && cat !== null) ? cat : App.UI.activeCategory;
       if (targetCat) cards = cards.filter(c => c.cat === targetCat);
       sessionLabel = targetCat || '';
+    }
+    if (type === 'CM' || type === 'TD') {
+      cards = cards.filter(c => c.type === type);
+      sessionLabel = (sessionLabel ? sessionLabel + ' — ' : '') + (type === 'CM' ? '📘 CM' : '📗 TD');
     }
     if (!cards.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
 
