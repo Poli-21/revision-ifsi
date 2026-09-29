@@ -253,15 +253,41 @@ App.Session = (() => {
     updateIntervalPreviews(c, ['int-nope','int-hard','int-ok','int-easy'], [0,3,4,5]);
     updateIntervalPreviews(c, ['dint-nope','dint-hard','dint-ok'], [0,3,4]);
     document.getElementById('card-hint').style.display = 'block';
-    setTimeout(() => {
-      // 300px mini sur grand écran ; sur téléphone on laisse la carte épouser son
-      // contenu (sinon grand vide sous la carte qui repousse les boutons hors de portée du pouce)
-      const minH = window.innerWidth <= 700 ? 190 : 300;
-      const h = Math.max(document.getElementById('card-front-face').scrollHeight,
-                         document.getElementById('card-back-face').scrollHeight, minH);
-      fc.style.height = h + 'px';
-    }, 40);
+    setTimeout(_fitCard, 40);
   }
+
+  // Ajuste la hauteur de la carte à son contenu. Rappelé quand une photo finit de
+  // charger (sa hauteur n'est pas connue avant) pour ne jamais rogner l'image.
+  function _fitCard() {
+    const fc = document.getElementById('flashcard');
+    if (!fc) return;
+    // 300px mini sur grand écran ; sur téléphone on laisse la carte épouser son
+    // contenu (sinon grand vide sous la carte qui repousse les boutons hors de portée du pouce)
+    const minH = window.innerWidth <= 700 ? 190 : 300;
+    fc.style.height = '';
+    const h = Math.max(document.getElementById('card-front-face').scrollHeight,
+                       document.getElementById('card-back-face').scrollHeight, minH);
+    fc.style.height = h + 'px';
+  }
+
+  // ── Photos : affichées en grand, agrandissables d'un clic ──────
+  function photoHTML(src, maxH) {
+    return `<img class="card-photo" src="${src}" alt="" draggable="false" style="max-height:${maxH}px" onload="App.Session._photoLoaded()" onclick="App.Session.zoomImage(this.src, event)">`;
+  }
+  function _photoLoaded() { if (current && !current.chronoOnly) _fitCard(); }
+  function zoomImage(src, ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    closeZoom();
+    const ov = document.createElement('div');
+    ov.id = 'img-zoom-overlay';
+    ov.innerHTML = `<img src="${src}" alt=""><button type="button" aria-label="Fermer">✕</button>`;
+    ov.onclick = closeZoom;
+    document.body.appendChild(ov);
+  }
+  function closeZoom() { document.getElementById('img-zoom-overlay')?.remove(); }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('img-zoom-overlay')) { e.stopImmediatePropagation(); e.preventDefault(); closeZoom(); }
+  }, true);
 
   function flip() {
     const fc = document.getElementById('flashcard');
@@ -336,7 +362,7 @@ App.Session = (() => {
     const wimg = document.getElementById('wimage');
     const img  = resolveImg(c);
     if (img) {
-      wimg.innerHTML   = img.type === 'svg' ? img.content : `<img src="${img.content}" style="max-height:290px;max-width:100%;object-fit:contain;border-radius:6px">`;
+      wimg.innerHTML   = img.type === 'svg' ? img.content : photoHTML(img.content, 290);
       wimg.style.display = 'flex';
     } else { wimg.style.display = 'none'; }
     const winput = document.getElementById('write-input');
@@ -388,7 +414,7 @@ App.Session = (() => {
     const img = resolveImg(c);
     const qimg = document.getElementById('qcm-image');
     if (img) {
-      qimg.innerHTML = img.type === 'svg' ? img.content : `<img src="${img.content}" style="max-height:150px;max-width:100%;object-fit:contain">`;
+      qimg.innerHTML = img.type === 'svg' ? img.content : photoHTML(img.content, 220);
       qimg.style.display = 'flex';
     } else { qimg.style.display = 'none'; }
     const { cards } = App.Store.state;
@@ -503,7 +529,7 @@ App.Session = (() => {
       const el = document.getElementById(id);
       if (!el) return;
       if (img) {
-        el.innerHTML    = img.type === 'svg' ? img.content : `<img src="${img.content}" style="max-height:310px;max-width:100%;object-fit:contain;border-radius:6px">`;
+        el.innerHTML    = img.type === 'svg' ? img.content : photoHTML(img.content, 340);
         el.style.display = 'flex';
       } else { el.style.display = 'none'; }
     });
@@ -547,5 +573,5 @@ App.Session = (() => {
     show();
   }
 
-  return { start, startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk };
+  return { start, startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, zoomImage, closeZoom, _photoLoaded };
 })();

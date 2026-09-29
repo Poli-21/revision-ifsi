@@ -1643,3 +1643,13 @@ body.dark .goal-bar-side{background:#334155;}
 @media (max-width:700px){
   .due-alert .goal-bar{order:2;max-width:none;align-self:stretch;width:100%;}
 }
+
+
+/* ══ Photos des cartes : grandes, nettes, agrandissables ══ */
+.card-photo{display:block;width:100%;height:auto;object-fit:contain;border-radius:8px;cursor:zoom-in;-webkit-user-drag:none;user-select:none;}
+.card-face .card-image{max-height:none;}
+.card-face .card-image svg,.write-card .wimage svg,.qcm-img svg{max-width:100%;height:auto;max-height:320px;}
+#img-zoom-overlay{position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:12px;cursor:zoom-out;}
+#img-zoom-overlay img{max-width:96vw;max-height:92vh;width:auto;height:auto;object-fit:contain;background:#fff;border-radius:6px;image-rendering:auto;}
+#img-zoom-overlay button{position:absolute;top:14px;right:14px;width:44px;height:44px;border-radius:50%;border:none;background:rgba(255,255,255,.2);color:#fff;font-size:1.3rem;font-weight:700;cursor:pointer;}
+.card-face .card-image,.card-face .card-image .card-photo{flex-shrink:0;}
