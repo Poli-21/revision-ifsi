@@ -600,6 +600,22 @@ function _closeSidebar() {
   document.getElementById('sidebar-overlay')?.classList.remove('open');
 }
 
+// ── Objectif du jour ───────────────────────────────────────────
+function startDailyGoal() {
+  const goal = App.Store.getDailyGoal();
+  const left = Math.max(0, goal - App.Store.reviewedToday());
+  App.Session.start('', undefined, left > 0 ? left : 50);   // '' = toutes les matières
+}
+function editDailyGoal() {
+  const cur = App.Store.getDailyGoal();
+  const v = prompt('Combien de cartes veux-tu réviser par jour ?', String(cur));
+  if (v === null) return;
+  const n = parseInt(v, 10);
+  if (!(n >= 5 && n <= 1000)) { alert('Choisis un nombre entre 5 et 1000.'); return; }
+  App.Store.setDailyGoal(n);
+  App.Render.all();
+}
+
 // ── Menu ⋮ (3 points) ─────────────────────────────────────────
 function _moreMenuEl() { return document.getElementById('more-menu'); }
 function closeMoreMenu() {

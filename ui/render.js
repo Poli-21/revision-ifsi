@@ -64,36 +64,37 @@ App.Render = (() => {
       }
     }
 
-    // Estimation inline dans le bandeau
+    // ── Objectif du jour ───────────────────────────────────────
+    const goal      = App.Store.getDailyGoal();
+    const doneToday = App.Store.reviewedToday();
+    const remaining = Math.max(0, goal - doneToday);
+    const pct       = Math.min(100, Math.round(doneToday / goal * 100));
+    _setText('goal-target', goal);
+    _setText('stat-goal', `${doneToday} / ${goal}`);
+    ['goal-bar-fill', 'goal-bar-fill-side'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.style.width = pct + '%'; el.classList.toggle('done', remaining === 0); }
+    });
+    const goalLabel = document.getElementById('goal-label');
+    if (goalLabel) goalLabel.textContent = remaining === 0
+      ? `🎉 Objectif atteint !${doneToday > goal ? ' (+' + (doneToday - goal) + ' bonus)' : ''}`
+      : `cartes révisées aujourd'hui · encore ${remaining} pour l'objectif`;
+    const startBtn = document.getElementById('daily-start-btn');
+    if (startBtn) {
+      const n = Math.min(remaining > 0 ? remaining : 50, due.length);
+      startBtn.textContent = due.length === 0 ? 'Rien à réviser 🎉'
+        : remaining === 0 ? `Bonus : ${n} cartes de plus →`
+        : doneToday === 0 ? `Commencer mes ${n} cartes →`
+        : `Continuer (${n} cartes) →`;
+    }
+    // Temps estimé pour finir l'objectif (et non pour tout le retard)
     const dueEstEl = document.getElementById('due-est-inline');
     if (dueEstEl) {
-      if (due.length === 0) {
-        dueEstEl.style.display = 'none';
-      } else {
-        const BASE_SECS = [65, 50, 38, 30, 24, 18, 14, 11];
-        let estSecs = 0;
-        due.forEach(card => {
-          const level  = SRS.getLevel(card);
-          const ef     = card.progress?.easeFactor ?? 2.5;
-          const lapses = card.progress?.lapses      ?? 0;
-          let t = BASE_SECS[level];
-          if      (ef < 1.5) t += 25;
-          else if (ef < 1.8) t += 15;
-          else if (ef < 2.1) t +=  7;
-          else if (ef > 2.4) t -=  4;
-          if      (lapses >= 5) t += 18;
-          else if (lapses >= 3) t += 10;
-          estSecs += Math.max(8, t);
-        });
-        let estTxt;
-        if      (estSecs < 60)   estTxt = `~${estSecs}s`;
-        else if (estSecs < 3600) estTxt = `~${Math.round(estSecs / 60)}min`;
-        else {
-          const h = Math.floor(estSecs / 3600);
-          const m = Math.round((estSecs % 3600) / 60);
-          estTxt = m > 0 ? `~${h}h${m}min` : `~${h}h`;
-        }
-        dueEstEl.textContent = estTxt;
+      const n = Math.min(remaining, due.length);
+      if (n === 0) { dueEstEl.style.display = 'none'; }
+      else {
+        const estSecs = n * 30;
+        dueEstEl.textContent = estSecs < 3600 ? `~${Math.max(1, Math.round(estSecs / 60))}min` : `~${Math.floor(estSecs / 3600)}h${String(Math.round((estSecs % 3600) / 60)).padStart(2, '0')}`;
         dueEstEl.style.display = 'inline';
       }
     }
@@ -102,7 +103,7 @@ App.Render = (() => {
     _renderExamDate(state);
 
     // Bandeau du jour
-    _setText('due-count', due.length);
+    _setText('due-count', doneToday);
     const chips = document.getElementById('cat-due-chips');
     if (chips) {
       const selCats  = App.UI.selectedCats;

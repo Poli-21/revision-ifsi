@@ -1629,3 +1629,17 @@ body.dark .more-btn{color:#e2e8f0;border-color:#475569;}
   #detail-overlay .btn, #modal-overlay .btn, #sync-overlay .btn, #exam-overlay .btn{min-height:42px;padding:9px 14px;font-size:.88rem;}
   #modal-overlay input, #modal-overlay select, #modal-overlay textarea{font-size:16px;} /* évite le zoom auto */
 }
+
+
+/* ══ Objectif du jour ══ */
+.goal-of{font-size:1.15rem;font-weight:700;color:rgba(255,255,255,.85);cursor:pointer;white-space:nowrap;}
+.goal-bar{height:10px;border-radius:99px;background:rgba(255,255,255,.28);overflow:hidden;margin-top:10px;max-width:420px;}
+.goal-bar-fill{height:100%;width:0;border-radius:99px;background:#fff;transition:width .4s ease;}
+.goal-bar-fill.done{background:#4ade80;}
+.goal-bar-side{background:var(--gray-200);margin:2px 0 6px;max-width:none;height:8px;}
+.goal-bar-side .goal-bar-fill{background:var(--primary);}
+.goal-bar-side .goal-bar-fill.done{background:var(--success);}
+body.dark .goal-bar-side{background:#334155;}
+@media (max-width:700px){
+  .due-alert .goal-bar{order:2;max-width:none;align-self:stretch;width:100%;}
+}

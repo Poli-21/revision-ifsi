@@ -151,6 +151,19 @@ App.Store = (() => {
     saveLog();
   }
 
+  // ── Objectif quotidien (nombre de cartes à réviser par jour) ──
+  const KEY_GOAL = 'ifsi_daily_goal_v1';
+  function getDailyGoal() {
+    try { const n = parseInt(localStorage.getItem(KEY_GOAL), 10); if (n >= 5 && n <= 1000) return n; } catch (e) {}
+    return 100;
+  }
+  function setDailyGoal(n) {
+    n = Math.max(5, Math.min(1000, Math.round(Number(n) || 100)));
+    try { localStorage.setItem(KEY_GOAL, String(n)); } catch (e) {}
+    return n;
+  }
+  function reviewedToday() { return state.studyLog[App.SRS.todayStr()]?.reviewed || 0; }
+
   function getStreak() {
     let streak = 0;
     const today = new Date();
@@ -184,5 +197,5 @@ App.Store = (() => {
     });
   }
 
-  return { state, load, save, saveLog, saveOrder, normCat, logReview, logSessionDuration, getStreak, getBackup, setBackup, deleteBackup, listBackupKeys };
+  return { state, load, save, saveLog, saveOrder, normCat, logReview, logSessionDuration, getStreak, getDailyGoal, setDailyGoal, reviewedToday, getBackup, setBackup, deleteBackup, listBackupKeys };
 })();

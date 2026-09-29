@@ -55,6 +55,7 @@
   <button role="menuitem" onclick="moreDo('exportCSV')">📊 Exporter (CSV)</button>
   <button role="menuitem" onclick="moreDo('importJSON')">📂 Importer un fichier</button>
   <div class="more-menu-title">Autre</div>
+  <button role="menuitem" onclick="moreDo('editDailyGoal')">🎯 Changer l'objectif du jour</button>
   <button role="menuitem" onclick="moreDo('startChrono')">⏱ Chrono libre</button>
   <button role="menuitem" onclick="moreDo('toggleDarkMode')">🌙 Mode nuit / jour</button>
   <button role="menuitem" onclick="moreDo('showQRCode')">📱 QR code d'accès</button>
@@ -69,9 +70,11 @@
     <button class="sidebar-close-btn" onclick="toggleDesktopSidebar()" title="Réduire le panneau">◀</button>
     <div class="sidebar-section">
       <h3>Aujourd'hui</h3>
-      <div class="stat-row"><span class="label">À réviser</span><span class="value" id="stat-due">—</span></div>
-      <div class="stat-row"><span class="label">Nouvelles</span><span class="value" id="stat-new">—</span></div>
-      <div class="stat-row"><span class="label">Total</span><span class="value" id="stat-total">—</span></div>
+      <div class="stat-row"><span class="label">🎯 Objectif</span><span class="value" id="stat-goal" onclick="editDailyGoal()" style="cursor:pointer">— / 100</span></div>
+      <div class="goal-bar goal-bar-side"><div class="goal-bar-fill" id="goal-bar-fill-side"></div></div>
+      <div class="stat-row" style="display:none"><span class="label">À réviser</span><span class="value" id="stat-due">—</span></div>
+      <div class="stat-row" style="display:none"><span class="label">Nouvelles</span><span class="value" id="stat-new">—</span></div>
+      <div class="stat-row" style="display:none"><span class="label">Total</span><span class="value" id="stat-total">—</span></div>
       <div class="stat-row"><span class="label">Série</span><span class="value" id="stat-streak">—</span></div>
       <div class="stat-row"><span class="label">⏱ Temps</span><span class="value" id="stat-time">—</span></div>
       <div class="stat-row" id="stat-session-row" style="display:none">
@@ -117,14 +120,16 @@
         <div style="flex:1">
           <div class="due-count-row" style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
             <div class="big" id="due-count">0</div>
+            <span class="goal-of" onclick="editDailyGoal()" title="Changer mon objectif du jour">/ <span id="goal-target">100</span> ✎</span>
             <span id="due-est-inline" style="font-size:.9rem;font-weight:600;color:rgba(255,255,255,.75);display:none"></span>
           </div>
-          <div class="label">cartes à réviser maintenant</div>
+          <div class="label" id="goal-label">cartes révisées aujourd'hui</div>
+          <div class="goal-bar"><div class="goal-bar-fill" id="goal-bar-fill"></div></div>
           <div id="exam-alerts-home" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
           <div class="cat-due-chips" id="cat-due-chips"></div>
         </div>
         <div class="due-actions">
-          <button class="btn btn-start" onclick="startSession()">Tout réviser →</button>
+          <button class="btn btn-start" id="daily-start-btn" onclick="startDailyGoal()">Commencer mes 100 cartes →</button>
         </div>
       </div>
       <p class="section-title">Prochaines révisions</p>

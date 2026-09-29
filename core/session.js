@@ -117,7 +117,7 @@ App.Session = (() => {
   // ── Démarrage ──────────────────────────────────────────────────
   // type (optionnel) : 'CM' ou 'TD' → ne garde que les cartes taguées ainsi,
   // en plus du filtre de matière habituel (cat).
-  function start(cat, type) {
+  function start(cat, type, limit) {
     const { state } = App.Store;
     let cards = state.cards.filter(c => App.SRS.isDue(c));
     let sessionLabel = '';
@@ -168,6 +168,7 @@ App.Session = (() => {
     // Maîtrisées : mélangées librement
     _shuffle(mastered);
     cards = [..._shuffle(examRisk), ...fragileOrdered, ...mastered];
+    if (limit > 0 && cards.length > limit) cards = cards.slice(0, limit);   // objectif du jour : pas plus que N cartes
     current = { queue: [...cards], idx: 0, stats: { ok: 0, hard: 0, nope: 0, again: 0 }, startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: sessionLabel };
     App.UI.showView('session');
     _initAfkListeners();
