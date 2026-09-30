@@ -600,6 +600,12 @@ function _closeSidebar() {
   document.getElementById('sidebar-overlay')?.classList.remove('open');
 }
 
+// ── Mode Tryhard : séries de 10, la suivante seulement si les 10 sont validées ──
+function startTryhard() {
+  _closeSidebar();
+  App.Session.start('', undefined, 0, true);   // '' = toutes les matières
+}
+
 // ── Objectif du jour ───────────────────────────────────────────
 function startDailyGoal() {
   const goal = App.Store.getDailyGoal();

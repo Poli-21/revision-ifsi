@@ -117,7 +117,7 @@ App.Session = (() => {
   // ── Démarrage ──────────────────────────────────────────────────
   // type (optionnel) : 'CM' ou 'TD' → ne garde que les cartes taguées ainsi,
   // en plus du filtre de matière habituel (cat).
-  function start(cat, type, limit) {
+  function start(cat, type, limit, tryhard) {
     const { state } = App.Store;
     let cards = state.cards.filter(c => App.SRS.isDue(c));
     let sessionLabel = '';
@@ -170,6 +170,13 @@ App.Session = (() => {
     cards = [..._shuffle(examRisk), ...fragileOrdered, ...mastered];
     if (limit > 0 && cards.length > limit) cards = cards.slice(0, limit);   // objectif du jour : pas plus que N cartes
     current = { queue: [...cards], idx: 0, stats: { ok: 0, hard: 0, nope: 0, again: 0 }, startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: sessionLabel };
+    if (tryhard) {
+      // Mode Tryhard : séries de 10. Une carte n'est "validée" que si elle est sue (Su / Je savais déjà) ;
+      // les autres reviennent dans la même série. La série suivante ne démarre qu'à 10/10 validées.
+      const SIZE = 10, pool = [...cards];
+      current.queue   = pool.splice(0, SIZE);
+      current.tryhard = { pool, size: SIZE, batchSize: current.queue.length, serie: 1, validated: 0, fails: 0, seriesDone: 0, validatedTotal: 0 };
+    }
     App.UI.showView('session');
     _initAfkListeners();
     _resetAfkTimer();
@@ -197,6 +204,7 @@ App.Session = (() => {
     document.getElementById('qcm-zone').style.display        = 'none';
     document.getElementById('write-answer-btns').style.display = 'none';
     document.getElementById('session-done').style.display    = 'none';
+    const _thb = document.getElementById('tryhard-break'); if (_thb) _thb.style.display = 'none';
     const chronoZone = document.getElementById('chrono-libre-zone');
     if (chronoZone) chronoZone.style.display = 'none';
     // Mode chrono libre : pas de cartes, juste le timer
@@ -212,11 +220,20 @@ App.Session = (() => {
     // Restaure la barre de progression si on revient en mode normal
     const prog = document.querySelector('.session-progress-bar');
     if (prog) prog.style.visibility = 'visible';
-    if (current.idx >= current.queue.length) { showDone(); return; }
+    if (current.idx >= current.queue.length) {
+      if (current.tryhard && current.tryhard.pool.length) { _showTryhardBreak(); return; }
+      showDone(); return;
+    }
     const c     = current.queue[current.idx];
     const total = current.queue.length;
-    document.getElementById('session-progress-fill').style.width = `${current.idx / total * 100}%`;
-    document.getElementById('session-count').textContent = `${current.idx + 1} / ${total}`;
+    if (current.tryhard) {
+      const t = current.tryhard;
+      document.getElementById('session-progress-fill').style.width = `${t.validated / t.batchSize * 100}%`;
+      document.getElementById('session-count').textContent = `🔥 Série ${t.serie} · ${t.validated}/${t.batchSize} validées`;
+    } else {
+      document.getElementById('session-progress-fill').style.width = `${current.idx / total * 100}%`;
+      document.getElementById('session-count').textContent = `${current.idx + 1} / ${total}`;
+    }
     if      (mode === 'flip')  showFlip(c);
     else if (mode === 'write') showWrite(c);
     else                       showQCM(c);
@@ -479,7 +496,41 @@ App.Session = (() => {
       else if (quality === 3) { current.stats.hard++;  current.queue.push({ ...c }); }
       else                    { current.stats.nope++; current.stats.again++; current.queue.push({ ...c }); }
     }
+    if (current.tryhard) {
+      if (quality >= 4) { current.tryhard.validated++; current.tryhard.validatedTotal++; }
+      else current.tryhard.fails++;
+    }
     current.idx++;
+    show();
+  }
+
+  // ── Mode Tryhard : écran entre deux séries ─────────────────────
+  function _showTryhardBreak() {
+    const t = current.tryhard;
+    t.seriesDone++;
+    ['card-container','answer-btns','write-zone','qcm-zone','write-answer-btns'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    const disc = document.getElementById('discovery-btns'); if (disc) disc.style.display = 'none';
+    document.getElementById('session-progress-fill').style.width = '100%';
+    document.getElementById('session-count').textContent = `🔥 Série ${t.serie} validée`;
+    const left = t.pool.length, next = Math.min(t.size, left);
+    document.getElementById('tryhard-break-title').textContent = `Série ${t.serie} validée ! ${t.batchSize}/${t.batchSize} ✅`;
+    document.getElementById('tryhard-break-sub').textContent =
+      (t.fails ? `${t.fails} erreur${t.fails > 1 ? 's' : ''} rattrapée${t.fails > 1 ? 's' : ''} dans cette série. ` : 'Sans aucune erreur, bravo ! ') +
+      `Il reste ${left} carte${left > 1 ? 's' : ''} à réviser.`;
+    document.getElementById('tryhard-next-btn').textContent = `Série ${t.serie + 1} (${next} carte${next > 1 ? 's' : ''}) →`;
+    document.getElementById('tryhard-break').style.display = 'block';
+    App.Render.all();
+  }
+
+  function nextTryhard() {
+    if (!current || !current.tryhard) return;
+    const t = current.tryhard;
+    current.queue = t.pool.splice(0, t.size);
+    current.idx = 0;
+    t.batchSize = current.queue.length;
+    t.serie++; t.validated = 0; t.fails = 0;
     show();
   }
 
@@ -498,6 +549,7 @@ App.Session = (() => {
     const m = Math.floor(elapsed / 60), s = elapsed % 60;
     document.getElementById('done-time').textContent = m > 0 ? `${m}m ${s}s` : `${s}s`;
     document.getElementById('session-progress-fill').style.width = '100%';
+    if (current.tryhard) document.getElementById('session-count').textContent = `🔥 Terminé · ${current.tryhard.validatedTotal} validées`;
     App.Render.all();
   }
 
@@ -573,5 +625,7 @@ App.Session = (() => {
     show();
   }
 
-  return { start, startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, zoomImage, closeZoom, _photoLoaded };
+  return { start, startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, nextTryhard, zoomImage, closeZoom, _photoLoaded,
+  // matière de la série en cours (pour "Recommencer") : '' = toutes les cartes à réviser
+  getCurrentCat: () => { const k = current && current.cat; return (k && App.Store.state.cards.some(c => c.cat === k)) ? k : ''; } };
 })();
