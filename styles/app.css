@@ -1653,3 +1653,12 @@ body.dark .goal-bar-side{background:#334155;}
 #img-zoom-overlay img{max-width:96vw;max-height:92vh;width:auto;height:auto;object-fit:contain;background:#fff;border-radius:6px;image-rendering:auto;}
 #img-zoom-overlay button{position:absolute;top:14px;right:14px;width:44px;height:44px;border-radius:50%;border:none;background:rgba(255,255,255,.2);color:#fff;font-size:1.3rem;font-weight:700;cursor:pointer;}
 .card-face .card-image,.card-face .card-image .card-photo{flex-shrink:0;}
+
+/* Stats sur téléphone : la prévision 14 jours ne doit jamais élargir la page */
+@media (max-width:700px){
+  .ypt-fc-bars{gap:2px;}
+  .ypt-fc-col{min-width:0;}
+  .ypt-fc-lbl{font-size:.52rem;letter-spacing:-.02em;}
+  .ypt-card{padding:18px 14px;}
+  #stats-view{max-width:100%;overflow-x:hidden;}
+}

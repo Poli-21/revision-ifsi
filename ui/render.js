@@ -289,7 +289,53 @@ App.Render = (() => {
       ? (withProg.reduce((s, c) => s + c.progress.easeFactor, 0) / withProg.length).toFixed(2)
       : '—';
     _setText('stats-avg-ef', avgEF);
+    weekExact();
     heatmap();
+  }
+
+  // ── Temps révisé : semaine en cours (lundi → dimanche), à la seconde ──
+  function weekExact() {
+    const el = document.getElementById('week-exact-card');
+    if (!el) return;
+    const log      = App.Store.state.studyLog;
+    const todayKey = App.SRS.todayStr();                     // même clé de jour que l'enregistrement
+    const base     = new Date(todayKey + 'T12:00:00Z');
+    const dowIdx   = (base.getUTCDay() + 6) % 7;             // 0 = lundi
+    const pending  = (App.Session && App.Session.pendingSecs) ? App.Session.pendingSecs() : 0;
+    const NAMES    = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+    const hms = s => {
+      s = Math.max(0, Math.round(s));
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      if (h > 0) return `${h} h ${String(m).padStart(2, '0')} min ${String(sec).padStart(2, '0')} s`;
+      if (m > 0) return `${m} min ${String(sec).padStart(2, '0')} s`;
+      return `${sec} s`;
+    };
+    const dayAt = off => {            // off = décalage en jours par rapport à aujourd'hui
+      const d = new Date(base); d.setUTCDate(d.getUTCDate() + off);
+      const key = d.toISOString().slice(0, 10), e = log[key] || {};
+      return { key, secs: (e.seconds || 0) + (key === todayKey ? pending : 0), cards: e.reviewed || 0 };
+    };
+    const week = NAMES.map((name, i) => ({ name, i, ...dayAt(i - dowIdx), future: i > dowIdx, today: i === dowIdx }));
+    const totSecs  = week.reduce((a, d) => a + d.secs, 0);
+    const totCards = week.reduce((a, d) => a + d.cards, 0);
+    const active   = week.filter(d => d.secs > 0 || d.cards > 0).length;
+    let roll = 0; for (let k = 0; k < 7; k++) roll += dayAt(-k).secs;   // 7 jours glissants
+    const maxS = Math.max(...week.map(d => d.secs), 1);
+
+    const rows = week.map(d => {
+      const pct = d.secs ? Math.max(3, Math.round(d.secs / maxS * 100)) : 0;
+      return `<div style="display:grid;grid-template-columns:78px 1fr auto;gap:10px;align-items:center;margin:7px 0;opacity:${d.future ? 0.35 : 1}">
+        <div style="font-size:.82rem;font-weight:${d.today ? 800 : 500};color:${d.today ? '#a78bfa' : '#9ca3af'}">${d.name}${d.today ? ' •' : ''}</div>
+        <div style="height:10px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden"><div style="height:100%;width:${pct}%;border-radius:99px;background:${d.today ? 'linear-gradient(90deg,#34d399,#059669)' : '#6d28d9'}"></div></div>
+        <div style="font-size:.8rem;color:#e5e7eb;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap">${d.future ? '—' : (d.secs ? hms(d.secs) : '0 s')}${d.cards ? ` <span style="color:#6b7280">· ${d.cards} 🃏</span>` : ''}</div>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `<div class="ypt-card-title">📆 Temps révisé cette semaine (lundi → dimanche)</div>
+      <div style="font-size:2.1rem;font-weight:800;color:#fff;line-height:1.1;font-variant-numeric:tabular-nums">${hms(totSecs)}</div>
+      <div style="font-size:.85rem;color:#9ca3af;margin:6px 0 14px">${totCards} carte${totCards > 1 ? 's' : ''} révisée${totCards > 1 ? 's' : ''} · ${active} jour${active > 1 ? 's' : ''} actif${active > 1 ? 's' : ''} sur 7 · 7 derniers jours glissants : ${hms(roll)}</div>
+      ${rows}
+      <div style="font-size:.7rem;color:#6b7280;margin-top:10px">Le temps d'une série est enregistré à sa fin (la série en cours est incluse ici). Les périodes d'inactivité de plus de 10 min ne sont pas comptées. Le jour change vers 1 h–2 h du matin (heure française).</div>`;
   }
 
   // ── cardItemHTML ───────────────────────────────────────────────

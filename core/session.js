@@ -545,7 +545,7 @@ App.Session = (() => {
     document.getElementById('done-hard').textContent     = current.stats.hard;
     document.getElementById('done-nope').textContent     = current.stats.nope;
     document.getElementById('done-accuracy').textContent = accuracy + '%';
-    App.Store.logSessionDuration(elapsed);
+    if (!current.timeLogged) { App.Store.logSessionDuration(elapsed); current.timeLogged = true; }   // une seule fois (end() ne le recompte pas)
     const m = Math.floor(elapsed / 60), s = elapsed % 60;
     document.getElementById('done-time').textContent = m > 0 ? `${m}m ${s}s` : `${s}s`;
     document.getElementById('session-progress-fill').style.width = '100%';
@@ -556,8 +556,8 @@ App.Session = (() => {
   function end() {
     if (current) {
       const elapsed = _effectiveSecs();
-      // On log le temps même en mode chrono libre
-      if (elapsed > 0) App.Store.logSessionDuration(elapsed);
+      // On log le temps même en mode chrono libre — sauf s'il l'a déjà été à l'écran de fin
+      if (elapsed > 0 && !current.timeLogged) { App.Store.logSessionDuration(elapsed); current.timeLogged = true; }
     }
     // Restaure la barre de progression si elle était cachée
     const prog = document.querySelector('.session-progress-bar');
@@ -598,6 +598,9 @@ App.Session = (() => {
 
   function resumeAfk() { _resetAfkTimer(); }
 
+  // Temps de la séance en cours pas encore enregistré (pour les stats « exactes »)
+  function pendingSecs() { return (current && !current.timeLogged) ? _effectiveSecs() : 0; }
+
 
   function startWithCards(cards, label) {
     if (!cards || !cards.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
@@ -625,7 +628,7 @@ App.Session = (() => {
     show();
   }
 
-  return { start, startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, nextTryhard, zoomImage, closeZoom, _photoLoaded,
+  return { start, startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
   // matière de la série en cours (pour "Recommencer") : '' = toutes les cartes à réviser
   getCurrentCat: () => { const k = current && current.cat; return (k && App.Store.state.cards.some(c => c.cat === k)) ? k : ''; } };
 })();
