@@ -1,5 +1,5 @@
 // Service Worker — cache offline + mises à jour automatiques
-const CACHE = 'ifsi-v10';
+const CACHE = 'ifsi-v11';
 const STATIC = [
   './icons/icon-192.png',
   './icons/icon-512.png',

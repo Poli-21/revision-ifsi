@@ -56,7 +56,25 @@ App.UE = (() => {
   // Valeurs par défaut confirmées par l'utilisateur·ice ; les autres se règlent
   // dans l'appli (onglet Partiels → UE → "ECTS ce semestre") et sont mémorisées
   // localement (elles priment sur ces défauts).
-  const ECTS_SEM_DEFAULTS = { 'B.1': { 1: 4 }, 'B.3': { 1: 4 } };
+  // Sources : tableau ECTS S1/S2 fourni par l'utilisateur·ice (oct. 2026) + fiches pédagogiques
+  // de son IFSI (Drive) pour C.1 (4 ECTS au S1) et C.2 (2 ECTS au S1). « E.4 Anglais
+  // professionnel » du tableau est rattaché à E.2 (langue vivante) dans ce référentiel.
+  const ECTS_SEM_DEFAULTS = {
+    'A.1': { 1: 3, 2: 3 },
+    'A.2': { 1: 2 },
+    'B.1': { 1: 4, 2: 3 },
+    'B.2': { 1: 3, 2: 3 },
+    'B.3': { 1: 4, 2: 4 },
+    'C.1': { 1: 4, 2: 3 },
+    'C.2': { 1: 2 },
+    'D.1': { 1: 2, 2: 2 },
+    'D.2': { 1: 2, 2: 2 },
+    'D.4': { 1: 2 },
+    'E.2': { 1: 1, 2: 1 },
+    'E.3': { 1: 2 },
+  };
+  // Poids appliqué quand l'ECTS d'une UE n'est pas connu pour le semestre (estimation prudente).
+  const UNKNOWN_SEM_WEIGHT = 2;
   const ECTS_SEM_KEY = 'ifsi_ects_sem_v1';
   function _ectsOverrides() { try { return JSON.parse(localStorage.getItem(ECTS_SEM_KEY) || '{}') || {}; } catch (e) { return {}; } }
   // ECTS effectifs d'une UE pour un semestre (nombre 1-6) ; retombe sur le total
@@ -72,6 +90,27 @@ App.UE = (() => {
     }
     return u.ects;
   }
+  // Poids de priorité d'une UE : ECTS du semestre s'il est connu, sinon une estimation (2) ;
+  // sans semestre précis ('toutes'), le total de l'UE.
+  function ectsWeight(u, sem) {
+    if (typeof u === 'string') u = LIST.find(x => x.code === u);
+    if (!u) return 1;
+    if (typeof sem !== 'number') return u.ects;
+    return hasSemEcts(u, sem) ? ectsFor(u, sem) : UNKNOWN_SEM_WEIGHT;
+  }
+  // Semestre en cours = celui choisi dans l'onglet Partiels (S1 par défaut).
+  function currentSemester() {
+    try { const n = Number(localStorage.getItem('ifsi_partiel_semestre')); if (n >= 1 && n <= 6) return n; } catch (e) {}
+    return 1;
+  }
+  // UE d'une carte : son tag, sinon déduite du nom de sa matière ("B1 > …" → B.1, "A2 …" → A.2).
+  function ueOfCard(c) {
+    if (c && c.ue && LIST.some(u => u.code === c.ue)) return c.ue;
+    const m = /^\s*([A-E])\s*\.?\s*([1-4])(?!\d)/i.exec((c && c.cat) || '');
+    if (m) { const code = m[1].toUpperCase() + '.' + m[2]; if (LIST.some(u => u.code === code)) return code; }
+    return null;
+  }
+
   // true si une valeur propre à ce semestre existe (défaut ou réglée par l'utilisateur·ice)
   function hasSemEcts(u, sem) {
     if (typeof u === 'string') u = LIST.find(x => x.code === u);
@@ -190,5 +229,5 @@ App.UE = (() => {
     return changed;
   }
 
-  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, ectsFor, hasSemEcts, setEctsSem, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards, migrateReferenceCategories, removeReferenceCards };
+  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, ectsFor, ectsWeight, currentSemester, ueOfCard, hasSemEcts, setEctsSem, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards, migrateReferenceCategories, removeReferenceCards };
 })();

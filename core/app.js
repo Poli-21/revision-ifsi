@@ -601,9 +601,53 @@ function _closeSidebar() {
 }
 
 // ── Mode Tryhard : séries de 10, la suivante seulement si les 10 sont validées ──
-function startTryhard() {
-  _closeSidebar();
-  App.Session.start('', undefined, 0, true);   // '' = toutes les matières
+// Le bouton ouvre d'abord un choix de matière ; "Toutes" suit la priorité ECTS.
+let _thChoices = [];
+function openTryhardPicker() {
+  _closeSidebar(); closeMoreMenu();
+  const { state } = App.Store, SRS = App.SRS;
+  const due = state.cards.filter(c => SRS.isDue(c));
+  if (!due.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
+  const byCat = {};
+  due.forEach(c => { byCat[c.cat] = (byCat[c.cat] || 0) + 1; });
+  const groups = {};                                   // parent → [{cat, n}]
+  Object.keys(byCat).sort((x, y) => x.localeCompare(y, 'fr', { numeric: true })).forEach(cat => {
+    const i = cat.indexOf(' > ');
+    const top = i === -1 ? cat : cat.slice(0, i);
+    (groups[top] = groups[top] || []).push({ cat, n: byCat[cat] });
+  });
+  _thChoices = [{ cat: '' }];
+  const reg = ch => { _thChoices.push(ch); return _thChoices.length - 1; };
+  const rows = Object.keys(groups).sort((x, y) => x.localeCompare(y, 'fr', { numeric: true })).map(top => {
+    const items = groups[top], total = items.reduce((t, x) => t + x.n, 0);
+    const subOnly = items.length === 1 && items[0].cat === top;
+    if (subOnly) return `<button class="th-row" onclick="startTryhard(${reg({ cat: top })})"><span>${_escHtml(top)}</span><b>${total}</b></button>`;
+    const allIdx = reg({ cat: items.map(x => x.cat) });
+    const subs = items.map(x => {
+      const label = x.cat === top ? `${top} (général)` : x.cat.slice(top.length + 3);
+      return `<button class="th-row th-sub" onclick="startTryhard(${reg({ cat: x.cat })})"><span>${_escHtml(label)}</span><b>${x.n}</b></button>`;
+    }).join('');
+    return `<details class="th-group"><summary><span>${_escHtml(top)}</span><b>${total}</b></summary>
+      <button class="th-row th-all" onclick="startTryhard(${allIdx})"><span>Tout ${_escHtml(top)}</span><b>${total}</b></button>${subs}</details>`;
+  }).join('');
+  closeTryhardPicker();
+  const ov = document.createElement('div');
+  ov.id = 'th-picker';
+  ov.onclick = e => { if (e.target === ov) closeTryhardPicker(); };
+  ov.innerHTML = `<div class="th-panel" role="dialog" aria-label="Mode Tryhard">
+    <div class="th-head"><div><div class="th-title">🔥 Mode Tryhard</div><div class="th-sub">Séries de 10 : la suivante ne démarre que quand les 10 sont validées. Choisis la matière :</div></div>
+      <button class="th-x" onclick="closeTryhardPicker()" aria-label="Fermer">✕</button></div>
+    <button class="th-row th-main" onclick="startTryhard(0)"><span>🎯 Toutes les matières <small>(priorité aux UE à gros ECTS)</small></span><b>${due.length}</b></button>
+    <div class="th-list">${rows}</div></div>`;
+  document.body.appendChild(ov);
+}
+function closeTryhardPicker() { document.getElementById('th-picker')?.remove(); }
+function _escHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTryhardPicker(); });
+function startTryhard(idx) {
+  const ch = _thChoices[idx || 0] || { cat: '' };
+  closeTryhardPicker();
+  App.Session.start(ch.cat, undefined, 0, true);       // '' = toutes les matières
 }
 
 // ── Objectif du jour ───────────────────────────────────────────

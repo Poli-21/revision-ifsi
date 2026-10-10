@@ -114,6 +114,30 @@ App.Session = (() => {
     show();
   }
 
+  // Réordonne `list` : blocs de 10 cartes d'une même UE, intercalés proportionnellement aux ECTS
+  // du semestre en cours (ordonnancement par "temps virtuel de fin" : plus le poids est grand,
+  // plus les blocs de cette UE reviennent tôt et souvent). Cartes sans UE : poids 1.
+  function _ectsBlocks(list, size = 10) {
+    if (!list || list.length < 2) return list || [];
+    const sem = App.UE.currentSemester();
+    const groups = new Map();
+    list.forEach((c, i) => {
+      const code = App.UE.ueOfCard(c) || '_none';
+      if (!groups.has(code)) groups.set(code, { w: code === '_none' ? 1 : Math.max(0.5, App.UE.ectsWeight(code, sem)), cards: [] });
+      groups.get(code).cards.push({ c, i });
+    });
+    if (groups.size < 2) return list;
+    const blocks = [];
+    groups.forEach(g => {
+      for (let k = 0; k < g.cards.length; k += size) {
+        const part = g.cards.slice(k, k + size);
+        blocks.push({ part, fin: (k + part.length) / g.w, w: g.w, first: part[0].i });
+      }
+    });
+    blocks.sort((a, b) => a.fin - b.fin || b.w - a.w || a.first - b.first);
+    return blocks.flatMap(b => b.part.map(x => x.c));
+  }
+
   // ── Démarrage ──────────────────────────────────────────────────
   // type (optionnel) : 'CM' ou 'TD' → ne garde que les cartes taguées ainsi,
   // en plus du filtre de matière habituel (cat).
@@ -167,7 +191,10 @@ App.Session = (() => {
     const fragileOrdered = _shuffle(Object.values(catGroups).map(_shuffle)).flat();
     // Maîtrisées : mélangées librement
     _shuffle(mastered);
-    cards = [..._shuffle(examRisk), ...fragileOrdered, ...mastered];
+    // Priorité ECTS : les UE à gros ECTS passent plus souvent et en premier (par blocs de 10 cartes
+    // d'une même UE, pour ne pas changer de sujet à chaque carte). L'ordre interne à chaque UE
+    // (fragiles groupées par chapitre) est conservé ; fragiles d'abord, puis maîtrisées.
+    cards = [..._ectsBlocks(_shuffle(examRisk)), ..._ectsBlocks(fragileOrdered), ..._ectsBlocks(mastered)];
     if (limit > 0 && cards.length > limit) cards = cards.slice(0, limit);   // objectif du jour : pas plus que N cartes
     current = { queue: [...cards], idx: 0, stats: { ok: 0, hard: 0, nope: 0, again: 0 }, startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: sessionLabel };
     if (tryhard) {

@@ -56,7 +56,7 @@
   <button role="menuitem" onclick="moreDo('importJSON')">📂 Importer un fichier</button>
   <div class="more-menu-title">Autre</div>
   <button role="menuitem" onclick="moreDo('editDailyGoal')">🎯 Changer l'objectif du jour</button>
-  <button role="menuitem" onclick="moreDo('startTryhard')">🔥 Mode Tryhard (séries de 10)</button>
+  <button role="menuitem" onclick="moreDo('openTryhardPicker')">🔥 Mode Tryhard (séries de 10)</button>
   <button role="menuitem" onclick="moreDo('startChrono')">⏱ Chrono libre</button>
   <button role="menuitem" onclick="moreDo('toggleDarkMode')">🌙 Mode nuit / jour</button>
   <button role="menuitem" onclick="moreDo('showQRCode')">📱 QR code d'accès</button>
@@ -83,7 +83,7 @@
         <span class="value" id="stat-session-timer" style="color:var(--primary);font-weight:700;font-variant-numeric:tabular-nums">0:00</span>
       </div>
       <button id="chrono-libre-btn" onclick="startChrono()" style="margin-top:.5rem;width:100%;padding:7px 0;border-radius:8px;border:1.5px dashed var(--primary);background:transparent;color:var(--primary);font-size:.8rem;font-weight:600;cursor:pointer;opacity:.75;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.75'">⏱ Démarrer le chrono</button>
-      <button id="tryhard-btn" onclick="startTryhard()" title="Séries de 10 cartes : la suivante ne démarre que quand les 10 sont validées" style="margin-top:.5rem;width:100%;padding:9px 0;border-radius:8px;border:none;background:linear-gradient(135deg,#ef4444,#f97316);color:#fff;font-size:.82rem;font-weight:700;cursor:pointer">🔥 Mode Tryhard · séries de 10</button>
+      <button id="tryhard-btn" onclick="openTryhardPicker()" title="Séries de 10 cartes : la suivante ne démarre que quand les 10 sont validées" style="margin-top:.5rem;width:100%;padding:9px 0;border-radius:8px;border:none;background:linear-gradient(135deg,#ef4444,#f97316);color:#fff;font-size:.82rem;font-weight:700;cursor:pointer">🔥 Mode Tryhard · séries de 10</button>
     </div>
     <div class="sidebar-section">
       <h3>Matières</h3>

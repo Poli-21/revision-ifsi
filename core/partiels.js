@@ -37,14 +37,15 @@ App.Partiels = (() => {
   function _el(id) { return document.getElementById(id); }
   // ECTS affichés : ceux du semestre sélectionné (S1..S6) si connus, sinon le total de l'UE.
   function _ectsLabel(u) {
+    if (typeof _sem === 'number' && !App.UE.hasSemEcts(u, _sem)) return `≈${App.UE.ectsWeight(u, _sem)} ECTS · à régler`;
     const e = App.UE.ectsFor(u, _sem);
     return App.UE.hasSemEcts(u, _sem) ? `${e} ECTS · S${_sem}` : `${e} ECTS`;
   }
   // Bloc ECTS de la fiche UE, avec champ pour régler la valeur du semestre affiché.
   function _ectsDetailHTML(u) {
     if (typeof _sem !== 'number') return `<strong>${u.ects} ECTS</strong> au total sur le cursus (coefficient dans la moyenne du semestre)`;
-    const e = App.UE.ectsFor(u, _sem);
-    return `<strong>${e} ECTS</strong> au S${_sem} (coefficient dans la moyenne du semestre)${App.UE.hasSemEcts(u, _sem) ? '' : ` — <em>total UE, à ajuster :</em>`}
+    const e = App.UE.ectsWeight(u, _sem);
+    return `<strong>${App.UE.hasSemEcts(u, _sem) ? '' : '≈'}${e} ECTS</strong> au S${_sem} (coefficient dans la moyenne du semestre)${App.UE.hasSemEcts(u, _sem) ? '' : ` — <em>estimation, à ajuster :</em>`}
       <label style="margin-left:6px;font-size:.78rem">ECTS ce semestre
         <input type="number" min="0" max="30" step="0.5" value="${e}" style="width:64px;padding:3px 6px;border:1px solid var(--gray-300);border-radius:6px;font-family:inherit"
           onchange="App.Partiels.setEcts('${u.code}', this.value)"></label>`;
@@ -92,7 +93,7 @@ App.Partiels = (() => {
       const hist = _historyForUE(u.code);
       const lastScore = hist.length ? hist[0].score : null;
       const factor = _priorityFactor(lastScore);
-      return { ue: u, lastScore, attempts: hist.length, score: App.UE.ectsFor(u, _sem) * factor };
+      return { ue: u, lastScore, attempts: hist.length, score: App.UE.ectsWeight(u, _sem) * factor };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
@@ -149,7 +150,7 @@ App.Partiels = (() => {
     }).join('');
 
     const domainBlocks = domains.map(d => {
-      const ueSorted = [...d.ues].sort((a, b) => App.UE.ectsFor(b, _sem) - App.UE.ectsFor(a, _sem));
+      const ueSorted = [...d.ues].sort((a, b) => App.UE.ectsWeight(b, _sem) - App.UE.ectsWeight(a, _sem));
       const ueCards = ueSorted.map(u => {
         const n = _cardsForUE(u.code).length;
         const hist = _historyForUE(u.code);
