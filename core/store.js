@@ -151,6 +151,26 @@ App.Store = (() => {
     saveLog();
   }
 
+  // ── Anglais : compte dans les révisions du jour ────────────────
+  // counted : true quand on compte UN mot (1 par mot et par leçon, pas par question)
+  // → entre dans « révisées aujourd'hui », l'objectif de 100 et la série de jours.
+  // seconds : temps de travail réel (déjà plafonné côté appelant) → temps du jour / de la semaine.
+  function logEnglish({ counted = false, correct = false, seconds = 0 } = {}) {
+    const today = App.SRS.todayStr();
+    if (!state.studyLog[today]) state.studyLog[today] = { reviewed: 0, ok: 0, hard: 0, nope: 0 };
+    const e = state.studyLog[today];
+    if (counted) {
+      e.reviewed = (e.reviewed || 0) + 1;
+      if (correct) e.ok = (e.ok || 0) + 1; else e.nope = (e.nope || 0) + 1;
+      e.english = (e.english || 0) + 1;
+    }
+    if (seconds > 0) {
+      e.seconds = (e.seconds || 0) + seconds;
+      e.englishSecs = (e.englishSecs || 0) + seconds;
+    }
+    saveLog();
+  }
+
   // ── Objectif quotidien (nombre de cartes à réviser par jour) ──
   const KEY_GOAL = 'ifsi_daily_goal_v1';
   function getDailyGoal() {
@@ -197,5 +217,5 @@ App.Store = (() => {
     });
   }
 
-  return { state, load, save, saveLog, saveOrder, normCat, logReview, logSessionDuration, getStreak, getDailyGoal, setDailyGoal, reviewedToday, getBackup, setBackup, deleteBackup, listBackupKeys };
+  return { state, load, save, saveLog, saveOrder, normCat, logReview, logSessionDuration, logEnglish, getStreak, getDailyGoal, setDailyGoal, reviewedToday, getBackup, setBackup, deleteBackup, listBackupKeys };
 })();

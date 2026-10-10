@@ -494,6 +494,7 @@ App.English = (() => {
   }
 
   function _startGame() {
+    if (_game) { _game.lastEvt = Date.now(); _game.counted = 0; _game.countedOk = 0; }
     _el('english-home').style.display   = 'none';
     _el('english-game').style.display   = 'block';
     _el('english-result').style.display = 'none';
@@ -635,7 +636,23 @@ App.English = (() => {
     }
   }
 
+  // Enregistre la réponse dans le suivi des révisions (objectif du jour, temps, série).
+  // 1 mot compté par mot de la leçon (via la question « EN → FR », présente pour chaque mot) ;
+  // le temps de toutes les questions est compté, plafonné à 60 s par réponse (pause = pas de temps).
+  function _logAnswer(correct) {
+    try {
+      const q = _game.queue[_game.idx];
+      const now = Date.now();
+      const secs = Math.min(60, Math.max(0, Math.round((now - (_game.lastEvt || now)) / 1000)));
+      _game.lastEvt = now;
+      const counted = !!q && q.type === 'mc_en_fr';
+      if (counted) { _game.counted = (_game.counted || 0) + 1; if (correct) _game.countedOk = (_game.countedOk || 0) + 1; }
+      App.Store.logEnglish({ counted, correct, seconds: secs });
+    } catch (e) { console.warn('logEnglish', e); }
+  }
+
   function _onCorrect(isTypo) {
+    _logAnswer(true);
     const pts = isTypo ? 7 : 10;
     _game.xp += pts;
     _soundCorrect();
@@ -645,6 +662,7 @@ App.English = (() => {
   }
 
   function _onWrong(correctAns) {
+    _logAnswer(false);
     _game.hearts = Math.max(0, _game.hearts - 1);
     _updateHearts(_game.hearts);
     const word = _game.queue[_game.idx].word;
@@ -731,6 +749,14 @@ App.English = (() => {
       if (stars === 3) setTimeout(_confetti, 200);
     }
     _game.failed = failed;
+    const cEl = _el('eng-result-count');
+    if (cEl) {
+      const n = _game.counted || 0;
+      const goal = App.Store.getDailyGoal(), done = App.Store.reviewedToday();
+      cEl.innerHTML = n > 0
+        ? `✅ <strong>${n} mot${n > 1 ? 's' : ''}</strong> compté${n > 1 ? 's' : ''} dans tes révisions du jour · <strong>${done} / ${goal}</strong>`
+        : '';
+    }
   }
 
   // ══════════════════════════════════════════════════════════════

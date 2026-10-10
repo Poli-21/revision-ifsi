@@ -222,6 +222,8 @@ App.Sync = (() => {
           hard:     Math.max(mergedLog[date].hard||0,     entry.hard||0),
           nope:     Math.max(mergedLog[date].nope||0,     entry.nope||0),
           seconds:  Math.max(mergedLog[date].seconds||0,  entry.seconds||0),
+          english:  Math.max(mergedLog[date].english||0,  entry.english||0),
+          englishSecs: Math.max(mergedLog[date].englishSecs||0, entry.englishSecs||0),
         };
       });
 

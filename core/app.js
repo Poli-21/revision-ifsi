@@ -41,6 +41,7 @@ App.UI = (() => {
       if (btn) btn.classList.toggle('active', t === tab);
     });
     try { document.getElementById('tab-' + tab)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+    if (tab === 'home')   App.Render.all();     // objectif du jour à jour (ex. mots d'anglais travaillés)
     if (tab === 'browse') App.Render.browse();
     if (tab === 'stats')  App.Render.stats();
     if (tab === 'ortho')  App.Ortho.populateCatSelect();
