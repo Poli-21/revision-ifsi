@@ -1694,3 +1694,8 @@ body.dark .th-row{background:#1e293b;color:#e2e8f0;border-color:#334155;}
 body.dark .th-group{border-color:#334155;}
 body.dark .th-row b,body.dark .th-group summary b{background:#334155;color:#cbd5e1;}
 body.dark .th-x{background:#334155;color:#e2e8f0;}
+
+/* ── Anglais : sous-thèmes du vocabulaire complet S1 ── */
+.eng-sub-header{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;margin:1rem 0 .5rem;padding:0 .2rem;font-weight:700;font-size:.95rem;color:var(--text-primary)}
+.eng-sub-header span{font-weight:500;font-size:.78rem;color:var(--text-secondary);white-space:nowrap}
+.eng-lesson-name{overflow-wrap:anywhere}

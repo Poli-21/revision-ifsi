@@ -220,6 +220,32 @@ App.English = (() => {
   // ══════════════════════════════════════════════════════════════
   //  CONSTANTES & ÉTAT
   // ══════════════════════════════════════════════════════════════
+  // ── Vocabulaire complet S1 (1515 mots, data/english_s1.js) ───────────
+  // Une leçon = 10 mots d'un même sous-thème (un reste de moins de 5 mots est ajouté
+  // à la leçon précédente). Ces leçons ne sont jamais verrouillées : on choisit librement.
+  (function addFullVocabulary() {
+    const data = (window.App && App.EnglishS1) || [];
+    if (!data.length) return;
+    const EMOJI = { 1: '🫀', 2: '🤒', 4: '🩺', 6: '💊' };
+    const seen = new Set();
+    data.forEach(g => {
+      const cid = 'v' + g.ch;
+      if (!seen.has(cid)) {
+        seen.add(cid);
+        CHAPTERS.push({ id: cid, title: `Chapitre ${g.ch} — ${g.title} · tout le vocabulaire`, badge: '📗 Liste officielle S1', full: true });
+      }
+      const words = g.words.map(([en, fr]) => ({ en, fr, ph: '', sub: g.sub }));
+      const chunks = [];
+      for (let i = 0; i < words.length; i += 10) chunks.push(words.slice(i, i + 10));
+      if (chunks.length > 1 && chunks[chunks.length - 1].length < 5) chunks[chunks.length - 2].push(...chunks.pop());
+      chunks.forEach((w, k) => LESSONS.push({
+        id: `s1_${g.ch}_${LESSONS.length}`, chapter: cid, sub: g.sub, free: true,
+        name: chunks.length > 1 ? `${g.sub} ${k + 1}/${chunks.length}` : g.sub,
+        emoji: EMOJI[g.ch] || '📘', words: w
+      }));
+    });
+  })();
+
   const STORAGE_KEY = 'ifsi_english_progress';
   const STREAK_KEY  = 'ifsi_english_streak';
   const DAILY_KEY   = 'ifsi_english_daily';
@@ -289,8 +315,13 @@ App.English = (() => {
     if (!q) return;
     _speak(q.type === 'mc_fr_en' || q.type === 'type_en' ? q.word.en : q.word.en);
   }
+  // « Foot / feet » → ['Foot','feet'] ; « Sole (of the foot) » → ['Sole'] (parenthèses ignorées)
+  function _alts(en) {
+    return String(en).split('/').map(a => a.replace(/\([^)]*\)/g, '').trim()).filter(Boolean);
+  }
   function _speak(text, lang = 'en-GB') {
     try {
+      if (lang === 'en-GB') text = _alts(text)[0] || text;
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = lang; u.rate = 0.82; u.pitch = 1;
@@ -313,9 +344,10 @@ App.English = (() => {
     return dp[m][n];
   }
   function _checkType(input, wordEn) {
-    const a = _normalize(input), b = _normalize(wordEn);
-    if (a === b) return 'correct';
-    if (b.length > 5 && _lev(a, b) === 1) return 'typo';
+    const a = _normalize(input);
+    const cands = [_normalize(wordEn), ..._alts(wordEn).map(_normalize)];
+    if (cands.includes(a)) return 'correct';
+    if (cands.some(b => b.length > 5 && _lev(a, b) === 1)) return 'typo';
     return 'wrong';
   }
 
@@ -359,9 +391,13 @@ App.English = (() => {
     const goalEl  = _el('eng-daily-goal-wrap'); if (goalEl) goalEl.style.display = 'block';
 
     // Mots maîtrisés
-    const completed = LESSONS.filter(l => (_progress[l.id]?.stars||0) > 0).length;
+    const doneLessons = LESSONS.filter(l => (_progress[l.id]?.stars||0) > 0);
+    const seenWords   = doneLessons.reduce((n, l) => n + l.words.length, 0);
+    const totalWords  = LESSONS.reduce((n, l) => n + l.words.length, 0);
     const mastEl = _el('eng-mastered-count');
-    if (mastEl) mastEl.textContent = completed > 0 ? `${completed * 8} / ${LESSONS.length * 8} mots vus` : '';
+    if (mastEl) mastEl.textContent = doneLessons.length > 0 ? `${seenWords} / ${totalWords} mots vus` : '';
+    const subEl = _el('eng-count-sub');
+    if (subEl) subEl.textContent = `${totalWords} mots — calé sur le programme officiel UE E2 (S1)`;
 
     // Bouton révision (mots avec erreurs)
     const weakWords = _getWeakWords();
@@ -381,11 +417,17 @@ App.English = (() => {
       html += `<div class="eng-chapter-header">
         <span class="eng-chapter-title">${_esc(chap.title)}</span>
         <span class="eng-chapter-badge">${_esc(chap.badge)}</span>
-      </div><div class="eng-lessons-grid">`;
+      </div>${chap.full ? '' : '<div class="eng-lessons-grid">'}`;
+      let lastSub = null;
       chapLessons.forEach(lesson => {
         const i      = LESSONS.indexOf(lesson);
         const prog   = _progress[lesson.id] || { stars:0, xp:0 };
-        const prevOk = i === 0 || (_progress[LESSONS[i-1].id]?.stars||0) > 0;
+        const prevOk = lesson.free || i === 0 || (_progress[LESSONS[i-1].id]?.stars||0) > 0;
+        if (lesson.sub && lesson.sub !== lastSub) {
+          const n = chapLessons.filter(l => l.sub === lesson.sub).reduce((t, l) => t + l.words.length, 0);
+          html += `${lastSub !== null ? '</div>' : ''}<div class="eng-sub-header">${_esc(lesson.sub)} <span>${n} mots</span></div><div class="eng-lessons-grid">`;
+          lastSub = lesson.sub;
+        }
         const locked = !prevOk;
         const stars  = prog.stars || 0;
         const starsHTML = '⭐'.repeat(stars) + `<span style="opacity:.2">⭐</span>`.repeat(3-stars);
@@ -463,7 +505,7 @@ App.English = (() => {
   // ══════════════════════════════════════════════════════════════
   function _buildQueue(words, isReview) {
     const q = [];
-    const canType = w => !w.en.includes(' ') && w.en.length <= 14;
+    const canType = w => { const p = _alts(w.en)[0] || ''; return p && !p.includes(' ') && p.length <= 14; };
     words.forEach(w => q.push({ type:'mc_en_fr', word:w }));
     [...words].sort(() => Math.random()-.5).slice(0, Math.ceil(words.length/2))
       .forEach(w => q.push({ type:'mc_fr_en', word:w }));
@@ -478,8 +520,12 @@ App.English = (() => {
   }
 
   function _getDistractors(word, count) {
-    const all = _allWords().filter(w => w.en !== word.en).sort(() => Math.random()-.5);
-    return all.slice(0, count);
+    const all = _allWords().filter(w => w.en !== word.en && w.fr !== word.fr && w.en.toLowerCase() !== word.en.toLowerCase());
+    const shuffled = all.sort(() => Math.random()-.5);
+    if (!word.sub) return shuffled.slice(0, count);
+    // mots du même sous-thème en priorité (réponses plausibles), complétés au hasard
+    const same = shuffled.filter(w => w.sub === word.sub), other = shuffled.filter(w => w.sub !== word.sub);
+    return [...same, ...other].slice(0, count);
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -631,7 +677,8 @@ App.English = (() => {
     if (correct) {
       txt.innerHTML = '<strong>' + msgs[Math.floor(Math.random()*msgs.length)] + '</strong>';
     } else {
-      setTimeout(() => _speak(correctAnswer), 200);
+      const _qq = _game && _game.queue[_game.idx];
+      setTimeout(() => _speak(_qq ? _qq.word.en : correctAnswer), 200);
       txt.innerHTML = '❌ <strong>Bonne réponse :</strong> ' + _esc(correctAnswer);
     }
   }
