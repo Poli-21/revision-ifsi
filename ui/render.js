@@ -34,17 +34,12 @@ App.Render = (() => {
     return [...saved, ...newCats];
   }
 
-  function all() {
+  // Temps du jour, série, objectif du jour et répartition ECTS. Appelé par all() et en direct
+  // depuis l'onglet Anglais (pour que « Temps » et l'objectif montent à chaque réponse).
+  function todayStats(dueList) {
     const { state } = App.Store;
     const { SRS } = App;
-    const due  = state.cards.filter(c => SRS.isDue(c));
-    const cats = orderedCats();
-
-    // Stats sidebar
-    _setText('stat-due',   due.length);
-    _setText('stat-new',   state.cards.filter(c => !c.progress && !c.suspended).length);
-    _setText('stat-total', state.cards.length);
-
+    const due = dueList || state.cards.filter(c => SRS.isDue(c));
     // Streak
     const streak = App.Store.getStreak();
     const streakEl = document.getElementById('stat-streak');
@@ -77,7 +72,7 @@ App.Render = (() => {
     });
     const goalLabel = document.getElementById('goal-label');
     const engToday = state.studyLog[App.SRS.todayStr()]?.english || 0;
-    const engNote  = engToday > 0 ? ` (dont ${engToday} mot${engToday > 1 ? 's' : ''} d'anglais 🇬🇧)` : '';
+    const engNote  = engToday > 0 ? ` (dont ${engToday} mot${engToday > 1 ? 's' : ''} d'anglais)` : '';
     if (goalLabel) goalLabel.textContent = remaining === 0
       ? `🎉 Objectif atteint !${doneToday > goal ? ' (+' + (doneToday - goal) + ' bonus)' : ''}${engNote}`
       : `cartes révisées aujourd'hui${engNote} · encore ${remaining} pour l'objectif`;
@@ -88,6 +83,22 @@ App.Render = (() => {
         : remaining === 0 ? `Bonus : ${n} cartes de plus →`
         : doneToday === 0 ? `Commencer mes ${n} cartes →`
         : `Continuer (${n} cartes) →`;
+    }
+    _setText('due-count', doneToday);
+    // Répartition des cartes du jour entre les UE (proportionnelle aux ECTS du semestre)
+    const planEl = document.getElementById('goal-ects-plan');
+    if (planEl) {
+      const nPlan = Math.min(remaining > 0 ? remaining : 50, due.length);
+      const plan  = (nPlan > 0 && App.Session && App.Session.ectsPlan) ? App.Session.ectsPlan(due, nPlan) : [];
+      if (plan.length < 2) { planEl.style.display = 'none'; planEl.innerHTML = ''; }
+      else {
+        const sem = App.UE.currentSemester();
+        const chip = p => p.code === '_none'
+          ? `<span class="gp" title="Cartes sans UE reconnue">autres <b>${p.n}</b></span>`
+          : `<span class="gp" title="${_esc(p.code)} · ${p.w} ECTS (S${sem})">${_esc(p.code)} <b>${p.n}</b></span>`;
+        planEl.innerHTML = `<span class="gp-title">🎓 Tes ${nPlan} cartes, réparties selon les ECTS (S${sem})</span>` + plan.map(chip).join('');
+        planEl.style.display = 'flex';
+      }
     }
     // Temps estimé pour finir l'objectif (et non pour tout le retard)
     const dueEstEl = document.getElementById('due-est-inline');
@@ -100,12 +111,26 @@ App.Render = (() => {
         dueEstEl.style.display = 'inline';
       }
     }
+  }
+
+  function all() {
+    const { state } = App.Store;
+    const { SRS } = App;
+    const due  = state.cards.filter(c => SRS.isDue(c));
+    const cats = orderedCats();
+
+    // Stats sidebar
+    _setText('stat-due',   due.length);
+    _setText('stat-new',   state.cards.filter(c => !c.progress && !c.suspended).length);
+    _setText('stat-total', state.cards.length);
+
+    todayStats(due);
 
     // ── Examens ────────────────────────────────────────────────
     _renderExamDate(state);
 
     // Bandeau du jour
-    _setText('due-count', doneToday);
+    _setText('due-count', App.Store.reviewedToday());
     const chips = document.getElementById('cat-due-chips');
     if (chips) {
       const selCats  = App.UI.selectedCats;
@@ -337,7 +362,7 @@ App.Render = (() => {
     el.innerHTML = `<div class="ypt-card-title">📆 Temps révisé cette semaine (lundi → dimanche)</div>
       <div style="font-size:2.1rem;font-weight:800;color:#fff;line-height:1.1;font-variant-numeric:tabular-nums">${hms(totSecs)}</div>
       <div style="font-size:.85rem;color:#9ca3af;margin:6px 0 14px">${totCards} carte${totCards > 1 ? 's' : ''} révisée${totCards > 1 ? 's' : ''} · ${active} jour${active > 1 ? 's' : ''} actif${active > 1 ? 's' : ''} sur 7 · 7 derniers jours glissants : ${hms(roll)}</div>
-      ${totEng || totEngSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">🇬🇧 dont anglais : ${totEng} mot${totEng > 1 ? 's' : ''} · ${hms(totEngSecs)}</div>` : ''}
+      ${totEng || totEngSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">dont anglais : ${totEng} mot${totEng > 1 ? 's' : ''} · ${hms(totEngSecs)}</div>` : ''}
       ${rows}
       <div style="font-size:.7rem;color:#6b7280;margin-top:10px">Le temps d'une série est enregistré à sa fin (la série en cours est incluse ici). Les périodes d'inactivité de plus de 10 min ne sont pas comptées. Le jour change vers 1 h–2 h du matin (heure française).</div>`;
   }
@@ -924,5 +949,5 @@ App.Render = (() => {
 
   function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  return { all, browse, browseDebounced, stats, heatmap, cardItemHTML, orderedCats };
+  return { all, todayStats, browse, browseDebounced, stats, heatmap, cardItemHTML, orderedCats };
 })();

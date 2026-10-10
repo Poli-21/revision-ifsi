@@ -141,6 +141,49 @@ App.Session = (() => {
   // ── Démarrage ──────────────────────────────────────────────────
   // type (optionnel) : 'CM' ou 'TD' → ne garde que les cartes taguées ainsi,
   // en plus du filtre de matière habituel (cat).
+  // Répartition des N cartes du jour entre les UE, proportionnelle aux ECTS du semestre en cours :
+  // une UE à 4 ECTS reçoit 2× plus de cartes qu'une UE à 2 ECTS. Une UE qui a moins de cartes à
+  // réviser que son quota donne le reste aux autres (jamais de carte « perdue »).
+  // Renvoie [{ code, n, w, avail }] (code '_none' = cartes sans UE reconnue), trié par ECTS décroissant.
+  function ectsPlan(cards, limit) {
+    const sem = App.UE.currentSemester();
+    const groups = new Map();
+    (cards || []).forEach(c => {
+      const code = App.UE.ueOfCard(c) || '_none';
+      if (!groups.has(code)) groups.set(code, { code, w: code === '_none' ? 1 : Math.max(0.5, App.UE.ectsWeight(code, sem)), avail: 0, n: 0 });
+      groups.get(code).avail++;
+    });
+    let rem = Math.min(limit, (cards || []).length);
+    let active = [...groups.values()];
+    while (rem > 0 && active.length) {
+      const sumW = active.reduce((t, g) => t + g.w, 0);
+      const full = active.filter(g => g.avail - g.n <= rem * g.w / sumW);
+      if (full.length) {                                       // UE « petite » : on prend tout, le reste va aux autres
+        full.forEach(g => { rem -= g.avail - g.n; g.n = g.avail; });
+        active = active.filter(g => !full.includes(g));
+        continue;
+      }
+      let given = 0;
+      active.forEach(g => { const sh = rem * g.w / sumW; g._f = Math.floor(sh); g._r = sh - g._f; g.n += g._f; given += g._f; });
+      active.sort((a, b) => b._r - a._r || b.w - a.w).slice(0, rem - given).forEach(g => { g.n++; });
+      rem = 0;
+    }
+    return [...groups.values()].filter(g => g.n > 0).sort((a, b) => b.n - a.n || b.w - a.w)
+      .map(g => ({ code: g.code, n: g.n, w: g.w, avail: g.avail }));
+  }
+  // Applique le plan : garde, dans l'ordre de priorité de la liste, les n premières cartes de chaque UE
+  function _pickByEcts(list, limit) {
+    const quota = new Map(ectsPlan(list, limit).map(p => [p.code, p.n]));
+    const used = new Map();
+    return list.filter(c => {
+      const code = App.UE.ueOfCard(c) || '_none';
+      const k = used.get(code) || 0;
+      if (k >= (quota.get(code) || 0)) return false;
+      used.set(code, k + 1);
+      return true;
+    });
+  }
+
   function start(cat, type, limit, tryhard) {
     const { state } = App.Store;
     let cards = state.cards.filter(c => App.SRS.isDue(c));
@@ -194,8 +237,14 @@ App.Session = (() => {
     // Priorité ECTS : les UE à gros ECTS passent plus souvent et en premier (par blocs de 10 cartes
     // d'une même UE, pour ne pas changer de sujet à chaque carte). L'ordre interne à chaque UE
     // (fragiles groupées par chapitre) est conservé ; fragiles d'abord, puis maîtrisées.
-    cards = [..._ectsBlocks(_shuffle(examRisk)), ..._ectsBlocks(fragileOrdered), ..._ectsBlocks(mastered)];
-    if (limit > 0 && cards.length > limit) cards = cards.slice(0, limit);   // objectif du jour : pas plus que N cartes
+    if (limit > 0 && cards.length > limit) {
+      // Objectif du jour : on choisit d'abord QUELLES cartes (quota par UE ∝ ECTS), puis on les
+      // enchaîne par blocs de 10 d'une même UE, les plus gros ECTS en premier.
+      const ordered = [..._shuffle(examRisk), ...fragileOrdered, ...mastered];
+      cards = _ectsBlocks(_pickByEcts(ordered, limit));
+    } else {
+      cards = [..._ectsBlocks(_shuffle(examRisk)), ..._ectsBlocks(fragileOrdered), ..._ectsBlocks(mastered)];
+    }
     current = { queue: [...cards], idx: 0, stats: { ok: 0, hard: 0, nope: 0, again: 0 }, startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: sessionLabel };
     if (tryhard) {
       // Mode Tryhard : séries de 10. Une carte n'est "validée" que si elle est sue (Su / Je savais déjà) ;
@@ -655,7 +704,7 @@ App.Session = (() => {
     show();
   }
 
-  return { start, startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
+  return { start, ectsPlan, _queue: () => (current ? [...current.queue] : []), startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
   // matière de la série en cours (pour "Recommencer") : '' = toutes les cartes à réviser
   getCurrentCat: () => { const k = current && current.cat; return (k && App.Store.state.cards.some(c => c.cat === k)) ? k : ''; } };
 })();

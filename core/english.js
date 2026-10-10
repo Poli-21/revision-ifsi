@@ -361,7 +361,7 @@ App.English = (() => {
   // ══════════════════════════════════════════════════════════════
   //  INIT / ACCUEIL
   // ══════════════════════════════════════════════════════════════
-  function init() { _load(); showHome(); }
+  function init() { _load(); showHome(); _startTimer(); }
 
   function showHome() {
     _game = null;
@@ -636,19 +636,59 @@ App.English = (() => {
     }
   }
 
-  // Enregistre la réponse dans le suivi des révisions (objectif du jour, temps, série).
-  // 1 mot compté par mot de la leçon (via la question « EN → FR », présente pour chaque mot) ;
-  // le temps de toutes les questions est compté, plafonné à 60 s par réponse (pause = pas de temps).
+  // Enregistre la réponse dans le suivi des révisions (objectif du jour, série).
+  // 1 mot compté par mot de la leçon (via la question « EN → FR », présente pour chaque mot).
+  // Le TEMPS, lui, est compté par le chrono de l'onglet (voir plus bas), pas par réponse.
   function _logAnswer(correct) {
     try {
       const q = _game.queue[_game.idx];
-      const now = Date.now();
-      const secs = Math.min(60, Math.max(0, Math.round((now - (_game.lastEvt || now)) / 1000)));
-      _game.lastEvt = now;
       const counted = !!q && q.type === 'mc_en_fr';
       if (counted) { _game.counted = (_game.counted || 0) + 1; if (correct) _game.countedOk = (_game.countedOk || 0) + 1; }
-      App.Store.logEnglish({ counted, correct, seconds: secs });
+      App.Store.logEnglish({ counted, correct });
+      _refreshToday();
     } catch (e) { console.warn('logEnglish', e); }
+  }
+  // « Temps », objectif du jour et barre de progression montent en direct (barre latérale visible sur PC)
+  function _refreshToday() { try { App.Render.todayStats(); } catch (e) {} }
+
+  // ── Chrono de l'onglet Anglais ─────────────────────────────────────────────
+  // Tant que l'onglet Anglais est ouvert ET que tu l'utilises (clic, touche, défilement, toucher
+  // dans la dernière minute), le temps s'ajoute à « Temps » du jour et de la semaine.
+  // Page cachée, autre onglet, ou 1 min sans rien toucher = pause. Jamais plus de 5 s ajoutées par tic.
+  const ACTIVE_IDLE_MS = 60 * 1000;
+  let _tickTimer = null, _lastAct = 0, _lastTick = 0, _acc = 0, _actBound = false;
+  function _markActivity() { _lastAct = Date.now(); }
+  function _englishVisible() {
+    const v = _el('english-view');
+    return !!v && v.style.display !== 'none' && getComputedStyle(v).display !== 'none';
+  }
+  function _startTimer() {
+    if (!_actBound) {
+      ['pointerdown', 'keydown', 'touchstart', 'scroll', 'wheel', 'mousemove'].forEach(ev =>
+        document.addEventListener(ev, _markActivity, { passive: true, capture: true }));
+      document.addEventListener('visibilitychange', () => { _lastTick = Date.now(); _tick(); });
+      window.addEventListener('pagehide', () => { try { App.Store.saveLog(); } catch (e) {} });
+      _actBound = true;
+    }
+    _markActivity();
+    _lastTick = Date.now();
+    if (!_tickTimer) _tickTimer = setInterval(_tick, 2000);
+  }
+  function _tick() {
+    const now = Date.now();
+    const dt  = Math.min(5, Math.max(0, (now - _lastTick) / 1000));
+    _lastTick = now;
+    if (!_englishVisible()) {                         // on a quitté l'onglet Anglais : le chrono s'arrête
+      if (_tickTimer) { clearInterval(_tickTimer); _tickTimer = null; }
+      return;
+    }
+    if (document.hidden || now - _lastAct > ACTIVE_IDLE_MS) return;   // pause
+    _acc += dt;
+    const whole = Math.floor(_acc);
+    if (whole > 0) {
+      _acc -= whole;
+      try { App.Store.logEnglish({ seconds: whole }); _refreshToday(); } catch (e) {}
+    }
   }
 
   function _onCorrect(isTypo) {
