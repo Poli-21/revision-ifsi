@@ -1841,7 +1841,24 @@ body.dark .sim-stepper li.now .sim-step-dot { color: #0f172a; }
 .sim-q { display: block; width: 100%; text-align: left; background: var(--sim-card); color: var(--gray-900); border: 1px solid var(--sim-line); border-radius: 8px; padding: 8px 10px; margin: 4px 0; font-size: .84rem; cursor: pointer; font-family: inherit; min-height: 38px; }
 .sim-q:hover { border-color: var(--primary); }
 .sim-q.done { color: var(--gray-500); background: var(--sim-soft); }
+.sim-sugg { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 2px; }
+.sim-sugg .sim-q { border-color: var(--primary); }
+.sim-unk .sim-ul { margin: 6px 0; }
 .sim-menu-tip { padding: 6px 2px 0; }
+.sim-toggles { display: flex; gap: 8px; }
+.sim-toggles .sim-menu-toggle { flex: 1 1 auto; width: auto; min-width: 0; }
+.sim-toggles .sim-act-toggle { flex: 0 0 auto; background: var(--primary-light); color: var(--primary); border-color: transparent; }
+.sim-toggles .sim-act-toggle[aria-expanded="true"] { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.sim-actmenu { max-height: 340px; }
+.sim-actgrp { padding: 2px 0 6px; border-bottom: 1px solid var(--sim-line); }
+.sim-actgrp:last-of-type { border-bottom: none; }
+.sim-acth { font-weight: 700; font-size: .82rem; padding: 8px 2px 2px; color: var(--gray-700); }
+.sim-status { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 6px; }
+.sim-status[hidden] { display: none; }
+.sim-chip-st { background: var(--sim-okbg); color: var(--sim-ok); border-color: transparent; font-size: .74rem; }
+.sim-msg.sim-ide { align-self: flex-start; background: var(--sim-okbg); color: var(--gray-900); border-left: 4px solid var(--sim-ok); border-bottom-left-radius: 4px; }
+.sim-msg.sim-good { align-self: center; max-width: 94%; background: var(--sim-okbg); color: var(--sim-ok); font-size: .82rem; border-radius: 10px; }
+.sim-msg.sim-bad { align-self: center; max-width: 94%; background: var(--sim-badbg); color: var(--sim-bad); font-size: .82rem; border-radius: 10px; font-weight: 600; }
 .sim-confirm { background: var(--sim-warnbg); border-radius: 10px; padding: 10px 12px; margin-top: 14px; font-size: .86rem; }
 .sim-confirm p { margin: 0 0 8px; }
 

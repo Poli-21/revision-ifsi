@@ -194,7 +194,7 @@ App.SimScenarios = [
   answers: {
     c_salut:        { text: 'Bonjour… Entrez, entrez.' },
     c_presentation: { text: 'Ah, vous êtes l\'étudiant… Enchantée. Moi, c\'est Lucienne Martin.', logs: ['g_presentation'] },
-    c_identite_q:   { text: 'Lucienne Martin, née le trois mars mille neuf cent quarante.', logs: ['g_identite'] },
+    c_identite_q:   { text: "Lucienne Martin, née le trois mars mille neuf cent quarante. J'ai quatre-vingt-six ans.", logs: ['g_identite'] },
     c_explication:  { text: 'Très bien, très bien, faites ce qu\'il faut, ma petite.', logs: ['g_explication'] },
     c_accord:       { text: 'Oui, oui, bien sûr, vous pouvez.', logs: ['g_accord'] },
     c_intimite:     { text: 'Merci, c\'est gentil de fermer la porte.', logs: ['g_intimite'] },

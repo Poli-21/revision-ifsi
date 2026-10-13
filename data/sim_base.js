@@ -30,7 +30,7 @@ App.SimBase = (() => {
     const base = {
       c_salut:        { text: 'Bonjour… entrez.' },
       c_presentation: { text: `Ah, vous êtes l'étudiant… Enchanté${w.e ? 'e' : ''}. Moi, c'est ${p.prenom} ${p.nom}.`, logs: ['g_presentation'] },
-      c_identite_q:   { text: `${p.prenom} ${p.nom}, né${w.e} le ${p.dobMots}.`, logs: ['g_identite'] },
+      c_identite_q:   { text: `${p.prenom} ${p.nom}, né${w.e} le ${p.dobMots}. J'ai ${p.age} ans.`, logs: ['g_identite'] },
       c_explication:  { text: "D'accord, faites ce qu'il faut.", logs: ['g_explication'] },
       c_accord:       { text: 'Oui, oui, vous pouvez.', logs: ['g_accord'] },
       c_intimite:     { text: "Merci d'avoir fermé la porte.", logs: ['g_intimite'] },

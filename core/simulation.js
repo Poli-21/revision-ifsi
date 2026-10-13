@@ -75,6 +75,9 @@ App.Sim = (() => {
     c.rx = c.rx || { ecg: null, skipped: false, gazo: null, gazoSkipped: false };
     c.wr = c.wr || { txt: { C: '', D: '', A: '', R: '' }, graded: false, pts: 0, warn: '' };
     c.ai = c.ai || {};
+    const k = c.care = (c.care && typeof c.care === 'object') ? c.care : {};
+    k.pos = k.pos || null; k.o2 = k.o2 || null; k.alert = k.alert || null; k.stay = !!k.stay; k.stayShown = !!k.stayShown; k.bad = k.bad || 0;
+    k.ev = Array.isArray(k.ev) ? k.ev : [];
   }
   function _save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
 
@@ -89,31 +92,157 @@ App.Sim = (() => {
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
       .replace(/[’'`´]/g, ' ').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   }
-  // Renvoie les identifiants d'intentions reconnues (3 au maximum), dans l'ordre où elles apparaissent.
+  // Mise en forme avant la reconnaissance : abréviations de SMS développées et tutoiement ramené au vouvoiement
+  // (les motifs de data/sim_intents.js sont écrits au vouvoiement).
+  const _ABBR = { qd: 'quand', pk: 'pourquoi', pq: 'pourquoi', tt: 'tout', ttt: 'traitement', slt: 'salut', bjr: 'bonjour', ds: 'dans', pr: 'pour', cmt: 'comment', bcp: 'beaucoup',
+                  qq: 'quelque', qqch: 'quelque chose', qqun: 'quelqu un', vs: 'vous', stp: '', svp: '', sv: '', tjs: 'toujours', tjrs: 'toujours', mtn: 'maintenant', ajd: 'aujourd hui', pdt: 'pendant', ac: 'avec',
+                  // mots collés ou écrits « comme on les dit » (SMS, dictée vocale, saisie rapide)
+                  jsuis: 'je suis', chui: 'je suis', chuis: 'je suis', jvais: 'je vais', jve: 'je vais', jv: 'je vais', jvous: 'je vous', jveux: 'je veux', jpeux: 'je peux', jpeu: 'je peux', jme: 'je me', jai: 'j ai',
+                  cest: 'c est', sest: 's est', lheure: 'l heure', dautre: 'd autre', dautres: 'd autres', danormal: 'd anormal', daide: 'd aide', deau: 'd eau', aujourdhui: 'aujourd hui',
+                  quelquun: 'quelqu un', kelkun: 'quelqu un', kelke: 'quelque', kelque: 'quelque', kelques: 'quelques', kelkes: 'quelques',
+                  kel: 'quel', kels: 'quels', kelle: 'quelle', kelles: 'quelles', koi: 'quoi', pourkoi: 'pourquoi', pkoi: 'pourquoi', pourqoi: 'pourquoi', ke: 'que', ki: 'qui', keske: 'qu est ce que', keskil: 'qu est ce qu il',
+                  coment: 'comment', comant: 'comment', komment: 'comment', koman: 'comment', vou: 'vous', alez: 'allez', bsoin: 'besoin', tps: 'temps', depui: 'depuis', comence: 'commence', comencer: 'commencer',
+                  bra: 'bras', tet: 'tete', nui: 'nuit', ya: 'y a', salu: 'salut', bnjour: 'bonjour', bonjou: 'bonjour', bojour: 'bonjour', ephad: 'ehpad', ephat: 'ehpad', mapel: 'm appelle', mapelle: 'm appelle', mappelle: 'm appelle',
+                  dacord: 'd accord', daccord: 'd accord', dacor: 'd accord', ptit: 'petit', ptite: 'petite', fai: 'fait', qqpart: 'quelque part', qqpar: 'quelque part', pa: 'pas', choz: 'chose', chos: 'chose', yaurai: 'y aurait', yaurait: 'y aurait',
+                  pouve: 'pouvez', save: 'savez', ave: 'avez', mentende: 'm entendez', mentendez: 'm entendez', mentend: 'm entend', voi: 'vois', envi: 'envie', dormire: 'dormir', tp: 'temps',
+                  linsuline: 'l insuline', linsulin: 'l insuline', jferme: 'je ferme', jferm: 'je ferme', inkietez: 'inquietez', inkiete: 'inquiete', '2': 'deux' };
+  // Mots collés ou abrégés qui demandent une règle plus souple qu'un simple remplacement de mot
+  const _GLUE = [[/\bon va fer\b/g, 'on va faire'], [/\b(avez|a|est|fait|etait|ressentez|sentez|prenez|prend) sa\b/g, '$1 ca'], [/\bque c passe\b/g, 'que s est passe'],[/\bj ?m ?a+pp?e+ll?e?\b/g, 'je m appelle'], [/\bsa (va|vous|fait|derange|gene|tourne|dure|date|commence|a|tape|cogne|bat|martele|pulse|tire|serre)\b/g, 'ca $1']];
+  const _TU = [
+    [/\btu te sens\b/g, 'vous vous sentez'], [/\bte sens tu\b/g, 'vous vous sentez'], [/\bsens tu\b/g, 'sentez vous'],
+    [/\bas tu\b/g, 'avez vous'], [/\bes tu\b/g, 'etes vous'], [/\bpeux tu\b/g, 'pouvez vous'], [/\bveux tu\b/g, 'voulez vous'], [/\bvois tu\b/g, 'voyez vous'], [/\bcomprends tu\b/g, 'comprenez vous'],
+    [/\bentends tu\b/g, 'entendez vous'], [/\bsais tu\b/g, 'savez vous'], [/\bprends tu\b/g, 'prenez vous'], [/\bbois tu\b/g, 'buvez vous'], [/\bmanges tu\b/g, 'mangez vous'], [/\bdors tu\b/g, 'dormez vous'],
+    [/\bfais tu\b/g, 'faites vous'], [/\bvas tu\b/g, 'allez vous'], [/\bdois tu\b/g, 'devez vous'],
+    [/\b(tu|t) es\b/g, 'vous etes'], [/\b(tu|t) as\b/g, 'vous avez'], [/\btu peux\b/g, 'vous pouvez'], [/\btu veux\b/g, 'vous voulez'], [/\btu (vois|voies)\b/g, 'vous voyez'], [/\btu comprends\b/g, 'vous comprenez'],
+    [/\btu entends\b/g, 'vous entendez'], [/\btu sais\b/g, 'vous savez'], [/\btu vas\b/g, 'vous allez'], [/\btu dois\b/g, 'vous devez'], [/\btu fais\b/g, 'vous faites'], [/\btu prends\b/g, 'vous prenez'],
+    [/\btu bois\b/g, 'vous buvez'], [/\btu manges\b/g, 'vous mangez'], [/\btu dors\b/g, 'vous dormez'], [/\btu sens\b/g, 'vous sentez'], [/\btu ressens\b/g, 'vous ressentez'], [/\btu arrives\b/g, 'vous arrivez'],
+    [/\b(tu|toi)\b/g, 'vous'], [/\bte\b/g, 'vous'], [/\bton\b/g, 'votre'], [/\bta\b/g, 'votre'], [/\btes\b/g, 'vos']
+  ];
+  function _prep(n) {
+    n = n.split(' ').map(w => Object.prototype.hasOwnProperty.call(_ABBR, w) ? _ABBR[w] : w).join(' ').replace(/\s+/g, ' ').trim();
+    _GLUE.forEach(([re, to]) => { n = n.replace(re, to); });
+    _TU.forEach(([re, to]) => { n = n.replace(re, to); });
+    return n;
+  }
+  // Distance d'édition (avec inversion de deux lettres = 1 faute) pour tolérer les fautes de frappe
+  function _dist(a, b) {
+    const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+    const d = []; for (let i = 0; i <= m; i++) { d[i] = [i]; } for (let j = 1; j <= n; j++) d[0][j] = j;
+    for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+    return d[m][n];
+  }
+  function _active(it, sc) { return !(it.extra && !(sc && sc.answers && sc.answers[it.id])); }
+  // Renvoie les identifiants d'intentions reconnues (4 au maximum), dans l'ordre où elles apparaissent.
   function parse(text, scnArg) {
-    const n = _norm(text);
+    const n = _prep(_norm(text));
     if (!n) return [];
+    const raw = String(text || '').trim();
     const sc = scnArg === undefined ? _curScn() : scnArg;
     const list = (window.App.SimIntents && window.App.SimIntents.LIST) || [];
     let hits = [];
+    const covered = [];                                                     // zones du texte déjà expliquées par un motif (pour la tolérance aux fautes)
     list.forEach(it => {
-      if (it.extra && !(sc && sc.answers && sc.answers[it.id])) return;     // question propre à certains scénarios
+      if (!_active(it, sc)) return;                                         // question propre à certains scénarios
+      if ((it.not || []).some(re => re.test(n))) return;
       let score = 0, pos = 1e9;
       const probe = (re, pts) => {
         const m = re.exec(n);
-        if (m) { score += pts; pos = Math.min(pos, m.index); }
+        if (m) { score += pts; pos = Math.min(pos, m.index); if (m[0].length <= 30) covered.push([m.index, m.index + m[0].length]); }
       };
       (it.strong || []).forEach(re => probe(re, 2));
       (it.weak || []).forEach(re => probe(re, 1));
+      (it.raw || []).forEach(re => { if (re.test(raw)) { score += 2; pos = Math.min(pos, 0); } });      // motifs sur le texte tel que tapé (majuscules)
       if (score >= (it.min || 2)) hits.push({ it, score, pos });
     });
+    const real = hits.filter(h => !h.it.solo);
+    if (!hits.length && n.split(' ').length <= 6) {                         // « Merci », « Bon courage » : seulement dans une phrase courte où rien d'autre n'est dit
+      list.forEach(it => {
+        if (!it.lone || !_active(it, sc) || hits.some(h => h.it === it) || (it.not || []).some(re => re.test(n))) return;
+        const m = it.lone.map(re => re.exec(n)).find(Boolean);
+        if (m) hits.push({ it, score: 2, pos: m.index });
+      });
+    }
+    // Tolérance aux fautes de frappe : sur tout le texte si rien n'a été compris, sinon seulement sur les mots longs non expliqués
+    _fuzzy(n, sc, list, covered, !!real.length).forEach(f => { if (!hits.some(h => h.it === f.it)) hits.push(f); });
     if (hits.some(h => !h.it.solo)) hits = hits.filter(h => !h.it.solo);   // « Bonjour » seul seulement
     const swallowed = new Set(); hits.forEach(h => (h.it.over || []).forEach(o => swallowed.add(o)));
     if (swallowed.size) hits = hits.filter(h => !swallowed.has(h.it.id));        // une question en « avale » d'autres
     hits.sort((a, b) => b.score - a.score);
-    hits = hits.slice(0, 3).sort((a, b) => a.pos - b.pos);
+    hits = hits.slice(0, 4).sort((a, b) => a.pos - b.pos);
     return hits.map(h => h.it.id);
   }
+  // Mots courants qu'il ne faut JAMAIS confondre avec un mot-clé (« couleur » n'est pas « douleur », « comprises » n'est pas « comprimés »)
+  const _FUZZ_BLOCK = new Set(['couleur', 'couleurs', 'manche', 'manches', 'sommes', 'marge', 'marges', 'valeur', 'valeurs', 'chaleur', 'chambre', 'chambres', 'matin', 'matins', 'malade', 'malades', 'dossier', 'dossiers',
+    'comprise', 'comprises', 'compris', 'resident', 'residents', 'residente', 'residentes', 'basse', 'bosses', 'coute', 'couter', 'chutes', 'repose', 'reposes', 'soleil', 'sommes', 'heure', 'heures', 'moral', 'morale', 'morales', 'moraux']);
+  const _col = s => s.replace(/(.)\1+/g, '$1');                             // « sonnette » et « sonete » s'écrivent pareil une fois les lettres doubles réduites
+  // Un mot tapé presque comme un mot-clé (1 lettre d'écart, lettres doubles oubliées ou en trop, fin du mot abîmée si le mot-clé est long).
+  function _near(t, k) {
+    if (_FUZZ_BLOCK.has(t) || t[0] !== k[0]) return false;
+    const tc = _col(t), kc = _col(k);
+    if (kc.length >= 9 && tc.length >= 7 && tc.slice(0, 7) === kc.slice(0, 7)) return true;   // « antecedan » ~ « antecedent »
+    if (tc.length < kc.length - 1) return false;
+    const d = Math.min(_dist(tc.slice(0, kc.length), kc), _dist(tc.slice(0, kc.length + 1), kc));
+    if (kc.length >= 9 && tc.slice(0, 3) === kc.slice(0, 3)) return d <= 2;   // « stagiere » ~ « stagiaire »
+    return d <= (kc.length >= 6 ? 1 : 0);                                   // mot-clé court (≤ 5 lettres) : écriture exacte seulement
+  }
+  function _fuzzy(n, sc, list, covered, strict) {
+    let p = 0;
+    const toks = n.split(' ').map(t => { const o = { t, i: p }; p += t.length + 1; return o; })
+      .filter(o => o.t.length >= (strict ? 6 : 5) && !covered.some(c => o.i < c[1] && o.i + o.t.length > c[0]));
+    const out = [];
+    if (!toks.length) return out;
+    list.forEach(it => {
+      if (!_active(it, sc) || !(it.kw || []).length || (it.not || []).some(re => re.test(n))) return;
+      let pos = 1e9;
+      it.kw.forEach(k => { if (strict && _col(k).length < 6) return; toks.forEach(o => { if (_near(o.t, k)) pos = Math.min(pos, o.i); }); });
+      if (pos < 1e9) out.push({ it, score: 2, pos });
+    });
+    return out;
+  }
+  // Quand rien n'est reconnu : propose les 2 questions les plus proches (mots en commun avec les libellés)
+  const _STOP = new Set(['vous', 'avez', 'etes', 'est', 'ce', 'que', 'qui', 'quoi', 'pour', 'dans', 'les', 'des', 'une', 'votre', 'vos', 'est ce', 'quel', 'quelle', 'avec', 'sans', 'pas', 'plus', 'tout', 'tous', 'cette', 'comme', 'bien', 'aussi', 'mais', 'donc', 'alors', 'fait', 'faire', 'peux', 'pouvez', 'madame', 'monsieur', 'matin', 'quelque', 'chose']);
+  function _suggest(text, scnArg) {
+    const n = _prep(_norm(text)); if (!n) return [];
+    const sc = scnArg === undefined ? _curScn() : scnArg;
+    const toks = n.split(' ').filter(t => t.length >= 4 && !_STOP.has(t));
+    if (!toks.length) return [];
+    const list = (window.App.SimIntents && window.App.SimIntents.LIST) || [];
+    const scored = [];
+    list.forEach(it => {
+      if (!_active(it, sc)) return;
+      const words = _norm((it.menu || '') + ' ' + (it.ask || '')).split(' ').filter(w => w.length >= 4 && !_STOP.has(w));
+      const kws = it.kw || [];
+      let sc2 = 0;
+      toks.forEach(t => {
+        if (words.some(w => w === t || (w.length >= 5 && t.length >= 5 && _dist(w.slice(0, 5), t.slice(0, 5)) <= 1))) sc2 += 2;
+        else if (kws.some(k => t.indexOf(k.slice(0, 5)) === 0)) sc2 += 2;
+      });
+      if (sc2 >= 2) scored.push({ id: it.id, sc: sc2 });
+    });
+    scored.sort((a, b) => b.sc - a.sc);
+    return scored.slice(0, 2).map(x => x.id);
+  }
+  // Journal LOCAL des phrases que l'application n'a pas comprises (pour les signaler et les ajouter au vocabulaire)
+  const UNK_KEY = 'ifsi_sim_unknown_v1';
+  function _unkRead() { try { const a = JSON.parse(localStorage.getItem(UNK_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function _unkAdd(text, scnId) {
+    try {
+      const t = String(text || '').trim().slice(0, 200); if (!t) return;
+      const a = _unkRead().filter(x => x && x.t !== t);
+      a.unshift({ t, s: scnId || '', d: new Date().toISOString().slice(0, 10) });
+      localStorage.setItem(UNK_KEY, JSON.stringify(a.slice(0, 60)));
+    } catch (e) {}
+  }
+  function unkCopy() {
+    const txt = _unkRead().map(x => x.t).join('\n');
+    const done = () => { const b = _el('sim-unk-copy'); if (b) { b.textContent = '✓ Copié'; setTimeout(() => { if (b) b.textContent = '📋 Copier la liste'; }, 1600); } };
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(done, () => {}); return; } } catch (e) {}
+    try { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); } catch (e) {}
+  }
+  function unkClear() { try { localStorage.removeItem(UNK_KEY); } catch (e) {} if (screen === 'liste') render(); }
   function _intent(id) { return ((window.App.SimIntents && window.App.SimIntents.LIST) || []).find(i => i.id === id) || null; }
 
   // ── Actions du jeu ────────────────────────────────────────────
@@ -156,7 +285,7 @@ App.Sim = (() => {
     _urgentHint();
     _save();
     if (!_cur() || _cur().stage !== 'chambre') return;
-    _renderLog(); _renderMenu(); _renderChambre(); _renderRecueil(); _renderTabs();
+    _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs();
   }
 
   function say(text) {
@@ -164,25 +293,31 @@ App.Sim = (() => {
     if (!c || !scn || c.stage !== 'chambre') return;
     text = String(text || '').trim().slice(0, 300);
     if (!text) return;
+    const A = parseAct(text);
+    if (A.acts.length || A.measure) { _handleAct(A, text); return; }
     _handle(parse(text), text);
   }
   function askMenu(id) {
     const it = _intent(id); if (!it) return;
     _handle([id], _gen(it.ask, _curScn()));
   }
-  function _handle(ids, studentText) {
+  function _handle(ids, studentText, opts) {
     const c = _cur(), scn = _curScn();
-    _log('me', studentText);
+    if (!(opts && opts.skipLog)) _log('me', studentText);
     c.last = null;
     if (!ids.length) {
       c.misses = (c.misses || 0) + 1;
       _log('pat', scn.notUnderstood);
-      if (c.misses >= 2) _log('sys', '💡 Astuce : ouvre « 📋 Questions possibles » pour voir ce que tu peux demander. Pose une question à la fois, avec des mots simples.');
+      c.suggest = _suggest(studentText, scn);
+      _unkAdd(studentText, scn.id);
+      _log('sys', c.suggest.length
+        ? '💡 Je n\'ai pas reconnu ta question. Tu voulais peut-être demander l\'une de ces questions (touche-la pour la poser), sinon reformule avec d\'autres mots.'
+        : (c.misses >= 2 ? '💡 Astuce : ouvre « 📋 Questions possibles » pour voir ce que tu peux demander. Pose une question à la fois, avec des mots simples.' : '💡 Je n\'ai pas reconnu ta question. Reformule avec d\'autres mots, ou ouvre « 📋 Questions possibles ».'));
       c.actions++;
       _afterAction();
       return;
     }
-    c.misses = 0;
+    c.misses = 0; c.suggest = null;
     const hasContact = ids.some(i => (_intent(i) || {}).contact);
     if (c.actions === 0 && !c.done.g_presentation && !hasContact) _log('pat', scn.whoAreYou);
     ids.forEach(id => {
@@ -205,6 +340,242 @@ App.Sim = (() => {
     });
     c.actions++;
     _afterAction();
+  }
+
+  // ── Gestes de sécurité pendant le recueil : installer, alerter, oxygène ─────────────────────────────
+  // L'étudiant peut TAPER ce qu'il fait (« je l'installe assise », « j'appelle l'infirmière ») ou toucher un bouton
+  // du menu « 🩺 Agir ». Ce que vaut chaque geste dépend du patient (data/sim_soins.js). Rien n'est caché : la
+  // réaction du patient et une explication s'affichent tout de suite, et une erreur se corrige (on le réinstalle).
+  // Hors score : bonus d'XP pour les bons gestes ; un geste DANGEREUX laissé en place à la fin plafonne le score.
+  const _SO = () => window.App.SimSoins || { POS: [], O2: [], DEFAULT: {}, cases: {} };
+  const _gx = (t, scn) => _gen(String(t == null ? '' : t).replace(/\{e\}/g, _male(scn) ? '' : 'e'), scn);
+  function _soinsOf(scn) {
+    const S = _SO(), cs = (S.cases || {})[scn.id] || {}, D = S.DEFAULT || {};
+    return { vital: cs.vital != null ? !!cs.vital : !!D.vital, pos: cs.pos || {}, o2: Object.assign({}, D.o2 || {}, cs.o2 || {}),
+             alert: Object.assign({}, D.alert || {}, cs.nurse || {}), rester: Object.assign({}, D.rester || {}, cs.rester || {}) };
+  }
+  const _DEBW = { un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9, dix: 10, quinze: 15 };
+  const _RE_ACT = {
+    subj: /\b(je|j|on|nous)\b/,
+    inf: /^(?:(?:alors|donc|bon|ok|ensuite|puis|et|il faut|faut|je dois|je vais|on doit)\s+)*(?:mettre|installer|alerter|appeler|prevenir|allonger|asseoir|assoir|relever|sonner|donner|brancher|lancer|faire venir|rester|surelever|redresser|coucher|baisser|retirer|enlever|arreter|couper|mets|installe|appelle|allonge|assois|assieds|previens|appuie|sonne|branche|donne|lance|couche|releve|baisse|arrete|coupe|enleve|retire|alerte)\b/,
+    ask: /\b(puis je|pourrais je|est ce que je|voulez vous que je|souhaitez vous que je|dois je|faut il que je|vous voulez que je|vous souhaitez que je)\b/,
+    neg: /\b(je|j|on) (ne|n) |\bm appel\w*|\bje (vois|constate|remarque|note|observe|vois bien)\b/,
+    bord1: /\b(bord du lit|au bord|fauteuil|chaise)\b/,
+    bord2: /\b(?:je|j|on) (?:le |la |l |vous )?(?:leve|fais lever|fais marcher|mets debout|mettre debout|fais debout|aide a (?:me |se |vous )?lever|aide a marcher)\b(?! (?:le |la |les |l |vos |votre |ses |sa |son |ma |mon |mes |un |une )?(?:dossier|bras|jambes?|mains?|pieds?|doigts?|yeux|tete|lit|drap|couverture|rideau|store|volet|fenetre|cote|verre|plateau|table|oreiller|paupieres?|menton|epaules?))/,
+    pls: /\b(pls|position laterale|laterale de securite|sur le cote|sur le flanc)\b/,
+    jambes: /\b(surelev\w*|jambes? (?:en )?(?:l air|hauteur|surelevees?|relevees?)|releve\w* (?:les |ses |vos )?jambes|mets? (?:les |ses |vos )?jambes (?:en haut|en l air|sur))\b/,
+    demi: /\b(demi assis\w*|semi assis\w*|(?:30|45) degres?|30 a 45|(?:relev|monte|redress)\w* (?:un peu |legerement |doucement |encore )?(?:le |la |son |votre |l )?(?:dossier|tete de lit|tete du lit))\b/,
+    assise: /\b(assis|assise|assoi\w*|assie\w*|asseoir|assoir|position assise|(?:cale\w*|calage) (?:par |avec )?(?:les |des )?oreillers?)\b/,
+    allong: /\b(?:je |j |on )?(?:le |la |l |vous )?(?:allonge\w*|couche\w*|recouche\w*|mets? a plat|mettre a plat|baisse\w* (?:le |la |son )?dossier)\b/,
+    alV: /\b(appel\w*|alerte\w*|alerter|prevenir|previens|preven\w*|sonne\w*|sonner|appuie\w*|appuyer|declenche\w*|hele|crie\w*|fais venir|fait venir|faire venir|demande\w* (?:de )?l aide)\b/,
+    alT: /\b(infirmi\w*|tutri\w*|tuteur|sophie|ide|referente|karim|aide soignant\w*|collegue|equipe|renfort\w*|quelqu un|aide|secours|medecin|samu|sonnette|bouton d appel|bouton rouge|poire|cadre|le 15|pompiers?)\b/,
+    alGo: /\b(vais|cours|pars|file|vole|monte|descends|retourne)\b[^.?]*\b(chercher|voir|prevenir|appeler|poste)\b/,
+    alC: /\b(?:vais|cours|pars|file|vole)\b[^.?]*\b(?:chercher|voir|trouver)\b/,
+    alY: /\b(venez|viens|accourez|vite|urgence|a l aide|au secours)\b/,
+    alP: /\b(infirmi\w*|tutri\w*|sophie|ide|karim|aide soignant\w*|referente|collegue)\b/,
+    alSamu: /\b(samu|le 15|pompiers?)\b/,
+    o2N: /\b(oxygen\w*|o2|o 2|o deux|deux ?o|masque a oxygene|lunettes? a oxygene|lunettes? nasales?|sonde nasale|haute concentration|mhc)\b/,
+    o2On: /\b(met\w*|mett\w*|install\w*|branch\w*|donn\w*|pos\w*|lance\w*|demarr\w*|administr\w*|ouvr\w*|regl\w*|place\w*|sous|met)\b/,
+    o2Off: /\b(enleve\w*|enlever|retire\w*|retirer|arrete\w*|arreter|coupe\w*|couper|stoppe\w*|ote\w*)\b/,
+    deb: /\b(\d+(?:[.,]\d+)?|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|quinze) ?(?:l|litres?|l ?min)\b/,
+    rest: /\b(?:je|j) (?:reste|ne (?:vous |le |la |l )?quitte pas|ne bouge pas|ne pars pas)\b|\brester (?:aupres|pres|avec)\b/,
+    meas: /\b(?:je|j|on)\b(?! (?:vais|viens|voudrais|souhaite|dois|peux|veux|aimerais|comptais|me propose))[^.?]*\b(?:prends?|prend|mesure\w*|pose\w*|place\w*|gonfle\w*|branche\w*|compte\w*|verifi\w*|controle\w*|releve\w*|lis|note\w*|effectue\w*|fais|fait)\b[^.?]*\b(?:tension|brassard|saturometre|oxymetre|thermometre|temperature|pouls|frequence respiratoire|frequence cardiaque|glycemie|dextro|constantes|saturation)\b/
+  };
+  // Reconnaît ce que l'étudiant FAIT (pas ce qu'il demande). Renvoie { acts: [...], measure: bool }.
+  function parseAct(text) {
+    const raw = String(text || ''), n = _prep(_norm(raw)), R = _RE_ACT, out = { acts: [], measure: false };
+    if (!n) return out;
+    const isQ = /\?\s*$/.test(raw.trim()) && !/^(?:je|j['’]|on |nous )/i.test(raw.trim());
+    if (R.meas.test(n) && !/\?/.test(raw)) out.measure = true;                        // « Je pose le saturomètre » : c'est à toi de faire le geste
+    if (R.alY.test(n) && R.alP.test(n) && !R.alV.test(n) && !R.ask.test(n)) { out.acts.push({ k: 'alerte', how: 'sonnette' }); return out; }   // « Sophie, venez vite ! »
+    if (R.rest.test(n) && !isQ) out.acts.push({ k: 'reste' });
+    if (R.ask.test(n) || isQ || R.neg.test(n)) return out;
+    if (!(R.subj.test(n) || R.inf.test(n))) return out;
+    // position (une seule : la plus précise)
+    let pos = null;
+    if (R.pls.test(n)) pos = 'pls';
+    else if (R.jambes.test(n)) pos = 'jambes';
+    else if (R.bord2.test(n) || (R.bord1.test(n) && (R.assise.test(n) || /\b(install\w*|aide\w*|mets?|met|mett\w*|transf\w*)\b/.test(n)))) pos = 'bord';
+    else if (R.demi.test(n)) pos = 'demi';
+    else if (R.assise.test(n)) pos = 'assise';
+    else if (R.allong.test(n)) pos = 'allongee';
+    if (pos) out.acts.push({ k: 'pos', id: pos });
+    // alerte
+    if ((R.alV.test(n) && R.alT.test(n)) || (R.alC.test(n) && R.alP.test(n))) {
+      out.acts.push({ k: 'alerte', how: R.alGo.test(n) ? 'chercher' : (R.alSamu.test(n) && !/\b(infirmi\w*|tutri\w*|sophie|ide)\b/.test(n) ? 'samu' : 'sonnette') });
+    }
+    // oxygène
+    if (R.o2N.test(n) || (/\bdebit\b/.test(n) && /\b(baisse\w*|diminue\w*|reduis\w*|monte\w*|augmente\w*|regle\w*)\b/.test(n))) {
+      if (R.o2N.test(n) && R.o2Off.test(n)) out.acts.push({ k: 'o2stop' });
+      else if (R.o2On.test(n) || /\bdebit\b/.test(n)) {
+        const m = R.deb.exec(n); let deb = null;
+        if (m) deb = /^\d/.test(m[1]) ? parseFloat(m[1].replace(',', '.')) : _DEBW[m[1]];
+        const dev = /\b(haute concentration|mhc|non reinspirant|reservoir)\b/.test(n) ? 'mhc' : (/\bmasque\b/.test(n) ? 'masque' : (/\b(lunettes?|nasales?|sonde)\b/.test(n) ? 'lunettes' : null));
+        out.acts.push({ k: 'o2', dev, deb });
+      }
+    }
+    return out;
+  }
+  const _ACT_DROP = ['q_mobilite', 'q_sonnette', 'q_equipe'];           // intentions que ces phrases d'action déclenchaient à tort
+  function _careEv(k, id, v) { const c = _cur(); c.care.ev.push({ k, id, v, n: c.actions }); if (c.care.ev.length > 60) c.care.ev.splice(0, c.care.ev.length - 60); }
+  function _careSay(who, text) { _log(who, _gx(text, _curScn())); }
+  function _verdictLine(v, why) {
+    if (!why) return;
+    if (v === 'good') _careSay('good', '✓ ' + why);
+    else if (v === 'ok') _careSay('narr', why);
+    else if (v === 'avoid') _careSay('sys', '⚠ À éviter. ' + why);
+    else _careSay('bad', '⛔ Dangereux. ' + why + ' Corrige tout de suite avec « Agir ».');
+  }
+  const _nurse = scn => (scn.call && scn.call.who) || 'Sophie';
+  function _runPos(id) {
+    const c = _cur(), scn = _curScn(), S = _soinsOf(scn), P = _SO().POS.find(p => p.id === id); if (!P) return;
+    const r = S.pos[id] || { v: 'ok', pat: '', why: '' };
+    if (c.care.pos && c.care.pos.id === id) { _log('sys', 'Tu l\'as déjà installé' + (_male(scn) ? '' : 'e') + ' ainsi : ' + _gx(P.short, scn) + '.'); return; }
+    c.care.pos = { id, v: r.v }; _careEv('pos', id, r.v);
+    if (r.pat) _careSay('pat', r.pat);
+    _verdictLine(r.v, r.why);
+    if (r.v === 'danger' || r.v === 'avoid') c.care.bad = (c.care.bad || 0) + 1;
+  }
+  function _runAlert(how) {
+    const c = _cur(), scn = _curScn(), S = _soinsOf(scn), A = S.alert, who = _nurse(scn);
+    if (c.care.alert) { _careSay('ide', who + ' : « ' + A.again + ' »'); return; }
+    const v = how === 'chercher' ? (S.vital ? 'avoid' : 'ok') : (S.vital && how === 'sonnette' ? 'good' : 'ok');
+    c.care.alert = { how, v, n: c.actions, found: Object.keys(c.found).length };
+    c.care.stay = how !== 'chercher';
+    _careEv('alerte', how, v);
+    if (how === 'chercher') _log('narr', '(Tu quittes la chambre en vitesse pour aller chercher ' + who + '…)');
+    else if (how === 'samu') _careSay('ide', who + ' arrive : « C\'est moi qui appelle le 15, pas toi : tu as bien fait de me prévenir. Je m\'en occupe. ' + (S.vital ? A.vitalOk : A.prompt) + ' »');
+    if (how !== 'samu') _careSay('ide', who + (how === 'chercher' ? ' : « ' + A.left + ' »' : ' arrive : « ' + (S.vital ? A.vitalOk : A.prompt) + ' »'));
+    if (how === 'chercher') _log('narr', '(Tu reviens dans la chambre avec ' + who + '.)');
+    _verdictLine(v, how === 'chercher' ? A.whyLeft : (how === 'samu' ? 'À l\'EHPAD, l\'étudiant ne déclenche pas le 15 tout seul : il alerte l\'infirmière, qui évalue et décide d\'appeler (ou le médecin). Tu as bien fait de demander de l\'aide sans attendre.' : (S.vital ? A.whyGood : A.whyOk)));
+  }
+  function _o2Level(S, dev, deb) {                       // ce que vaut un réglage d'oxygène chez CE patient
+    const o = S.o2;
+    if (!o.byDeb) return 'ok';                          // autorisé (urgence vitale) mais sans bénéfice ici : le texte du cas l'explique
+    if (dev === 'mhc' || deb >= 10) return 'danger';
+    if (dev === 'lunettes' && deb > 0 && deb <= 2) return 'good';
+    return 'avoid';
+  }
+  function _runO2(a) {
+    const c = _cur(), scn = _curScn(), S = _soinsOf(scn), o = S.o2, who = _nurse(scn);
+    if (o.mode === 'refuse') {
+      _careSay('pat', o.pat); _verdictLine('avoid', o.why); _careEv('o2', 'refus', 'avoid'); c.care.bad = (c.care.bad || 0) + 1; return;
+    }
+    let dev = a.dev, deb = a.deb;
+    if (deb == null && dev === 'mhc') deb = 15;
+    if (deb == null || !(deb > 0)) {                      // pas de débit précisé : on demande, sans rien lancer
+      _menuAct = true; _menuOpen = false;
+      _log('sys', '💡 À quel débit ? Précise-le (par exemple « de l\'oxygène aux lunettes à 2 litres ») ou choisis dans « 🩺 Agir ». L\'oxygène est un médicament : le débit compte.');
+      return;
+    }
+    if (!dev) dev = deb >= 6 ? 'masque' : (c.care.o2 ? c.care.o2.dev : 'lunettes');
+    const v = _o2Level(S, dev, deb);
+    c.care.o2 = { dev, deb, v }; _careEv('o2', dev + ' ' + deb, v);
+    const r = o.byDeb ? (o[v] || {}) : { pat: o.pat, why: o.why };
+    if (r.pat) _careSay('pat', r.pat);
+    _verdictLine(v === 'good' ? 'good' : v, r.why);
+    if (v === 'good' && !c.care.alert) _log('sys', '💡 Dans la réalité, c\'est l\'infirmière qui décide et règle l\'oxygène : alerte ' + who + ' d\'abord (« 🩺 Agir » → sonnette).');
+    if (c.care.alert) {                                   // l'infirmière est dans la chambre : elle réagit
+      if (v === 'danger') _careSay('ide', who + ' : « Stop ! Baisse le débit tout de suite : c\'est moi qui règle l\'oxygène. »');
+      else if (v === 'good') _careSay('ide', who + ' : « Oui, à faible débit, c\'est bien. Je prends le relais pour la prescription et le réglage ; surveille sa saturation et sa vigilance. »');
+    }
+    if (v !== 'good') c.care.bad = (c.care.bad || 0) + 1;
+  }
+  function _runO2Stop() {
+    const c = _cur(), scn = _curScn();
+    if (!c.care.o2) { _log('narr', '(Il n\'y a pas d\'oxygène en route.)'); return; }
+    c.care.o2 = null; _careEv('o2', 'stop', 'ok'); _log('narr', '(Tu arrêtes l\'oxygène et tu retires le matériel.)');
+  }
+  function _runStay() {
+    const c = _cur(), scn = _curScn(), S = _soinsOf(scn);
+    if (c.care.stay && c.care.stayShown) { _log('narr', '(Tu es toujours près de ' + (_male(scn) ? 'lui' : 'elle') + '.)'); return; }
+    c.care.stay = true; c.care.stayShown = true; _careEv('reste', '', S.vital ? 'good' : 'ok');
+    _careSay('narr', S.rester.pat); _verdictLine(S.vital ? 'good' : 'ok', S.rester.why);
+  }
+  function _runAct(a) {
+    if (a.k === 'pos') _runPos(a.id);
+    else if (a.k === 'alerte') _runAlert(a.how);
+    else if (a.k === 'o2') _runO2(a);
+    else if (a.k === 'o2stop') _runO2Stop();
+    else if (a.k === 'reste') _runStay();
+  }
+  const MEASURE_HINT = '🩺 Pour mesurer ou relever une constante, c\'est toi qui fais le geste : ouvre l\'onglet « Chambre » et choisis l\'instrument. Ici, tu parles au patient ou tu agis (position, alerte, oxygène).';
+  function _handleAct(A, text, noParse) {
+    const c = _cur();
+    _log('me', text); c.last = null; c.misses = 0; c.suggest = null;
+    if (A.measure) _log('sys', MEASURE_HINT);
+    A.acts.forEach(_runAct);
+    let ids = (noParse || (A.measure && !/\?/.test(text))) ? [] : parse(text);
+    if (A.acts.length) ids = ids.filter(i => _ACT_DROP.indexOf(i) < 0);
+    if (ids.length) { _handle(ids, text, { skipLog: true }); return; }
+    c.actions++; _afterAction();
+  }
+  // Bouton « Agir » : kind = pos | alerte | o2 | o2stop | reste
+  function act(kind, arg) {
+    const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre') return;
+    const S = _SO();
+    let a = null, say = '';
+    if (kind === 'pos') { const P = S.POS.find(p => p.id === arg); if (!P) return; a = { k: 'pos', id: P.id }; say = P.say; }
+    else if (kind === 'alerte') { a = { k: 'alerte', how: arg === 'chercher' ? 'chercher' : 'sonnette' };
+      say = arg === 'chercher' ? 'Je vais chercher ' + _nurse(scn) + ' au poste de soins.' : 'J\'appuie sur la sonnette d\'appel pour faire venir ' + _nurse(scn) + '.'; }
+    else if (kind === 'o2') { const O = S.O2.find(p => p.id === arg); if (!O) return; a = { k: 'o2', dev: O.dev, deb: O.deb }; say = O.say; }
+    else if (kind === 'o2stop') { a = { k: 'o2stop' }; say = 'J\'arrête l\'oxygène.'; }
+    else if (kind === 'reste') { a = { k: 'reste' }; say = 'Je reste près de vous, je ne vous quitte pas.'; }
+    if (!a) return;
+    _handleAct({ acts: [a], measure: false }, _gx(say, scn), true);
+  }
+  let _menuAct = false;
+  function toggleAct() { _menuAct = !_menuAct; if (_menuAct) _menuOpen = false; _renderMenu(); _renderActMenu(); }
+  function _renderActMenu() {
+    const m = _el('sim-actmenu'), b = _el('sim-act-btn'), c = _cur(), scn = _curScn(); if (!m || !c || !scn) return;
+    m.style.display = _menuAct ? 'block' : 'none';
+    if (b) b.setAttribute('aria-expanded', _menuAct ? 'true' : 'false');
+    if (!_menuAct) return;
+    const S = _SO(), cp = c.care.pos ? c.care.pos.id : null, co = c.care.o2, who = _nurse(scn);
+    const btn = (on, js, txt) => `<button type="button" class="sim-q ${on ? 'done' : ''}" onclick="${js}">${on ? '✓ ' : ''}${_esc(txt)}</button>`;
+    m.innerHTML = `<div class="sim-actgrp"><div class="sim-acth">Installer ${_male(scn) ? 'le résident' : 'la résidente'}</div>
+        ${S.POS.map(p => btn(cp === p.id, `App.Sim.act('pos','${p.id}')`, p.ico + ' ' + _gx(p.label, scn))).join('')}</div>
+      <div class="sim-actgrp"><div class="sim-acth">Appeler à l'aide</div>
+        ${btn(!!(c.care.alert && c.care.alert.how !== 'chercher'), `App.Sim.act('alerte','sonnette')`, '🔔 Appuyer sur la sonnette d\'appel : ' + who + ' arrive')}
+        ${btn(!!(c.care.alert && c.care.alert.how === 'chercher'), `App.Sim.act('alerte','chercher')`, '🏃 Aller chercher ' + who + ' au poste de soins')}
+        ${btn(!!c.care.stay, `App.Sim.act('reste','')`, '🤝 Rester près de ' + (_male(scn) ? 'lui' : 'elle') + ' et le rassurer'.replace('le rassurer', _male(scn) ? 'le rassurer' : 'la rassurer'))}</div>
+      <div class="sim-actgrp"><div class="sim-acth">Oxygène <span class="sim-muted sim-small">(un médicament : le débit compte)</span></div>
+        ${S.O2.map(o => btn(!!(co && co.dev === o.dev && co.deb === o.deb), `App.Sim.act('o2','${o.id}')`, '🫁 ' + o.label)).join('')}
+        ${co ? btn(false, `App.Sim.act('o2stop','')`, '⏹ Arrêter l\'oxygène') : ''}</div>
+      <div class="sim-muted sim-small sim-menu-tip">Tu peux aussi taper ce que tu fais : « je l'installe assise », « j'appelle l'infirmière », « je mets de l'oxygène à 2 litres ». Mesures (tension, saturation…) : onglet « Chambre ».</div>`;
+  }
+  function _renderStatus() {
+    const el = _el('sim-status'), c = _cur(), scn = _curScn(); if (!el || !c || !scn) return;
+    const S = _SO(), chips = [];
+    if (c.care.pos) { const P = S.POS.find(p => p.id === c.care.pos.id); if (P) chips.push('🛏️ ' + _gx(P.short, scn)); }
+    if (c.care.o2) chips.push('🫁 O₂ ' + (c.care.o2.dev === 'mhc' ? 'masque haute conc.' : c.care.o2.dev) + ' ' + String(c.care.o2.deb).replace('.', ',') + ' L/min');
+    if (c.care.alert) chips.push('👩‍⚕️ ' + _nurse(scn) + ' est là');
+    if (c.care.stay) chips.push('🤝 Tu restes près de ' + (_male(scn) ? 'lui' : 'elle'));
+    el.hidden = !chips.length;
+    el.innerHTML = chips.map(x => `<span class="sim-chip sim-chip-st">${_esc(x)}</span>`).join('');
+  }
+  // Bilan des gestes de sécurité : points d'XP (hors score) et gestes dangereux laissés en place
+  function _soinsResults(c, scn) {
+    const care = c.care || { ev: [] }, S = _soinsOf(scn), unsafe = [];
+    const al = care.alert || null, pos = care.pos || null, o2 = care.o2 || null;
+    if (pos && pos.v === 'danger') { const P = _SO().POS.find(p => p.id === pos.id); unsafe.push('Position dangereuse laissée en place pendant le recueil : ' + (P ? _gx(P.short, scn).toLowerCase() : pos.id) + '.'); }
+    if (o2 && o2.v === 'danger') unsafe.push('Oxygène à un débit dangereux laissé en place pendant le recueil (' + (o2.dev === 'mhc' ? 'masque haute concentration' : o2.dev) + ', ' + String(o2.deb).replace('.', ',') + ' L/min).');
+    let bonus = (al ? (al.v === 'good' ? 3 : (al.v === 'ok' ? 2 : 1)) : 0) + (pos ? (pos.v === 'good' ? 3 : (pos.v === 'ok' ? 1 : 0)) : 0) + (o2 && o2.v === 'good' ? (al ? 2 : 1) : 0) + (care.stay ? 1 : 0);
+    if (unsafe.length) bonus = 0;
+    return { vital: S.vital, alert: al, pos, o2, stay: !!care.stay, tried: (care.ev || []).length > 0, bonus: Math.min(9, bonus), unsafe };
+  }
+  function _soinsBilanHtml(c, scn, R) {
+    const so = R && R.soins; if (!so) return '';
+    const S = _soinsOf(scn), A = S.alert, P = _SO().POS, mk = v => v === 'good' ? '✓' : (v === 'ok' ? '•' : (v === 'avoid' ? '⚠' : '⛔'));
+    const rows = [];
+    if (so.alert) rows.push(`<div class="sim-row-res ${so.alert.v === 'good' || so.alert.v === 'ok' ? 'ok' : 'late'}"><span class="sim-mark">${mk(so.alert.v)}</span><div><b>Tu as alerté ${_esc(_nurse(scn))} pendant le recueil</b><div class="sim-muted sim-small">${_esc(_gx(so.alert.v === 'avoid' ? A.whyLeft : (S.vital ? A.whyGood : A.whyOk), scn))}</div></div></div>`);
+    else if (so.vital) rows.push(`<div class="sim-row-res miss"><span class="sim-mark">✗</span><div><b>Tu n'as pas alerté ${_esc(_nurse(scn))} pendant le recueil</b><div class="sim-muted sim-small">Dans une urgence, on prévient dès qu'on repère des signes de gravité : sonnette ou Karim, sans quitter la personne. Tu l'as fait plus tard, à l'étape « Décision » : c'est moins rapide.</div></div></div>`);
+    if (so.pos) { const r = (S.pos[so.pos.id] || {}), L = P.find(p => p.id === so.pos.id);
+      rows.push(`<div class="sim-row-res ${so.pos.v === 'good' || so.pos.v === 'ok' ? 'ok' : 'late'}"><span class="sim-mark">${mk(so.pos.v)}</span><div><b>Position à la fin du recueil : ${_esc(_gx(L ? L.short : so.pos.id, scn).toLowerCase())}</b><div class="sim-muted sim-small">${_esc(_gx(r.why || '', scn))}</div></div></div>`); }
+    if (so.o2) rows.push(`<div class="sim-row-res ${so.o2.v === 'good' ? 'ok' : 'late'}"><span class="sim-mark">${mk(so.o2.v)}</span><div><b>Oxygène en route à la fin du recueil : ${_esc(so.o2.dev === 'mhc' ? 'masque haute concentration' : so.o2.dev)}, ${_esc(String(so.o2.deb).replace('.', ','))} L/min</b><div class="sim-muted sim-small">${_esc(_gx((S.o2.byDeb ? (S.o2[so.o2.v] || {}) : S.o2).why || '', scn))}</div></div></div>`);
+    if (so.stay) rows.push(`<div class="sim-row-res ok"><span class="sim-mark">✓</span><div><b>Tu es resté(e) près ${_male(scn) ? 'du résident' : 'de la résidente'}</b><div class="sim-muted sim-small">Rester auprès de la personne qui va mal la rassure et permet de surveiller sa respiration et sa vigilance.</div></div></div>`);
+    if (!rows.length) return so.vital ? `<h3 class="sim-h">🩺 Gestes de sécurité pendant le recueil</h3><div class="sim-card"><p class="sim-muted sim-small">Tu n'as fait aucun geste de sécurité pendant le recueil (alerter, installer, rester près de ${_male(scn) ? 'lui' : 'elle'}). Dans ce cas d'urgence, ils comptent : tu peux les faire dès que tu repères des signes de gravité, avec « 🩺 Agir » ou en tapant ce que tu fais.</p></div>` : '';
+    return `<h3 class="sim-h">🩺 Gestes de sécurité pendant le recueil</h3><div class="sim-card">${rows.join('')}<div class="sim-muted sim-small" style="margin-top:8px">${so.bonus ? '+' + so.bonus + ' XP pour ces gestes (hors score). ' : ''}Repères à valider avec ton formateur et les protocoles de ton stage ; l'oxygène est un médicament.</div></div>`;
   }
 
   // ── Instruments : c'est l'étudiant qui fait le geste ──────────
@@ -431,6 +802,7 @@ App.Sim = (() => {
     { id: 'mesures', ico: '🎯', name: 'Mesures justes', desc: 'Noter toutes les mesures sans aucune erreur de saisie.', test: (R, c, scn) => (c.errors || 0) === 0 && Object.keys(c.entered).length >= scn.toolOrder.length },
     { id: 'alerte', ico: '🚨', name: 'Bon réflexe', desc: "Juger qu'il faut alerter l'infirmière maintenant, sans geste dangereux.", test: R => (R.niveau.good || R.niveau.id === 'maintenant') && !R.unsafe.length },
     { id: 'securite', ico: '🛡️', name: "Sécurité d'abord", desc: "Choisir au moins 5 des bons gestes d'attente, sans geste dangereux.", test: R => R.actions.good >= 5 && !R.unsafe.length },
+    { id: 'secu', ico: '🩺', name: 'Gestes sûrs', desc: "Alerter l'infirmière et installer le résident correctement pendant le recueil, sans geste dangereux.", test: R => !!R.soins && !!R.soins.alert && R.soins.alert.v !== 'avoid' && !!R.soins.pos && R.soins.pos.v === 'good' && !R.unsafe.length },
     { id: 'saed', ico: '📞', name: 'Message clair', desc: "Obtenir au moins 12/15 à l'appel SAED.", test: R => R.appel.pts >= 12 },
     { id: 'discordance', ico: '🔎', name: 'Discordance repérée', desc: "Repérer une information qui ne colle pas avec le dossier (allergie, chute non signalée, repas non pris…) et la transmettre à l'infirmière.", test: R => !!R.allergySaid },
     { id: 'transmetteur', ico: '📝', name: 'Transmetteur', desc: 'Obtenir au moins 12/15 à la transmission écrite.', test: R => R.trans.pts >= 12 },
@@ -630,7 +1002,7 @@ App.Sim = (() => {
         <div class="sim-row sim-enter">${S.canRetry ? `<button class="btn btn-primary" onclick="App.Sim.saedRetry()">↺ Rappeler ${_esc(call.who)} avec ces précisions</button><button class="btn btn-ghost" onclick="App.Sim.saedDone()">Continuer sans rappeler</button>` : `<button class="btn btn-primary" onclick="App.Sim.saedDone()">Continuer : ${_esc((scn.rx && scn.rx.nextLabel) || 'la prescription')} →</button>`}</div>`;
     }
     return `<div class="sim-card"><h2 class="sim-title">📞 Appeler ${_esc(call.who)}</h2><p class="sim-lead">${_esc(call.intro)}</p>
-      <div class="sim-note"><b>Méthode.</b> ${_esc(call.method)}</div>${_recueilRecap(c, scn)}${logHtml}${form}${after}</div>`;
+      <div class="sim-note"><b>Méthode.</b> ${_esc(call.method)}</div>${c.care && c.care.alert ? `<div class="sim-note">👩‍⚕️ <b>${_esc(call.who)} est déjà venue</b> pendant le recueil, quand tu l'as alertée. Tu lui fais maintenant ton point complet, avec toutes les mesures : situation, antécédents, évaluation, demande.</div>` : ''}${_recueilRecap(c, scn)}${logHtml}${form}${after}</div>`;
   }
 
   // Prescription du médecin
@@ -849,10 +1221,12 @@ App.Sim = (() => {
     const unsafe = [];
     if (lv && lv.verdict === 'danger') unsafe.push(lv.unsafe || 'Tu as jugé qu\'il n\'y avait rien à signaler alors que plusieurs signes allaient dans le même sens.');
     dangers.forEach(a => unsafe.push('Geste dangereux choisi : ' + a.label));
+    const soins = _soinsResults(c, scn);
+    soins.unsafe.forEach(u => unsafe.push(u));
     const raw = recueil.pts + gestes.pts + niveau.pts + actions.pts + appel.pts + trans.pts;
     const capped = unsafe.length > 0 && raw > 50;
     const total = Math.round(unsafe.length ? Math.min(raw, 50) : raw);
-    return { recueil, gestes, niveau, actions, appel, trans, unsafe, raw: Math.round(raw * 10) / 10, capped, total,
+    return { recueil, gestes, niveau, actions, appel, trans, soins, unsafe, raw: Math.round(raw * 10) / 10, capped, total,
              allergySaid: _callAllergy(c, scn), ecg: c.rx.ecg ? { score: c.rx.ecg.score } : null, gazo: c.rx.gazo ? { score: c.rx.gazo.score } : null, partial: !!partial };
   }
   function _complete() {
@@ -863,8 +1237,9 @@ App.Sim = (() => {
     const base = R.prevBest == null ? R.total + 10 : Math.max(5, R.total - R.prevBest);
     const bonusEcg = R.ecg ? Math.min(20, Math.round(R.ecg.score / 5)) : 0;
     const bonusGazo = R.gazo ? Math.min(10, Math.round(R.gazo.score / 10)) : 0;
-    const bonus = bonusEcg + bonusGazo;
-    R.xp = { base, bonus, bonusEcg, bonusGazo, total: base + bonus, first: R.prevBest == null };
+    const bonusSoins = R.soins ? R.soins.bonus : 0;
+    const bonus = bonusEcg + bonusGazo + bonusSoins;
+    R.xp = { base, bonus, bonusEcg, bonusGazo, bonusSoins, total: base + bonus, first: R.prevBest == null };
     const before = _levelOf(P.xp).L.n;
     R.earned = BADGES.filter(bd => { try { return bd.test(R, c, scn); } catch (e) { return false; } }).map(bd => bd.id);
     R.newBadges = R.earned.filter(id => !P.badges[id]);
@@ -932,7 +1307,7 @@ App.Sim = (() => {
                    actions: 0, firstCare: null, secs: 0, dossierOpen: false, misses: 0, last: null, saved: false };
     _fix(st.current);
     _gReset();
-    _confirmFinish = false; _menuOpen = false;
+    _confirmFinish = false; _menuOpen = false; _menuAct = false;
     screen = 'jeu';
     _save(); render();
   }
@@ -1020,8 +1395,16 @@ App.Sim = (() => {
       <h3 class="sim-h">Ateliers techniques</h3>
       ${window.App.SimECG ? window.App.SimECG.card() : ''}
       ${hist}
+      ${_unkHtml()}
       <p class="sim-muted sim-small sim-disclaimer">Outil d'entraînement. Il ne remplace ni tes cours ni les protocoles de ton lieu de stage. Les valeurs et réponses sont à valider avec ton formateur.</p>
     </div>`;
+  }
+  function _unkHtml() {
+    const a = _unkRead(); if (!a.length) return '';
+    return `<details class="sim-bdgs sim-unk"><summary>💬 Phrases non comprises (${a.length})</summary>
+      <p class="sim-muted sim-small">Les phrases que le patient n'a pas comprises sont gardées ici, sur cet appareil seulement. Copie la liste et envoie-la pour qu'on ajoute ces façons de parler.</p>
+      <ul class="sim-ul">${a.slice(0, 30).map(x => `<li>${_esc(x.t)}</li>`).join('')}</ul>
+      <div class="sim-row"><button class="btn btn-ghost btn-sm" id="sim-unk-copy" onclick="App.Sim.unkCopy()">📋 Copier la liste</button><button class="btn btn-ghost btn-sm" onclick="App.Sim.unkClear()">Vider</button></div></details>`;
   }
   function discard() { st.current = null; _save(); render(); }
   function _progHtml() {
@@ -1079,13 +1462,18 @@ App.Sim = (() => {
       <div class="sim-play" id="sim-play" data-tab="${_esc(c.tab || 'dialogue')}">
         <section class="sim-panel sim-p-dialogue" id="sim-p-dialogue" aria-label="Dialogue">
           <div class="sim-pt"><span class="sim-avatar" aria-hidden="true">${scn.patient.avatar || '👵'}</span><div><b>${_esc(scn.patient.civ)} ${_esc(scn.patient.nom)}</b><div class="sim-muted sim-small">${_male(scn) ? 'Résident' : 'Résidente'} · chambre ${_esc(scn.patient.chambre)}</div></div></div>
+          <div class="sim-status" id="sim-status" hidden aria-label="Ce que tu as mis en place"></div>
           <div class="sim-log" id="sim-log" role="log" aria-live="polite"></div>
           <form class="sim-form" id="sim-form" onsubmit="return App.Sim.submit(event)">
             <input id="sim-input" type="text" autocomplete="off" enterkeyhint="send" maxlength="300" placeholder="Écris ce que tu dis à ${_esc(scn.patient.civ)} ${_esc(scn.patient.nom)}…" aria-label="Ta phrase">
             <button class="btn btn-primary" type="submit">Envoyer</button>
           </form>
-          <button class="sim-menu-toggle" type="button" id="sim-menu-btn" onclick="App.Sim.toggleMenu()">📋 Questions possibles</button>
+          <div class="sim-toggles">
+            <button class="sim-menu-toggle" type="button" id="sim-menu-btn" onclick="App.Sim.toggleMenu()" aria-expanded="false">📋 Questions possibles</button>
+            <button class="sim-menu-toggle sim-act-toggle" type="button" id="sim-act-btn" onclick="App.Sim.toggleAct()" aria-expanded="false">🩺 Agir</button>
+          </div>
           <div class="sim-menu" id="sim-menu"></div>
+          <div class="sim-menu sim-actmenu" id="sim-actmenu"></div>
         </section>
         <section class="sim-panel sim-p-chambre" id="sim-p-chambre" aria-label="Chambre">
           <div class="sim-scene-bar"><h3 class="sim-h">🛏️ Dans la chambre</h3>
@@ -1110,7 +1498,7 @@ App.Sim = (() => {
         if (g) { ev.preventDefault(); hot(g.getAttribute('data-hot')); }
       });
     }
-    _renderLog(); _renderMenu(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderGesture();
+    _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderGesture();
     setTimeout(_scrollLog, 0);
   }
 
@@ -1121,7 +1509,10 @@ App.Sim = (() => {
   function _scrollLog() { const l = _el('sim-log'); if (l) l.scrollTop = l.scrollHeight; }
   function _renderLog() {
     const l = _el('sim-log'), c = _cur(); if (!l || !c) return;
-    l.innerHTML = c.log.map(m => `<div class="sim-msg sim-${_esc(m.who)}">${_esc(m.text)}</div>`).join('');
+    const scn = _curScn();
+    const chips = (c.suggest && c.suggest.length && scn)
+      ? `<div class="sim-sugg">${c.suggest.map(id => { const it = _intent(id); return it ? `<button type="button" class="sim-q" onclick="App.Sim.askMenu('${_esc(id)}')">${_esc(_gen(it.menu, scn))}</button>` : ''; }).join('')}</div>` : '';
+    l.innerHTML = c.log.map(m => `<div class="sim-msg sim-${_esc(m.who)}">${_esc(m.text)}</div>`).join('') + chips;
     _scrollLog();
   }
   function _renderMenu() {
@@ -1137,10 +1528,10 @@ App.Sim = (() => {
         <summary>${_esc(_gen(t.label, scn))}</summary>
         ${items.map(i => `<button type="button" class="sim-q ${c.asked[i.id] ? 'done' : ''}" onclick="App.Sim.askMenu('${_esc(i.id)}')">${c.asked[i.id] ? '✓ ' : ''}${_esc(_gen(i.menu, scn))}</button>`).join('')}
       </details>`;
-    }).join('') + '<div class="sim-muted sim-small sim-menu-tip">Tu peux aussi taper ta propre phrase dans la zone de texte.</div>';
+    }).join('') + '<div class="sim-muted sim-small sim-menu-tip">Tu peux aussi taper ta propre phrase dans la zone de texte. Pour agir (installer le résident, alerter, oxygène) : bouton « 🩺 Agir ».</div>';
   }
   function thToggle(id, open) { if (open) _openThemes[id] = true; else delete _openThemes[id]; }
-  function toggleMenu() { _menuOpen = !_menuOpen; _renderMenu(); }
+  function toggleMenu() { _menuOpen = !_menuOpen; if (_menuOpen) _menuAct = false; _renderMenu(); _renderActMenu(); }
 
   function _renderChambre() { _renderToolbar(); _renderLast(); _renderList(); _renderFinish(); _syncScene(); }
 
@@ -1410,7 +1801,7 @@ App.Sim = (() => {
       <div class="sim-card sim-result">
         <div class="sim-result-score"><b>${R.total}</b><span>/100</span></div>
         <div class="sim-result-t"><div class="sim-result-w">${word}</div>
-          <div class="sim-muted sim-small">+${R.xp.total} XP${R.xp.first ? ' (dont 10 pour une première partie)' : ' (tu gagnes des XP quand tu progresses)'}${(R.xp.bonusEcg != null ? R.xp.bonusEcg : (R.ecg ? R.xp.bonus : 0)) ? ' · ECG +' + (R.xp.bonusEcg != null ? R.xp.bonusEcg : R.xp.bonus) : ''}${R.xp.bonusGazo ? ' · gaz du sang +' + R.xp.bonusGazo : ''} · temps actif ${_hms(c.secs)}</div>
+          <div class="sim-muted sim-small">+${R.xp.total} XP${R.xp.first ? ' (dont 10 pour une première partie)' : ' (tu gagnes des XP quand tu progresses)'}${(R.xp.bonusEcg != null ? R.xp.bonusEcg : (R.ecg ? R.xp.bonus : 0)) ? ' · ECG +' + (R.xp.bonusEcg != null ? R.xp.bonusEcg : R.xp.bonus) : ''}${R.xp.bonusGazo ? ' · gaz du sang +' + R.xp.bonusGazo : ''}${R.xp.bonusSoins ? ' · gestes de sécurité +' + R.xp.bonusSoins : ''} · temps actif ${_hms(c.secs)}</div>
           <div class="sim-result-lv">Niveau ${lv.L.n} · ${_esc(lv.L.name)}${R.level.after > R.level.before ? ' <em class="sim-new">Niveau gagné</em>' : ''}</div>
           <div class="sim-xpbar"><i style="width:${lv.pct}%"></i></div></div>
       </div>
@@ -1426,6 +1817,7 @@ App.Sim = (() => {
         ${R.gazo ? `<p class="sim-muted sim-small">🩸 Gaz du sang lu : ${R.gazo.score}/100 (bonus d'XP, hors score ; lecture sommaire, pas un diagnostic).</p>` : ''}
         ${R.capped ? `<p class="sim-warn sim-small">Total avant plafond : ${fmt(R.raw)}/100.</p>` : ''}
       </div>
+      ${_soinsBilanHtml(c, scn, R)}
       ${earned}${stats}
       ${tips.length ? `<h3 class="sim-h">Pour progresser</h3><div class="sim-card"><ul class="sim-ul">${tips.map(t => `<li>${_esc(t)}</li>`).join('')}</ul></div>` : ''}
       <h3 class="sim-h">Informations clés</h3>
@@ -1494,9 +1886,9 @@ App.Sim = (() => {
   _load();
 
   return {
-    open, close, start, resume, toList, discard, setTab, say, submit, askMenu, toggleMenu, thToggle,
+    open, close, start, resume, toList, discard, setTab, say, submit, askMenu, toggleMenu, toggleAct, act, thToggle,
     pickTool, dropTool, hot, gStartCount, gTap, gRecount, gPlace, gInflate, gSubmit, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
-    decLevel, decLevelOk, decPick, decActionsOk, decNext, txt, sendSaed, saedRetry, saedDone, rxEcg, rxSkip, rxGazo, rxGazoSkip, rxNext, wrSubmit, wrDone, aiReview,
-    parse, _t: { norm: _norm, state: () => st, tick: _tick, grade: (kind, texts) => { const scn = _curScn() || _scenarios()[0]; return _grade(kind === 'saed' ? scn.call.sections : scn.written.fields, texts); }, results: () => _results(), levelOf: _levelOf }
+    decLevel, decLevelOk, decPick, decActionsOk, decNext, txt, sendSaed, saedRetry, saedDone, rxEcg, rxSkip, rxGazo, rxGazoSkip, rxNext, unkCopy, unkClear, wrSubmit, wrDone, aiReview,
+    parse, parseAct, _t: { norm: _norm, prep: _prep, suggest: _suggest, unk: _unkRead, state: () => st, tick: _tick, grade: (kind, texts) => { const scn = _curScn() || _scenarios()[0]; return _grade(kind === 'saed' ? scn.call.sections : scn.written.fields, texts); }, results: () => _results(), levelOf: _levelOf }
   };
 })();

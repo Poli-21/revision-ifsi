@@ -163,7 +163,7 @@ App.SimScenarios = App.SimScenarios || [];
     answers: Object.assign(B.contact(patient, {
       c_salut:        { text: 'Bon… jour…' },
       c_presentation: { text: "(Elle hoche la tête et sourit de travers.) « Mon… sieur… Mada… Moi… Mo… nique. »", logs: ['g_presentation'] },
-      c_identite_q:   { text: "« Gi… rard. Mo… nique. Trois… mars… quarante-deux. » (elle cherche ses mots, mais y arrive)", logs: ['g_identite'] },
+      c_identite_q:   { text: "« Gi… rard. Mo… nique. Trois… mars… quarante-deux. Quatre-vingt… quatre ans. » (elle cherche ses mots, mais y arrive)", logs: ['g_identite'] },
       c_explication:  { text: '(Elle hoche la tête : elle a compris.)', logs: ['g_explication'] },
       c_accord:       { text: '(Elle hoche la tête et fait « oui » de la main gauche.)', logs: ['g_accord'] },
       c_intimite:     { text: '(Elle hoche la tête.)', logs: ['g_intimite'] },

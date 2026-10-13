@@ -182,7 +182,7 @@ App.SimScenarios = App.SimScenarios || [];
     answers: Object.assign(B.contact(patient, {
       c_salut:        { text: 'Bon… jour…' },
       c_presentation: { text: "(Il lève la main.) « Ah… l'étudiant… Moi… Gérard… Moreau. » (il reprend son souffle entre les mots)", logs: ['g_presentation'] },
-      c_identite_q:   { text: "« Moreau… Gérard. Douze… juin… cinquante. » (il souffle entre les mots)", logs: ['g_identite'] },
+      c_identite_q:   { text: "« Moreau… Gérard. Douze… juin… cinquante. Soixante-seize… ans. » (il souffle entre les mots)", logs: ['g_identite'] },
       c_explication:  { text: '(Il hoche la tête.) « D\'accord… »', logs: ['g_explication'] },
       c_accord:       { text: '(Il fait « oui » de la tête, la main sur la poitrine.)', logs: ['g_accord'] },
       c_intimite:     { text: '(Il hoche la tête.) « Merci… »', logs: ['g_intimite'] },
@@ -261,7 +261,7 @@ App.SimScenarios = App.SimScenarios || [];
         ref: 'Pratique usuelle de recueil de données, à confirmer dans ton cours' }
     ] }),
 
-    alertSummary: "Pris un par un, ces signes pourraient passer pour un gros rhume chez un homme qui tousse tout le temps. Ensemble (essoufflement au repos, phrases coupées, lèvres bleutées, tirage, fréquence respiratoire à 28, saturation à 86 % alors que son habituel est 91 %, somnolence, spray qui ne soulage plus, fièvre), ils sont l'alerte d'une détresse respiratoire chez un insuffisant respiratoire chronique. Tu ne poses pas de diagnostic et tu ne traites rien : tu repères, tu l'installes assis ou demi-assis (dossier relevé à plus de 30°), tu restes auprès de lui, tu ne donnes ni calmant ni somnifère, tu ne règles aucun débit d'oxygène (c'est un médicament : il peut en avoir besoin, mais prescrit, à faible débit et surveillé) et tu alertes l'infirmière tout de suite, qui appelle le 15 (si personne ne répond rapidement, tu appelles toi-même le 15 plutôt que d'attendre).",
+    alertSummary: "Pris un par un, ces signes pourraient passer pour un gros rhume chez un homme qui tousse tout le temps. Ensemble (essoufflement au repos, phrases coupées, lèvres bleutées, tirage, fréquence respiratoire à 28, saturation à 86 % alors que son habituel est 91 %, somnolence, spray qui ne soulage plus, fièvre), ils sont l'alerte d'une détresse respiratoire chez un insuffisant respiratoire chronique. Tu ne poses pas de diagnostic et tu ne traites rien : tu repères, tu l'installes assis ou demi-assis (dossier relevé à plus de 30°), tu restes auprès de lui, tu ne donnes ni calmant ni somnifère, tu ne règles pas seul le débit d'oxygène (c'est un médicament : il peut en avoir besoin, mais sur décision de l'infirmière ou du protocole du service, à faible débit et surveillé ; dans le simulateur, tu peux t'entraîner à le proposer et l'infirmière corrige) et tu alertes l'infirmière tout de suite, qui appelle le 15 (si personne ne répond rapidement, tu appelles toi-même le 15 plutôt que d'attendre).",
 
     decision: {
       intro: "Tu as terminé le recueil. Avant d'agir, prends un instant : ce que tu as trouvé veut-il dire quelque chose, et que fais-tu maintenant ? Un étudiant ne pose pas de diagnostic : il repère, il sécurise et il alerte.",
@@ -362,7 +362,7 @@ App.SimScenarios = App.SimScenarios || [];
           ] }
       ],
       reply: {
-        good: "Merci, c'est très clair. J'arrive tout de suite et j'appelle le 15 : garde-le assis, reste auprès de lui, ne lui donne ni calmant ni oxygène, et continue à surveiller sa respiration et sa saturation. Prépare son dossier et la liste de ses traitements.",
+        good: "Merci, c'est très clair. J'arrive tout de suite et j'appelle le 15 : garde-le assis, reste auprès de lui, ne lui donne aucun calmant, ne touche pas au débit d'oxygène sans mon accord, et continue à surveiller sa respiration et sa saturation. Prépare son dossier et la liste de ses traitements.",
         mid: "D'accord, j'ai l'essentiel. J'arrive.",
         low: 'Je ne suis pas sûre de bien comprendre la situation.',
         retry: 'Rappelle-moi avec ces précisions, vite.',
@@ -436,7 +436,7 @@ App.SimScenarios = App.SimScenarios || [];
       model: {
         C: "Détresse respiratoire chez un résident BPCO : essoufflement au repos",
         D: "À 7 h 50 : résident assis, penché en avant, phrases coupées, lèvres bleutées, tirage intercostal, sueurs, somnolent. Toux et crachats jaune-vert depuis 2 jours, aggravation cette nuit (spray sans effet à 3 h et 6 h 30). FR 28/min (18 d'habitude), SpO2 86 % en air ambiant (91 % d'habitude), pouls 108/min, PA 150/86, température 38,1 °C.",
-        A: "Infirmière (Sophie) alertée à [heure], 15 appelé par l'infirmière à [heure]. Resté auprès du résident, rassuré, installé assis, rien donné par la bouche, pas de calmant, pas d'oxygène mis en route par moi. Surveillance de la respiration et de la saturation en attendant les secours. Dossier de liaison d'urgence préparé.",
+        A: "Infirmière (Sophie) alertée à [heure], 15 appelé par l'infirmière à [heure]. Resté auprès du résident, rassuré, installé assis, rien donné par la bouche, pas de calmant, aucun débit d'oxygène réglé sans l'accord de l'infirmière. Surveillance de la respiration et de la saturation en attendant les secours. Dossier de liaison d'urgence préparé.",
         R: "Gaz du sang réalisé par le SMUR et communiqué à Sophie : pH 7,29, PaCO₂ 66 mmHg, HCO₃⁻ 31 mmol/L, PaO₂ 54 mmHg. Ma lecture sommaire : pH bas, PaCO₂ élevée, PaO₂ basse (l'interprétation est faite par le médecin). Secours arrivés à [heure], résident transféré aux urgences. Fils Patrick prévenu par l'infirmière. À suivre : nouvelles de l'hôpital."
       },
       aiFacts: null
