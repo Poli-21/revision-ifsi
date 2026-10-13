@@ -9,7 +9,11 @@ window.App = window.App || {};
 App.SimECG = (() => {
   const Art = () => App.SimECGArt;
   const KEY = 'ifsi_simecg_v1';
-  const PATIENT = { nom: 'LEFÈVRE', prenom: 'Geneviève', dn: '12/03/1942', age: 84 };
+  const PATIENT0 = { nom: 'LEFÈVRE', prenom: 'Geneviève', dn: '12/03/1942', age: 84 };
+  // Contexte facultatif donné par un scénario de simulation : { patient, rate, situation, onDone(r), onBack() }.
+  // Sans contexte (atelier ouvert depuis la liste), l'atelier se comporte exactement comme avant.
+  let CTX = null;
+  const PATIENT = new Proxy({}, { get: (_, k) => ((CTX && CTX.patient) || PATIENT0)[k] });
   const LIMBS = ['RA', 'LA', 'LL', 'RL'];
   const VS = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
   const ZONE_NAME = { poignet_d: 'poignet droit', poignet_g: 'poignet gauche', cheville_g: 'cheville gauche', cheville_d: 'cheville droite' };
@@ -78,7 +82,7 @@ App.SimECG = (() => {
 
   // Construit l'enregistrement à partir de ce que l'étudiant a réellement posé et réglé
   function buildRecording(S) {
-    const rate = 72, RR = 60 / rate, rnd = mulberry(1942 + S.attempt * 7);
+    const rate = (CTX && CTX.rate) || 72, RR = 60 / rate, rnd = mulberry(1942 + S.attempt * 7);
     const beats = []; for (let t = 0.5; t < 24; t += RR * (1 + (rnd() - 0.5) * 0.04)) beats.push(t);
     const rec = { beats, RR, comps: {}, off: {}, offWhy: {}, noise: { tremor: !!S.art.tremor, wander: !!S.art.wander, hz50: false, hz50big: false }, speed: S.set.speed, gain: S.set.gain, seed: rnd() };
     const L = S.limbs, V = S.V;
@@ -290,21 +294,34 @@ App.SimECG = (() => {
       <span class="sim-muted sim-small">${hist.attempts.length ? hist.attempts.length + ' essai' + (hist.attempts.length > 1 ? 's' : '') + ' · meilleur score ' + best + '/100' : 'Fonctionne hors ligne'}</span></div>
     </div>`;
   }
-  function open() {
+  function open(ctx) {
+    CTX = (ctx && typeof ctx === 'object' && ctx.patient) ? ctx : null;
     _loadH(); _clr();
     const root = _el('sim-root'); if (!root) return;
     S = null; _intro();
     _startTimer();
     try { window.scrollTo({ top: 0 }); document.querySelector('.main')?.scrollTo({ top: 0 }); } catch (e) {}
   }
-  function back() { _clr(); S = null; try { App.Sim.toList(); } catch (e) { App.Sim.open(); } }
+  function back() {
+    _clr(); S = null;
+    const c = CTX; CTX = null;
+    if (c && typeof c.onBack === 'function') { try { c.onBack(); return; } catch (e) {} }
+    try { App.Sim.toList(); } catch (e) { App.Sim.open(); }
+  }
+  // Fin de l'atelier lancé depuis un scénario : on renvoie le score au scénario
+  function done() {
+    const c = CTX, r = S && S.bilan ? { score: S.bilan.total, secs: S.secs, mode: S.mode, tries: S.attempt } : null;
+    _clr(); S = null; CTX = null;
+    if (c && typeof c.onDone === 'function' && r) { try { c.onDone(r); return; } catch (e) {} }
+    try { App.Sim.toList(); } catch (e) { App.Sim.open(); }
+  }
 
   function _shell(inner, showSteps) {
     const root = _el('sim-root'); if (!root) return;
     const idx = S ? STEPS.findIndex(x => x[0] === S.step) : -1;
     const stepper = showSteps ? `<ol class="sim-stepper ecg-stepper" aria-label="Étapes">` + STEPS.map((x, i) => `<li class="${i < idx ? 'done' : (i === idx ? 'now' : '')}"><span class="sim-step-dot">${i < idx ? '✓' : (i + 1)}</span><span class="sim-step-lbl">${x[1]}</span></li>`).join('') + '</ol>' : '';
     root.innerHTML = `<div class="sim-wrap ecg-wrap" id="sim-ecg">
-      <div class="sim-bar"><button class="btn btn-ghost btn-sm" onclick="App.SimECG.back()">← Simulation</button><div class="sim-bar-title">🫀 Atelier ECG</div>${S ? '<span class="sim-bar-time" id="ecg-clock">' + _hms(S.secs) + '</span>' : ''}</div>
+      <div class="sim-bar"><button class="btn btn-ghost btn-sm" onclick="App.SimECG.back()">${CTX ? '← Prescription' : '← Simulation'}</button><div class="sim-bar-title">🫀 Atelier ECG</div>${S ? '<span class="sim-bar-time" id="ecg-clock">' + _hms(S.secs) + '</span>' : ''}</div>
       ${stepper}${S && S.todo && S.todo.length && S.attempt > 1 && ['membres', 'thorax', 'enreg'].indexOf(S.step) >= 0 ? '<div class="sim-note ecg-todo">🔁 <b>Nouvel enregistrement : à corriger</b><ul class="sim-ul">' + S.todo.map(t => '<li>' + _esc(t) + '</li>').join('') + '</ul></div>' : ''}${inner}</div>`;
   }
   function _hms(s) { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
@@ -313,7 +330,7 @@ App.SimECG = (() => {
     const last = hist.attempts.slice(-3).reverse();
     _shell(`<div class="sim-card">
       <h2 class="sim-title">Poser un ECG 12 dérivations</h2>
-      <p class="sim-lead"><b>Situation.</b> ${PATIENT.prenom} ${PATIENT.nom}, ${PATIENT.age} ans, est résidente en EHPAD. Le médecin traitant a prescrit un ECG de contrôle. Tu es l'étudiant(e) infirmier(ère) : tu prépares la résidente, tu poses les électrodes, tu règles l'appareil, tu enregistres puis tu vérifies que le tracé est exploitable avant de le transmettre. <i>(Patiente fictive.)</i></p>
+      <p class="sim-lead"><b>Situation.</b> ${CTX && CTX.situation ? _esc(CTX.situation) + ' ' : `${PATIENT.prenom} ${PATIENT.nom}, ${PATIENT.age} ans, est résidente en EHPAD. Le médecin traitant a prescrit un ECG de contrôle. `}Tu es l'étudiant(e) infirmier(ère) : tu prépares la résidente, tu poses les électrodes, tu règles l'appareil, tu enregistres puis tu vérifies que le tracé est exploitable avant de le transmettre. <i>(Patiente fictive.)</i></p>
       <h3 class="sim-h2">Choisis ton mode</h3>
       <div class="ecg-modes">
         <button class="ecg-mode" onclick="App.SimECG.start('guide')"><b>🧭 Guidé</b><span>Repères visibles sur le schéma (lignes, numéros d'espaces), vérification de chaque étape avec explication.</span></button>
@@ -655,7 +672,9 @@ App.SimECG = (() => {
         <li>Vert et noir inversés ne se voient presque pas sur le tracé : seul un branchement soigneux l'évite.</li>
       </ul>
       <p class="sim-muted sim-small sim-disclaimer">Outil d'entraînement : tracé simulé, repères d'après des protocoles français ; valide les détails (rasage, pose chez la femme, protocole de service) avec ton cours et ton formateur.</p>
-      <div class="sim-row"><button class="btn btn-primary" onclick="App.SimECG.start('${S.mode}')">Rejouer</button><button class="btn btn-ghost" onclick="App.SimECG.back()">Retour à la simulation</button></div>
+      ${CTX
+        ? `<div class="sim-row"><button class="btn btn-primary" onclick="App.SimECG.done()">✓ Retour à la prescription</button><button class="btn btn-ghost" onclick="App.SimECG.start('${S.mode}')">Refaire l'ECG</button></div>`
+        : `<div class="sim-row"><button class="btn btn-primary" onclick="App.SimECG.start('${S.mode}')">Rejouer</button><button class="btn btn-ghost" onclick="App.SimECG.back()">Retour à la simulation</button></div>`}
     </div>`, false);
   }
   function next() {
@@ -702,6 +721,6 @@ App.SimECG = (() => {
   }
 
   _loadH();
-  return { card, open, back, start, toggle, validatePrep, next, pick, uncheck, checkLimbs, checkThorax, setSpeed, setGain, setIdentity, goStep, record, answer, validateQC, redoRec, finish,
+  return { card, open, back, start, toggle, validatePrep, next, pick, uncheck, checkLimbs, checkThorax, setSpeed, setGain, setIdentity, goStep, record, answer, validateQC, redoRec, finish, done,
     _t: { state: () => S, evalLimbs, evalThorax, buildRecording, truth, uOf, tick: _tick } };
 })();

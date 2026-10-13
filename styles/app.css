@@ -2071,3 +2071,112 @@ body.dark .sim-tapbtn { color: #0f172a; }
 .ecg-brow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--sim-line); }
 .ecg-bpts { font-weight: 900; font-size: 1.15rem; white-space: nowrap; }
 .ecg-bpts small { font-size: .75rem; color: var(--gray-500); font-weight: 700; }
+
+/* ── Simulation : décision, appel SAED, prescription, transmissions, bilan noté, niveaux ── */
+.sim-substeps { list-style: none; display: flex; gap: 6px; margin: 0 0 12px; padding: 0; flex-wrap: wrap; }
+.sim-substeps li { font-size: .74rem; font-weight: 700; color: var(--gray-500); background: var(--sim-soft); border: 1px solid var(--sim-line); border-radius: 99px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 5px; }
+.sim-substeps li b { width: 17px; height: 17px; border-radius: 50%; background: var(--sim-line); color: var(--gray-600); display: inline-flex; align-items: center; justify-content: center; font-size: .66rem; }
+.sim-substeps li.now { color: var(--primary); border-color: var(--primary); background: var(--primary-light); }
+.sim-substeps li.now b { background: var(--primary); color: #fff; }
+.sim-substeps li.done { color: var(--sim-ok); }
+.sim-substeps li.done b { background: var(--sim-okbg); color: var(--sim-ok); }
+.sim-opts { display: flex; flex-direction: column; gap: 8px; }
+.sim-opt { display: flex; align-items: flex-start; gap: 10px; text-align: left; width: 100%; font-family: inherit; font-size: .9rem; line-height: 1.45; cursor: pointer;
+  padding: 10px 12px; min-height: 46px; border-radius: 10px; border: 2px solid var(--sim-line); background: var(--sim-card); color: var(--gray-900); }
+.sim-opt:hover { border-color: var(--primary); }
+.sim-opt-m { flex-shrink: 0; font-size: 1.05rem; line-height: 1.3; color: var(--primary); }
+.sim-opt.on { border-color: var(--primary); background: var(--primary-light); }
+.sim-opt.locked { cursor: default; opacity: .65; }
+.sim-opt.locked.on { opacity: 1; }
+.sim-opt.on.good { border-color: var(--sim-ok); background: var(--sim-okbg); }
+.sim-opt.on.avoid { border-color: var(--sim-warn); background: var(--sim-warnbg); }
+.sim-opt.on.danger { border-color: var(--sim-bad); background: var(--sim-badbg); }
+.sim-fb { border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: .88rem; line-height: 1.5; border-left: 5px solid var(--sim-line); background: var(--sim-soft); }
+.sim-fb p { margin: 4px 0 0; }
+.sim-fb .sim-ul { margin-top: 4px; }
+.sim-fb.good { border-color: var(--sim-ok); background: var(--sim-okbg); color: var(--sim-ok); }
+.sim-fb.avoid { border-color: var(--sim-warn); background: var(--sim-warnbg); color: var(--sim-warn); }
+.sim-fb.danger { border-color: var(--sim-bad); background: var(--sim-badbg); color: var(--sim-bad); }
+.sim-fb.good p, .sim-fb.avoid p, .sim-fb.danger p, .sim-fb.danger li { color: var(--gray-900); }
+.sim-recap { border: 1px solid var(--sim-line); border-radius: 10px; padding: 4px 12px 8px; margin: 10px 0; background: var(--sim-soft); }
+.sim-recap summary { cursor: pointer; font-weight: 700; font-size: .84rem; padding: 6px 0; color: var(--gray-700); }
+.sim-recap-body { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; }
+.sim-revs { margin-top: 10px; }
+.sim-rev { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--sim-line); font-size: .86rem; line-height: 1.45; }
+.sim-rev:last-child { border-bottom: none; }
+.sim-rev .sim-mark { background: var(--sim-soft); color: var(--gray-500); }
+.sim-rev.ok .sim-mark { background: var(--sim-okbg); color: var(--sim-ok); }
+.sim-rev.missed .sim-mark { background: var(--sim-warnbg); color: var(--sim-warn); }
+.sim-rev.avoid .sim-mark { background: var(--sim-warnbg); color: var(--sim-warn); }
+.sim-rev.danger .sim-mark { background: var(--sim-badbg); color: var(--sim-bad); }
+.sim-rev.danger { background: var(--sim-badbg); border-radius: 8px; padding-left: 8px; padding-right: 8px; }
+.sim-tag { font-weight: 800; }
+.sim-rev.ok .sim-tag { color: var(--sim-ok); }
+.sim-rev.missed .sim-tag, .sim-rev.avoid .sim-tag { color: var(--sim-warn); }
+.sim-rev.danger .sim-tag { color: var(--sim-bad); }
+.sim-saed { margin: 10px 0; }
+.sim-saed label { display: block; font-size: .86rem; margin-bottom: 4px; line-height: 1.4; }
+.sim-saed textarea { display: block; width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; line-height: 1.45; padding: 9px 11px; border: 1.5px solid var(--sim-line); border-radius: 10px;
+  background: var(--sim-card); color: var(--gray-900); resize: vertical; min-height: 44px; }
+.sim-saed textarea:focus { outline: none; border-color: var(--primary); }
+.sim-saed textarea[readonly] { background: var(--sim-soft); }
+.sim-chat { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.sim-chat .sim-msg { max-width: 92%; }
+.sim-pts { color: var(--primary); font-variant-numeric: tabular-nums; }
+.sim-corr { border: 1px solid var(--sim-line); border-radius: 10px; padding: 6px 12px 8px; margin: 8px 0; }
+.sim-corr-h { display: flex; justify-content: space-between; gap: 10px; font-size: .84rem; padding: 3px 0 5px; border-bottom: 1px solid var(--sim-line); margin-bottom: 4px; }
+.sim-corr-h span { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+.sim-corr-row { display: flex; gap: 9px; padding: 4px 0; font-size: .84rem; line-height: 1.4; align-items: flex-start; }
+.sim-corr-row.ok .sim-mark { background: var(--sim-okbg); color: var(--sim-ok); }
+.sim-corr-row.miss .sim-mark { background: var(--sim-badbg); color: var(--sim-bad); }
+.sim-corr-warn { margin-top: 6px; font-size: .8rem; background: var(--sim-warnbg); color: var(--sim-warn); border-radius: 8px; padding: 6px 9px; font-weight: 600; line-height: 1.4; }
+.sim-model { background: var(--sim-soft); border-radius: 10px; padding: 4px 12px; margin-top: 6px; font-size: .86rem; line-height: 1.5; }
+.sim-ai { margin-top: 12px; }
+.sim-ai-out { margin-top: 8px; background: var(--sim-soft); border: 1px dashed var(--sim-line); border-radius: 10px; padding: 8px 12px; font-size: .86rem; line-height: 1.5; }
+.sim-ai-out.err { background: var(--sim-warnbg); color: var(--sim-warn); border-color: var(--sim-warn); }
+.sim-ai-h { font-weight: 800; font-size: .78rem; color: var(--gray-600); margin-bottom: 4px; }
+.sim-ai-t { margin: 3px 0 6px; }
+.sim-rx { border: 2px solid var(--sim-line); border-radius: 12px; background: var(--sim-card); overflow: hidden; margin: 12px 0; }
+.sim-rx-h { background: var(--primary-light); color: var(--primary); font-weight: 800; font-size: .82rem; padding: 8px 12px; }
+.sim-rx-p { padding: 8px 12px 0; font-weight: 700; font-size: .86rem; }
+.sim-rx-l { list-style: none; margin: 0; padding: 6px 12px; }
+.sim-rx-l li { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--sim-line); font-size: .88rem; line-height: 1.45; }
+.sim-rx-l li:last-child { border-bottom: none; }
+.sim-rx-i { font-size: 1.15rem; flex-shrink: 0; }
+.sim-rx-ecg { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .82rem; }
+.sim-rx-ecg .sim-small { flex-basis: 100%; }
+.sim-rx-ecg.ok { color: var(--sim-ok); font-weight: 700; }
+.sim-rx-a { padding: 8px 12px 10px; background: var(--sim-warnbg); color: var(--sim-warn); font-size: .82rem; font-weight: 600; line-height: 1.45; }
+/* niveaux, XP, badges */
+.sim-xp-top { display: flex; align-items: center; gap: 12px; }
+.sim-xp-n { flex-shrink: 0; min-width: 56px; text-align: center; padding: 8px 10px; border-radius: 12px; background: var(--primary); color: #fff; font-weight: 900; font-size: .95rem; }
+body.dark .sim-xp-n { color: #0f172a; }
+.sim-xpbar { height: 9px; background: var(--sim-line); border-radius: 99px; overflow: hidden; margin: 10px 0 4px; }
+.sim-xpbar i { display: block; height: 100%; background: var(--primary); border-radius: 99px; transition: width .4s; }
+.sim-bdgs summary { cursor: pointer; font-weight: 700; font-size: .84rem; padding: 6px 0; color: var(--primary); }
+.sim-bdg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 6px; }
+.sim-bdg { display: flex; flex-direction: column; gap: 2px; padding: 9px 10px; border-radius: 10px; border: 1.5px solid var(--sim-line); background: var(--sim-soft); font-size: .8rem; line-height: 1.35; }
+.sim-bdg.on { border-color: var(--sim-ok); background: var(--sim-okbg); }
+.sim-bdg.on.new { box-shadow: 0 0 0 2px var(--sim-ok); }
+.sim-bdg.off { opacity: .6; }
+.sim-bdg-i { font-size: 1.5rem; }
+.sim-bdg.on b, .sim-bdg.on .sim-muted { color: var(--gray-900); }
+/* bilan noté */
+.sim-result { display: flex; gap: 16px; align-items: center; }
+.sim-result-score { display: flex; align-items: baseline; gap: 3px; flex-shrink: 0; }
+.sim-result-score b { font-size: 3.4rem; font-weight: 900; line-height: 1; color: var(--primary); font-variant-numeric: tabular-nums; }
+.sim-result-score span { font-size: 1.1rem; font-weight: 700; color: var(--gray-500); }
+.sim-result-t { flex: 1; min-width: 0; }
+.sim-result-w { font-size: 1.15rem; font-weight: 800; }
+.sim-result-lv { font-weight: 700; font-size: .86rem; margin-top: 6px; }
+.sim-brk { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 9px 0; border-top: 1px solid var(--sim-line); align-items: center; }
+.sim-brk:first-child { border-top: none; }
+.sim-brk-p { font-weight: 900; font-size: 1.05rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sim-brk-p small { font-size: .72rem; color: var(--gray-500); font-weight: 700; }
+.sim-brk-bar { grid-column: 1 / -1; height: 6px; background: var(--sim-line); border-radius: 99px; overflow: hidden; }
+.sim-brk-bar i { display: block; height: 100%; background: var(--primary); border-radius: 99px; }
+@media (max-width: 520px) {
+  .sim-result { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .sim-result-t { width: 100%; }
+  .sim-bdg-grid { grid-template-columns: 1fr 1fr; }
+}

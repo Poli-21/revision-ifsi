@@ -170,11 +170,39 @@ Réponds STRICTEMENT en JSON valide : un tableau d'objets {"question": "...", "r
     return _call(history, { temperature: 0.7, maxTokens: 1500, systemText: sys });
   }
 
+  // ── 4. Avis sur un exercice de la simulation clinique (appel SAED, transmission écrite) ──
+  // Facultatif, nécessite internet. L'IA ne note pas : elle commente. Le score du jeu reste celui de la correction hors ligne.
+  // kind : 'saed' | 'transmission' ; facts : situation fictive du scénario ; text : ce que l'étudiant a écrit.
+  async function reviewSim(kind, facts, text) {
+    const isSaed = kind === 'saed';
+    const sys = "Tu es un formateur IFSI bienveillant et précis (France, référentiel 2026). Tu relis un exercice d'un étudiant infirmier de 1re année dans une simulation avec un patient FICTIF. Tu ne poses jamais de diagnostic médical et tu ne donnes pas de note. Tu n'inventes aucune donnée absente de la situation fournie.";
+    const task = isSaed
+      ? "L'étudiant a rédigé un message téléphonique à l'infirmière référente selon la méthode SAED de la HAS (Situation, Antécédents, Évaluation, Demande)."
+      : "L'étudiant a rédigé une transmission ciblée pour le dossier de soins (Cible, puis Données, Actions, Résultats).";
+    const prompt = `${task}
+
+Situation fictive (vérité du scénario) :
+"""${facts}"""
+
+Texte de l'étudiant :
+"""${text}"""
+
+Réponds en français, de façon courte (moins de 180 mots), avec exactement ces trois balises, une par ligne :
+POINTS_FORTS: [2 points précis séparés par ;]
+A_AMELIORER: [2 points précis séparés par ; : valeurs inexactes ou manquantes, vocabulaire, clarté, diagnostic évité]
+REFORMULATION: [une phrase exemple améliorée, réaliste à l'oral ou à l'écrit]`;
+    const raw = await _call([{ role: 'user', text: prompt }], { temperature: 0.3, maxTokens: 1500, systemText: sys });
+    const grab = tag => { const m = raw.match(new RegExp(tag + ':\\s*([\\s\\S]*?)(?=\\n[A-Z_]+:|$)')); return m ? m[1].trim() : ''; };
+    const out = { forts: grab('POINTS_FORTS'), ameliorer: grab('A_AMELIORER'), reformulation: grab('REFORMULATION') };
+    if (!out.forts && !out.ameliorer && !out.reformulation) out.libre = raw.trim().slice(0, 1200);
+    return out;
+  }
+
   loadConfig();
   return {
     DEFAULT_MODEL,
     loadConfig, isConfigured, setKey, setModel, getModel, clear,
-    testConnection, correctAnswer, generatePracticeQuestions, chat,
+    testConnection, correctAnswer, generatePracticeQuestions, chat, reviewSim,
     get config() { return config; }
   };
 })();

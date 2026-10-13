@@ -1,7 +1,9 @@
-// core/simulation.js — Jeux · Simulation clinique (étape 1 : moteur + scénario EHPAD en version texte)
-// Tout fonctionne HORS LIGNE : la reconnaissance des phrases et les réponses du patient viennent des
-// fichiers data/sim_intents.js et data/sim_ehpad.js. Aucune IA, aucun envoi de données ici.
-// Sauvegarde automatique dans localStorage (clé ifsi_sim_v1). Patients fictifs.
+// core/simulation.js — Jeux · Simulation clinique (préparation, recueil, décision, appel SAED, prescription,
+// transmissions écrites, bilan noté, niveaux et badges)
+// Tout fonctionne HORS LIGNE : la reconnaissance des phrases, les réponses du patient et la correction viennent
+// des fichiers data/sim_intents.js et data/sim_ehpad.js. Seul l'avis de l'IA (facultatif, bouton à part) utilise internet.
+// Sauvegarde automatique dans localStorage (clé ifsi_sim_v1), sur cet appareil uniquement (la progression n'est pas
+// synchronisée ; seul le temps actif l'est, via App.Store.logSim). Patients fictifs.
 'use strict';
 window.App = window.App || {};
 
@@ -10,7 +12,8 @@ App.Sim = (() => {
   const MAX_HISTORY = 30;
   const MAX_LOG = 400;
 
-  let st = { v: 1, current: null, history: [] };
+  const _newProg = () => ({ xp: 0, runs: 0, best: {}, badges: {} });
+  let st = { v: 1, current: null, history: [], prog: _newProg() };
   let screen = 'liste';            // liste | jeu (couloir, chambre, bilan : selon current.stage)
   let _confirmFinish = false;
   let _menuOpen = false;
@@ -24,8 +27,8 @@ App.Sim = (() => {
   const STAGES = [
     { id: 'couloir', label: 'Préparation' },
     { id: 'chambre', label: 'Recueil' },
-    { id: 'decision', label: 'Décision', soon: true },
-    { id: 'transmissions', label: 'Transmissions', soon: true },
+    { id: 'decision', label: 'Décision' },
+    { id: 'transmissions', label: 'Transmissions' },
     { id: 'bilan', label: 'Bilan' }
   ];
   const SECTIONS = [
@@ -41,7 +44,12 @@ App.Sim = (() => {
   function _load() {
     try {
       const r = JSON.parse(localStorage.getItem(KEY));
-      if (r && r.v === 1) st = { v: 1, current: r.current || null, history: Array.isArray(r.history) ? r.history : [] };
+      if (r && r.v === 1) {
+        const p = r.prog && typeof r.prog === 'object' ? r.prog : {};
+        st = { v: 1, current: r.current || null, history: Array.isArray(r.history) ? r.history : [],
+               prog: { xp: +p.xp > 0 ? Math.round(p.xp) : 0, runs: +p.runs > 0 ? Math.round(p.runs) : 0,
+                       best: p.best && typeof p.best === 'object' ? p.best : {}, badges: p.badges && typeof p.badges === 'object' ? p.badges : {} } };
+      }
     } catch (e) {}
     if (st.current && !_scn(st.current.scenarioId)) st.current = null;
     _fix(st.current);
@@ -50,6 +58,11 @@ App.Sim = (() => {
     if (!c) return;
     c.log = c.log || []; c.found = c.found || {}; c.done = c.done || {}; c.asked = c.asked || {}; c.seenObj = c.seenObj || {};
     c.pending = c.pending || {}; c.entered = c.entered || {}; c.errors = c.errors || 0; c.misplaced = c.misplaced || 0;
+    c.dec = c.dec || { step: 'level', order: null, level: null, levelDone: false, picks: {}, actionsDone: false };
+    c.saed = c.saed || { txt: { S: '', A: '', E: '', D: '' }, tries: 0, p1: null, p2: null, t1: null, log: [], sent: false, done: false, canRetry: false, warn: '' };
+    c.rx = c.rx || { ecg: null, skipped: false };
+    c.wr = c.wr || { txt: { C: '', D: '', A: '', R: '' }, graded: false, pts: 0, warn: '' };
+    c.ai = c.ai || {};
   }
   function _save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
 
@@ -361,20 +374,444 @@ App.Sim = (() => {
   // ── Fin de partie et bilan ────────────────────────────────────
   function askFinish() { _confirmFinish = true; _renderChambre(); }
   function cancelFinish() { _confirmFinish = false; _renderChambre(); }
+  // ══════════════════════════════════════════════════════════════
+  //  Fin du scénario : décision → appel (SAED) → prescription → transmissions → bilan
+  //  La correction est faite HORS LIGNE, par mots-clés : elle repère la présence d'éléments attendus.
+  //  Elle ne comprend pas le sens d'une phrase (une IA facultative peut donner un avis plus fin).
+  // ══════════════════════════════════════════════════════════════
+  const LEVELS = [
+    { n: 1, name: 'Découverte', xp: 0 }, { n: 2, name: 'Observation', xp: 100 }, { n: 3, name: 'Rigueur', xp: 250 },
+    { n: 4, name: 'Initiative', xp: 450 }, { n: 5, name: 'Fiabilité', xp: 700 }, { n: 6, name: 'Autonomie', xp: 1000 }
+  ];
+  function _levelOf(xp) {
+    let L = LEVELS[0];
+    LEVELS.forEach(l => { if (xp >= l.xp) L = l; });
+    const next = LEVELS[L.n] || null;
+    return { L, next, pct: next ? Math.max(0, Math.min(100, Math.round(100 * (xp - L.xp) / (next.xp - L.xp)))) : 100 };
+  }
+  const BADGES = [
+    { id: 'premier_pas', ico: '🌱', name: 'Premier pas', desc: 'Terminer une partie complète.', test: () => true },
+    { id: 'oeil', ico: '👁️', name: 'Œil de lynx', desc: 'Trouver toutes les informations clés du recueil.', test: R => R.recueil.found === R.recueil.total },
+    { id: 'mains', ico: '🧴', name: 'Mains propres', desc: 'Te frictionner les mains avant ET après le contact.', test: (R, c) => !!(c.done.g_sha_in && c.done.g_sha_out) },
+    { id: 'mesures', ico: '🎯', name: 'Mesures justes', desc: 'Noter les six mesures sans aucune erreur de saisie.', test: (R, c, scn) => (c.errors || 0) === 0 && Object.keys(c.entered).length >= scn.toolOrder.length },
+    { id: 'alerte', ico: '🚨', name: 'Bon réflexe', desc: "Juger qu'il faut alerter l'infirmière maintenant, sans geste dangereux.", test: R => R.niveau.id === 'maintenant' && !R.unsafe.length },
+    { id: 'securite', ico: '🛡️', name: "Sécurité d'abord", desc: "Choisir au moins 5 des 6 bons gestes d'attente, sans geste dangereux.", test: R => R.actions.good >= 5 && !R.unsafe.length },
+    { id: 'saed', ico: '📞', name: 'Message clair', desc: "Obtenir au moins 12/15 à l'appel SAED.", test: R => R.appel.pts >= 12 },
+    { id: 'discordance', ico: '🔎', name: 'Discordance repérée', desc: "Transmettre à l'infirmière l'allergie possible absente du dossier.", test: R => !!R.allergySaid },
+    { id: 'transmetteur', ico: '📝', name: 'Transmetteur', desc: 'Obtenir au moins 12/15 à la transmission écrite.', test: R => R.trans.pts >= 12 },
+    { id: 'ecg', ico: '🫀', name: 'ECG réussi', desc: "Réaliser l'ECG de la prescription avec au moins 70/100.", test: R => !!R.ecg && R.ecg.score >= 70 },
+    { id: 'excellence', ico: '⭐', name: 'Excellence', desc: 'Atteindre 90/100 ou plus, sans geste dangereux.', test: R => R.total >= 90 && !R.unsafe.length },
+    { id: 'progres', ico: '📈', name: 'Progression', desc: 'Rejouer et gagner au moins 10 points par rapport à ton meilleur score.', test: R => R.prevBest != null && R.total >= R.prevBest + 10 }
+  ];
+  const fmt = x => String(Math.round(x * 10) / 10).replace('.', ',');
+  const _ai = () => !!(window.App.AI && window.App.AI.isConfigured && window.App.AI.isConfigured());
+
+  // ── Correction hors ligne par éléments attendus ──
+  function _words(t) { const n = _norm(t); return n ? n.split(' ').length : 0; }
+  function _gradeEl(el, n, w) {
+    if (w < 2) return false;
+    if (el.test) { try { return !!el.test(n, w); } catch (e) { return false; } }
+    if (el.all) return el.all.every(re => re.test(n));
+    if (el.need) return el.need.re.filter(re => re.test(n)).length >= el.need.min;
+    return (el.re || []).some(re => re.test(n));
+  }
+  // parts : [{ id, label, elements:[{id,w,label,re|need|all|test}], warn? }] ; texts : { id: texte }
+  function _grade(parts, texts) {
+    let pts = 0, max = 0;
+    const secs = parts.map(p => {
+      const raw = (texts && texts[p.id]) || '', n = _norm(raw), w = _words(raw);
+      const items = p.elements.map(el => ({ el, ok: _gradeEl(el, n, w) }));
+      let got = items.reduce((a, x) => a + (x.ok ? x.el.w : 0), 0);
+      const mx = p.elements.reduce((a, el) => a + el.w, 0);
+      const warned = !!(p.warn && w >= 2 && p.warn.re.some(re => re.test(n)));
+      if (warned) got = Math.max(0, got - p.warn.pen);
+      pts += got; max += mx;
+      return { id: p.id, label: p.label, items, got, max: mx, warned, warn: warned ? p.warn.text : '', words: w };
+    });
+    return { secs, pts, max, ratio: max ? pts / max : 0 };
+  }
+  function _corrHtml(g) {
+    return g.secs.map(s => `<div class="sim-corr"><div class="sim-corr-h"><b>${_esc(s.label)}</b><span>${fmt(s.got)}/${s.max}</span></div>` +
+      s.items.map(x => `<div class="sim-corr-row ${x.ok ? 'ok' : 'miss'}"><span class="sim-mark">${x.ok ? '✓' : '✗'}</span><span>${_esc(x.el.label)}</span></div>`).join('') +
+      (s.warned ? `<div class="sim-corr-warn">⚠ ${_esc(s.warn)}</div>` : '') + '</div>').join('') +
+      '<p class="sim-muted sim-small">Correction automatique par mots-clés : elle repère si l\'élément est présent, pas si ta phrase est bien tournée. Un ✗ peut venir d\'une formulation différente de celles prévues.</p>';
+  }
+  function _callPts(S) {
+    if (!S || S.p1 == null) return 0;
+    if (S.tries >= 2 && S.p2 != null) return Math.max(S.p1, Math.round(S.p2 * 0.85 * 10) / 10);
+    return S.p1;
+  }
+  function _shuffle(ids, seed) {
+    const a = ids.slice(); let s = (seed >>> 0) || 1;
+    const rnd = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  let _saveT = null;
+  function _saveSoon() { clearTimeout(_saveT); _saveT = setTimeout(_save, 400); }
+  function _top() { try { window.scrollTo({ top: 0 }); const m = document.querySelector('.main'); if (m && m.scrollTo) m.scrollTo({ top: 0 }); } catch (e) {} }
+  function _into(id) { setTimeout(() => { const e = _el(id); if (e && e.scrollIntoView) { try { e.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (x) { e.scrollIntoView(); } } }, 30); }
+  function _stage(...ok) { const c = _cur(); return !!c && ok.indexOf(c.stage) >= 0; }
+
+  // ── Transition recueil → décision ──
   function finish() {
     const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre') return;
     _confirmFinish = false;
     _gReset();
-    c.stage = 'bilan';
-    if (!c.saved) {
-      c.saved = true;
-      const b = _bilanData();
-      st.history.unshift({ scenarioId: scn.id, date: new Date().toISOString(), keyFound: b.keyFound, keyTotal: b.keyTotal,
-                           gFound: b.gFound, gTotal: b.gTotal, secs: Math.round(c.secs || 0) });
-      if (st.history.length > MAX_HISTORY) st.history.length = MAX_HISTORY;
+    c.stage = 'decision'; c.last = null;
+    _save(); render(); _top();
+  }
+
+  // ── Étape Décision : niveau d'alerte → gestes en attendant → appel de l'infirmière → prescription ──
+  const DEC_STEPS = [['level', 'Analyse'], ['actions', 'En attendant'], ['call', 'Appel'], ['rx', 'Prescription']];
+  function _decOrder(c, scn) {
+    if (!c.dec.order) c.dec.order = { lv: _shuffle(scn.decision.levels.map(l => l.id), c.startedAt), ac: _shuffle(scn.decision.actions.map(a => a.id), c.startedAt + 7) };
+    return c.dec.order;
+  }
+  function _sub(c) {
+    const idx = DEC_STEPS.findIndex(s => s[0] === c.dec.step);
+    return '<ol class="sim-substeps" aria-label="Sous-étapes de la décision">' + DEC_STEPS.map((s, i) =>
+      `<li class="${i < idx ? 'done' : (i === idx ? 'now' : '')}"><b>${i < idx ? '✓' : i + 1}</b> ${_esc(s[1])}</li>`).join('') + '</ol>';
+  }
+  function _bar(scn, c, title) {
+    return `<div class="sim-bar"><button class="btn btn-ghost btn-sm" onclick="App.Sim.toList()">← Menu</button>
+      <div class="sim-bar-title">${_esc(title || scn.title)}</div><div class="sim-bar-time" id="sim-clock" title="Temps actif">${_hms(c.secs)}</div></div>${_stepper()}`;
+  }
+  function _foundAlerts(c, scn) {
+    return Object.keys(scn.facts).filter(k => scn.facts[k].alert && c.found[k]);
+  }
+
+  function _renderDecision(root) {
+    const c = _cur(), scn = _curScn(), D = c.dec;
+    _decOrder(c, scn);
+    let body = '';
+    if (D.step === 'level') body = _decLevel(c, scn);
+    else if (D.step === 'actions') body = _decActions(c, scn);
+    else if (D.step === 'call') body = _decCall(c, scn);
+    else body = _decRx(c, scn);
+    root.innerHTML = `<div class="sim-wrap">${_bar(scn, c)}${_sub(c)}${body}</div>`;
+  }
+
+  function _decLevel(c, scn) {
+    const dec = scn.decision, D = c.dec, ord = _decOrder(c, scn).lv;
+    const al = _foundAlerts(c, scn);
+    const recap = al.length
+      ? al.map(k => `<div class="sim-fact"><span class="sim-fact-k">${_esc(scn.facts[k].label)}</span><span class="sim-fact-v">${_esc(scn.facts[k].text)}</span></div>`).join('')
+      : '<div class="sim-fact-none">Tu n\'as relevé aucun signe d\'alerte pendant le recueil.</div>';
+    const opts = ord.map(id => {
+      const l = dec.levels.find(x => x.id === id), on = D.level === id;
+      const cls = 'sim-opt' + (on ? ' on' : '') + (D.levelDone ? ' locked' : '') + (D.levelDone && on ? ' ' + l.verdict : '');
+      return `<button type="button" class="${cls}" data-id="${_esc(id)}" ${D.levelDone ? 'disabled' : ''} aria-pressed="${on}" onclick="App.Sim.decLevel('${_esc(id)}')"><span class="sim-opt-m">${on ? '●' : '○'}</span><span>${_esc(l.label)}</span></button>`;
+    }).join('');
+    let foot;
+    if (!D.levelDone) foot = `<div class="sim-row sim-enter"><button class="btn btn-primary" ${D.level ? '' : 'disabled'} onclick="App.Sim.decLevelOk()">Valider mon choix</button>${D.level ? '' : '<span class="sim-muted sim-small">Choisis une réponse.</span>'}</div>`;
+    else {
+      const l = dec.levels.find(x => x.id === D.level);
+      const tag = { good: '✓ Bonne analyse', avoid: '◐ À nuancer', danger: '⚠ Risque pour la résidente' }[l.verdict];
+      foot = `<div class="sim-fb ${l.verdict}" id="sim-fb"><b>${tag}</b><p>${_esc(l.feedback)}</p></div>
+        <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.decNext()">Continuer : que fais-tu en attendant ? →</button></div>`;
     }
+    return `<div class="sim-card"><h2 class="sim-title">Décision</h2><p class="sim-lead">${_esc(dec.intro)}</p>
+      <details class="sim-recap" ${al.length <= 8 ? 'open' : ''}><summary>📋 Ce que tu as relevé d'inhabituel (${al.length})</summary>${recap}</details></div>
+      <div class="sim-card"><h3 class="sim-h" style="margin-top:0">${_esc(dec.levelQ)}</h3><div class="sim-opts">${opts}</div>${foot}</div>`;
+  }
+
+  function _actionsReview(c, scn) {
+    const dec = scn.decision, picks = c.dec.picks;
+    const rows = dec.actions.map(a => {
+      const p = !!picks[a.id];
+      let st, mark, tag;
+      if (a.v === 'good') { st = p ? 'ok' : 'missed'; mark = p ? '✓' : '○'; tag = p ? 'Bien' : 'À ne pas oublier'; }
+      else if (a.v === 'danger') { st = p ? 'danger' : 'ok'; mark = p ? '⛔' : '✓'; tag = p ? 'Geste dangereux' : 'Tu as évité ce geste dangereux'; }
+      else { st = p ? 'avoid' : 'ok'; mark = p ? '✗' : '✓'; tag = p ? 'À éviter' : 'Bien vu de ne pas le faire'; }
+      return `<div class="sim-rev ${st}"><span class="sim-mark">${mark}</span><div><b>${_esc(a.label)}</b><div class="sim-small sim-tag">${_esc(tag)}</div><div class="sim-muted sim-small">${_esc(a.why)}</div></div></div>`;
+    }).join('');
+    return rows;
+  }
+  function _decActions(c, scn) {
+    const dec = scn.decision, D = c.dec, ord = _decOrder(c, scn).ac;
+    const n = Object.keys(D.picks).filter(k => D.picks[k]).length;
+    if (!D.actionsDone) {
+      const items = ord.map(id => {
+        const a = dec.actions.find(x => x.id === id), on = !!D.picks[id];
+        return `<button type="button" class="sim-opt chk${on ? ' on' : ''}" data-id="${_esc(id)}" aria-pressed="${on}" onclick="App.Sim.decPick('${_esc(id)}')"><span class="sim-opt-m">${on ? '☑' : '☐'}</span><span>${_esc(a.label)}</span></button>`;
+      }).join('');
+      return `<div class="sim-card"><h2 class="sim-title">En attendant Sophie</h2><p class="sim-lead">${_esc(dec.actionsQ)}</p>
+        <div class="sim-opts">${items}</div>
+        <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.decActionsOk()">Valider mes choix (${n})</button><span class="sim-muted sim-small">Aucune limite : coche ce que tu ferais vraiment.</span></div></div>`;
+    }
+    const R = _results(true);
+    return `<div class="sim-card"><h2 class="sim-title">En attendant Sophie</h2>
+      <div class="sim-fb ${R.actions.danger ? 'danger' : (R.actions.good >= 5 && !R.actions.avoid ? 'good' : 'avoid')}" id="sim-fb"><b>${R.actions.danger ? '⚠ Au moins un geste dangereux' : 'Bilan de tes choix'}</b>
+        <p>${R.actions.good}/${R.actions.goodTotal} bons gestes · ${R.actions.avoid} geste${R.actions.avoid > 1 ? 's' : ''} à éviter · ${R.actions.danger} geste${R.actions.danger > 1 ? 's' : ''} dangereux. <b>${fmt(R.actions.pts)}/${R.actions.max} points.</b>${R.actions.danger ? ' Un geste dangereux plafonne le score final de la partie à 50/100.' : ''}</p></div>
+      <div class="sim-revs">${_actionsReview(c, scn)}</div>
+      <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.decNext()">Continuer : appeler Sophie →</button></div></div>`;
+  }
+
+  // Appel à l'infirmière référente (SAED)
+  function _recueilRecap(c, scn) {
+    return `<details class="sim-recap"><summary>📋 Mon recueil de données (à relire avant d'appeler)</summary><div class="sim-recap-body">${_recueilHtml(true)}</div></details>`;
+  }
+  function _aiBlock(kind, c) {
+    const out = c.ai && c.ai[kind];
+    let html;
+    if (out && out.state === 'ok') {
+      const li = t => t ? '<ul class="sim-ul">' + String(t).split(';').map(x => x.trim()).filter(Boolean).map(x => `<li>${_esc(x)}</li>`).join('') + '</ul>' : '';
+      html = out.libre ? `<p class="sim-ai-t">${_esc(out.libre)}</p>` :
+        `${out.forts ? '<b>Points forts</b>' + li(out.forts) : ''}${out.ameliorer ? '<b>À améliorer</b>' + li(out.ameliorer) : ''}${out.reformulation ? '<b>Exemple de reformulation</b><p class="sim-ai-t">' + _esc(out.reformulation) + '</p>' : ''}`;
+      html = `<div class="sim-ai-out"><div class="sim-ai-h">🤖 Avis de l'IA (indicatif · ne change pas ton score)</div>${html}</div>`;
+    } else if (out && out.state === 'loading') html = '<div class="sim-ai-out"><div class="sim-ai-h">🤖 L\'IA relit ton texte…</div></div>';
+    else if (out && out.state === 'err') html = `<div class="sim-ai-out err" role="alert">${_esc(out.msg)}</div>`;
+    else html = '';
+    let btn;
+    if (!_ai()) btn = '<span class="sim-muted sim-small">Facultatif : une IA peut relire ton texte plus finement. Ajoute ta clé Gemini dans Réglages → Intelligence artificielle (internet nécessaire).</span>';
+    else if (navigator.onLine === false) btn = '<span class="sim-muted sim-small">🔌 Hors ligne : l\'avis de l\'IA a besoin d\'internet. La correction ci-dessus fonctionne sans.</span>';
+    else btn = `<button class="btn btn-ghost btn-sm" ${out && out.state === 'loading' ? 'disabled' : ''} onclick="App.Sim.aiReview('${kind}')">🤖 Demander l'avis de l'IA</button><span class="sim-muted sim-small">Facultatif · internet · ton texte est envoyé à Google (Gemini) avec ta clé. La patiente est fictive : n'écris jamais de vraies données de patients.</span>`;
+    return `<div class="sim-ai" id="sim-ai-${kind}"><div class="sim-row">${btn}</div>${html}</div>`;
+  }
+  function _decCall(c, scn) {
+    const call = scn.call, S = c.saed;
+    const logHtml = S.log.length ? `<div class="sim-chat">${S.log.map(m => `<div class="sim-msg sim-${m.who === 'me' ? 'me' : 'pat'}" style="white-space:pre-wrap">${m.who === 'me' ? '' : '<b>' + _esc(call.who) + ' · </b>'}${_esc(m.text)}</div>`).join('')}</div>` : '';
+    const g = S.tries ? _grade(call.sections, S.txt) : null;
+    let form = '';
+    if (!S.sent) {
+      const miss = (S.tries && S.t1) ? _grade(call.sections, S.t1).secs.reduce((a, s) => a.concat(s.items.filter(x => !x.ok).map(x => x.el.label)), []) : [];
+      form = `${S.warn ? `<div class="sim-g-warn" role="alert">${_esc(S.warn)}</div>` : ''}
+        ${S.tries ? `<div class="sim-note">↺ <b>Rappelle Sophie</b> en complétant ton message. Il te manquait :<ul class="sim-ul">${miss.map(m => `<li>${_esc(m)}</li>`).join('')}</ul>Seul le meilleur des deux essais comptera (le 2e à 85 %).</div>` : ''}
+        ${call.sections.map(s => `<div class="sim-saed"><label for="saed-${s.id}"><b>${_esc(s.label)}</b> <span class="sim-muted sim-small">${_esc(s.hint)}</span></label>
+          <textarea id="saed-${s.id}" rows="${s.id === 'E' ? 4 : 2}" maxlength="900" placeholder="${_esc(s.placeholder)}" oninput="App.Sim.txt('saed','${s.id}',this.value)">${_esc(S.txt[s.id])}</textarea></div>`).join('')}
+        <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.sendSaed()">📞 ${S.tries ? 'Rappeler' : 'Appeler'} ${_esc(call.who)}</button></div>`;
+    }
+    let after = '';
+    if (S.sent) {
+      const pts = _callPts(S);
+      after = `<h3 class="sim-h">Correction de ton appel · <span class="sim-pts">${fmt(pts)}/15</span></h3>
+        ${S.tries >= 2 ? `<p class="sim-muted sim-small">1er essai : ${fmt(S.p1)}/15 · 2e essai : ${fmt(S.p2)}/15 × 0,85 = ${fmt(Math.round(S.p2 * 0.85 * 10) / 10)}. Le meilleur est retenu.</p>` : ''}
+        <div class="sim-card">${_corrHtml(g)}</div>
+        <details class="sim-why"><summary>Voir un exemple de message SAED complet</summary><div class="sim-model">${['S', 'A', 'E', 'D'].map(k => `<p><b>${k}</b> · ${_esc(call.model[k])}</p>`).join('')}</div></details>
+        ${_aiBlock('saed', c)}
+        <div class="sim-row sim-enter">${S.canRetry ? `<button class="btn btn-primary" onclick="App.Sim.saedRetry()">↺ Rappeler Sophie avec ces précisions</button><button class="btn btn-ghost" onclick="App.Sim.saedDone()">Continuer sans rappeler</button>` : `<button class="btn btn-primary" onclick="App.Sim.saedDone()">Continuer : la prescription →</button>`}</div>`;
+    }
+    return `<div class="sim-card"><h2 class="sim-title">📞 Appeler ${_esc(call.who)}</h2><p class="sim-lead">${_esc(call.intro)}</p>
+      <div class="sim-note"><b>Méthode.</b> ${_esc(call.method)}</div>${_recueilRecap(c, scn)}${logHtml}${form}${after}</div>`;
+  }
+
+  // Prescription du médecin
+  function _decRx(c, scn) {
+    const rx = scn.rx, R = c.rx;
+    const al = c.saed && c.saed.sent ? _callAllergy(c, scn) : false;
+    const lines = rx.lines.map(l => {
+      let extra = '';
+      if (l.ecg) {
+        if (R.ecg) extra = `<div class="sim-rx-ecg ok">✓ ECG réalisé · ${R.ecg.score}/100 · mode ${R.ecg.mode === 'auto' ? 'autonome' : 'guidé'} <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxEcg()">Refaire</button></div>`;
+        else if (R.skipped) extra = '<div class="sim-rx-ecg">Sophie réalise l\'ECG à ta place. <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxEcg()">Finalement, je le fais</button></div>';
+        else extra = `<div class="sim-rx-ecg"><button class="btn btn-primary btn-sm" onclick="App.Sim.rxEcg()">🫀 Réaliser l'ECG (atelier)</button><button class="btn btn-ghost btn-sm" onclick="App.Sim.rxSkip()">Laisser Sophie le faire</button><div class="sim-muted sim-small">Facultatif. Sophie reste à côté de toi : en 1re année, un geste technique se fait sous la supervision d'un soignant. L'ECG simulé est celui de Mme Martin (pouls à 104/min).</div></div>`;
+      }
+      return `<li><span class="sim-rx-i">${l.icon}</span><div>${_esc(l.t)}${extra}</div></li>`;
+    }).join('');
+    return `<div class="sim-card"><h2 class="sim-title">Prescription du médecin</h2><p class="sim-lead">${_esc(rx.intro)}</p>
+      <div class="sim-rx"><div class="sim-rx-h">📄 ${_esc(rx.from)}</div><div class="sim-rx-p">Mme Lucienne MARTIN · 86 ans · chambre 12</div>
+        <ul class="sim-rx-l">${lines}</ul>
+        <div class="sim-rx-a">${_esc(al ? rx.allergyKnown : rx.allergyUnknown)}</div></div>
+      <p class="sim-muted sim-small">${_esc(rx.note)}</p>
+      <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.rxNext()">Continuer : écrire mes transmissions →</button></div></div>`;
+  }
+  function _callAllergy(c, scn) {
+    const S = c.saed;
+    if (!S || !S.sent) return false;
+    const g = _grade(scn.call.sections, S.txt), sec = g.secs.find(s => s.id === 'A');
+    return !!(sec && sec.items.find(x => x.el.id === 'a_allerg' && x.ok));
+  }
+
+  // ── Handlers de la décision ──
+  function decLevel(id) {
+    const c = _cur(), scn = _curScn(); if (!_stage('decision') || c.dec.step !== 'level' || c.dec.levelDone) return;
+    if (!scn.decision.levels.some(l => l.id === id)) return;
+    c.dec.level = id; _save(); render();
+  }
+  function decLevelOk() {
+    const c = _cur(); if (!_stage('decision') || c.dec.step !== 'level' || !c.dec.level || c.dec.levelDone) return;
+    c.dec.levelDone = true; _save(); render(); _into('sim-fb');
+  }
+  function decPick(id) {
+    const c = _cur(), scn = _curScn(); if (!_stage('decision') || c.dec.step !== 'actions' || c.dec.actionsDone) return;
+    if (!scn.decision.actions.some(a => a.id === id)) return;
+    if (c.dec.picks[id]) delete c.dec.picks[id]; else c.dec.picks[id] = true;
     _save(); render();
   }
+  function decActionsOk() {
+    const c = _cur(); if (!_stage('decision') || c.dec.step !== 'actions' || c.dec.actionsDone) return;
+    c.dec.actionsDone = true; _save(); render(); _into('sim-fb');
+  }
+  function decNext() {
+    const c = _cur(); if (!_stage('decision')) return;
+    if (c.dec.step === 'level' && c.dec.levelDone) c.dec.step = 'actions';
+    else if (c.dec.step === 'actions' && c.dec.actionsDone) c.dec.step = 'call';
+    else return;
+    _save(); render(); _top();
+  }
+  function txt(kind, id, val) {
+    const c = _cur(); if (!c) return;
+    const t = kind === 'saed' ? (c.saed && c.saed.txt) : (c.wr && c.wr.txt);
+    if (!t || !(id in t)) return;
+    t[id] = String(val || '').slice(0, 900); _saveSoon();
+  }
+  function sendSaed() {
+    const c = _cur(), scn = _curScn(); if (!_stage('decision') || c.dec.step !== 'call') return;
+    const S = c.saed, call = scn.call; if (S.sent) return;
+    if (['S', 'A', 'E', 'D'].reduce((a, k) => a + _words(S.txt[k]), 0) < 8) {
+      S.warn = 'Écris ton message pour ' + call.who + ' (quelques phrases) avant d\'appeler.'; _save(); render(); return;
+    }
+    S.warn = '';
+    const g = _grade(call.sections, S.txt);
+    S.tries++;
+    if (S.tries === 1) { S.p1 = g.pts; S.t1 = Object.assign({}, S.txt); } else S.p2 = g.pts;
+    S.sent = true;
+    const demandOk = g.secs.some(s => s.id === 'D' && s.items.some(x => x.el.id === 'd_venir' && x.ok));
+    const missing = [];
+    g.secs.forEach(s => s.items.forEach(x => { if (!x.ok) missing.push(x.el); }));
+    missing.sort((a, b) => b.w - a.w);
+    const Rp = call.reply;
+    let reply;
+    if (g.ratio >= 0.75 && demandOk) reply = Rp.good;
+    else if (S.tries >= 2) reply = Rp.final;
+    else if (g.ratio >= 0.75) reply = Rp.noDemand + ' ' + Rp.retry;
+    else reply = (g.ratio >= 0.45 ? Rp.mid : Rp.low) + ' ' + missing.slice(0, 2).map(m => m.ask).join(' ') + ' ' + Rp.retry;
+    S.canRetry = S.tries === 1 && !(g.ratio >= 0.75 && demandOk);
+    S.done = !S.canRetry;
+    S.log.push({ who: 'me', text: ['S', 'A', 'E', 'D'].map(k => k + ' : ' + S.txt[k].trim()).join('\n') });
+    S.log.push({ who: 'sophie', text: reply });
+    if (S.log.length > 12) S.log.splice(0, S.log.length - 12);
+    _save(); render(); _into('sim-ai-saed');
+  }
+  function saedRetry() {
+    const c = _cur(); if (!_stage('decision') || c.dec.step !== 'call' || !c.saed.canRetry) return;
+    c.saed.sent = false; c.saed.canRetry = false; _save(); render(); _top();
+  }
+  function saedDone() {
+    const c = _cur(); if (!_stage('decision') || c.dec.step !== 'call' || !c.saed.sent) return;
+    c.dec.step = 'rx'; _save(); render(); _top();
+  }
+  function rxEcg() {
+    const c = _cur(), scn = _curScn(); if (!_stage('decision') || c.dec.step !== 'rx' || !window.App.SimECG) return;
+    _save();
+    const ctx = Object.assign({}, scn.rx.ecgCtx, {
+      onDone: r => { c.rx.ecg = { score: r.score, secs: r.secs, mode: r.mode }; c.rx.skipped = false; _save(); screen = 'jeu'; render(); _top(); },
+      onBack: () => { screen = 'jeu'; render(); _top(); }
+    });
+    window.App.SimECG.open(ctx);
+  }
+  function rxSkip() { const c = _cur(); if (!_stage('decision') || c.dec.step !== 'rx') return; c.rx.skipped = true; _save(); render(); }
+  function rxNext() {
+    const c = _cur(); if (!_stage('decision') || c.dec.step !== 'rx') return;
+    c.stage = 'transmissions'; _save(); render(); _top();
+  }
+
+  // ── Étape Transmissions écrites (ciblées) ──
+  function _renderTrans(root) {
+    const c = _cur(), scn = _curScn(), W = c.wr, wr = scn.written;
+    let body;
+    const fields = wr.fields.map(f => `<div class="sim-saed"><label for="wr-${f.id}"><b>${_esc(f.label)}</b> <span class="sim-muted sim-small">${_esc(f.hint)}</span></label>
+      <textarea id="wr-${f.id}" rows="${f.rows || 3}" maxlength="900" placeholder="${_esc(f.placeholder)}" ${W.graded ? 'readonly' : ''} oninput="App.Sim.txt('wr','${f.id}',this.value)">${_esc(W.txt[f.id])}</textarea></div>`).join('');
+    if (!W.graded) {
+      body = `<div class="sim-card"><h2 class="sim-title">📝 Transmissions écrites</h2><p class="sim-lead">${_esc(wr.intro)}</p>
+        <div class="sim-note">${_esc(wr.rules)}</div>
+        <details class="sim-recap"><summary>📋 Mon recueil de données (à relire)</summary><div class="sim-recap-body">${_recueilHtml(true)}</div></details>
+        ${W.warn ? `<div class="sim-g-warn" role="alert">${_esc(W.warn)}</div>` : ''}${fields}
+        <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.wrSubmit()">Valider ma transmission</button></div></div>`;
+    } else {
+      const g = _grade(wr.fields, W.txt);
+      body = `<div class="sim-card"><h2 class="sim-title">📝 Transmissions écrites</h2>${fields}
+        <h3 class="sim-h">Correction · <span class="sim-pts">${fmt(g.pts)}/15</span></h3>${_corrHtml(g)}
+        <details class="sim-why"><summary>Voir un exemple de transmission ciblée</summary><div class="sim-model">${wr.fields.map(f => `<p><b>${_esc(f.label)}</b> · ${_esc(wr.model[f.id])}</p>`).join('')}<p class="sim-muted sim-small">[heure] : à remplacer par l'heure réelle. Chaque service a son logiciel et ses habitudes de rédaction.</p></div></details>
+        ${_aiBlock('transmission', c)}
+        <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.wrDone()">Voir mon bilan →</button></div></div>`;
+    }
+    root.innerHTML = `<div class="sim-wrap">${_bar(scn, c)}${body}</div>`;
+  }
+  function wrSubmit() {
+    const c = _cur(), scn = _curScn(); if (!_stage('transmissions') || c.wr.graded) return;
+    const W = c.wr;
+    if (Object.keys(W.txt).reduce((a, k) => a + _words(W.txt[k]), 0) < 10) { W.warn = 'Écris ta transmission (cible, données, actions, résultats) avant de la valider.'; _save(); render(); return; }
+    W.warn = '';
+    W.pts = _grade(scn.written.fields, W.txt).pts; W.graded = true;
+    _save(); render(); _top();
+  }
+  function wrDone() {
+    const c = _cur(); if (!_stage('transmissions') || !c.wr.graded) return;
+    _complete();
+  }
+
+  // ── Avis facultatif de l'IA (internet + clé personnelle) ──
+  async function aiReview(kind) {
+    const c = _cur(), scn = _curScn(); if (!c || !scn || (kind !== 'saed' && kind !== 'transmission')) return;
+    if (!_ai() || navigator.onLine === false) return;
+    c.ai = c.ai || {};
+    if (c.ai[kind] && c.ai[kind].state === 'loading') return;
+    const text = kind === 'saed'
+      ? scn.call.sections.map(s => s.label.charAt(0) + ' : ' + (c.saed.txt[s.id] || '')).join('\n')
+      : scn.written.fields.map(f => f.label + ' : ' + (c.wr.txt[f.id] || '')).join('\n');
+    c.ai[kind] = { state: 'loading' };
+    const refresh = () => { const box = _el('sim-ai-' + kind); if (box && _cur() === c) box.outerHTML = _aiBlock(kind, c); };
+    refresh();
+    try {
+      const out = await window.App.AI.reviewSim(kind, scn.call.aiFacts, text);
+      c.ai[kind] = Object.assign({ state: 'ok' }, out);
+    } catch (e) {
+      c.ai[kind] = { state: 'err', msg: String((e && e.message) || 'Avis indisponible pour le moment.') };
+    }
+    _save(); refresh();
+  }
+
+  // ── Calcul du résultat, progression, badges ──
+  function _results(partial) {
+    const c = _cur(), scn = _curScn(), b = _bilanData(), dec = scn.decision;
+    const recueil = { max: 30, found: b.keyFound, total: b.keyTotal, pts: 30 * b.keyFound / (b.keyTotal || 1) };
+    const gW = b.grid.reduce((a, x) => a + (x.state === 'ok' || x.state === 'retry' ? 1 : (x.state === 'late' ? 0.5 : 0)), 0);
+    const gestes = { max: 15, value: gW, total: b.gTotal, pts: 15 * gW / (b.gTotal || 1) };
+    const lv = dec.levels.find(l => l.id === c.dec.level) || null;
+    const niveau = { max: 10, id: lv ? lv.id : null, pts: lv ? lv.pts : 0 };
+    const picked = dec.actions.filter(a => c.dec.picks[a.id]);
+    const goodTotal = dec.actions.filter(a => a.v === 'good').length;
+    const good = picked.filter(a => a.v === 'good').length, avoid = picked.filter(a => a.v === 'avoid').length;
+    const dangers = picked.filter(a => a.v === 'danger');
+    let ap = dec.actionsMax * good / goodTotal - 3 * avoid;
+    if (dangers.length) ap = 0;
+    const actions = { max: dec.actionsMax, good, goodTotal, avoid, danger: dangers.length, pts: Math.max(0, Math.min(dec.actionsMax, ap)) };
+    const appel = { max: 15, pts: _callPts(c.saed), tries: c.saed.tries || 0 };
+    const trans = { max: 15, pts: c.wr.graded ? c.wr.pts : 0 };
+    const unsafe = [];
+    if (lv && lv.verdict === 'danger') unsafe.push('Tu as jugé qu\'il n\'y avait rien à signaler alors que plusieurs signes allaient dans le même sens.');
+    dangers.forEach(a => unsafe.push('Geste dangereux choisi : ' + a.label));
+    const raw = recueil.pts + gestes.pts + niveau.pts + actions.pts + appel.pts + trans.pts;
+    const capped = unsafe.length > 0 && raw > 50;
+    const total = Math.round(unsafe.length ? Math.min(raw, 50) : raw);
+    return { recueil, gestes, niveau, actions, appel, trans, unsafe, raw: Math.round(raw * 10) / 10, capped, total,
+             allergySaid: _callAllergy(c, scn), ecg: c.rx.ecg ? { score: c.rx.ecg.score } : null, partial: !!partial };
+  }
+  function _complete() {
+    const c = _cur(), scn = _curScn(); if (!c || !scn || c.res) return;
+    const P = st.prog;
+    const R = _results();
+    R.prevBest = P.best[scn.id] != null ? P.best[scn.id] : null;
+    const base = R.prevBest == null ? R.total + 10 : Math.max(5, R.total - R.prevBest);
+    const bonus = R.ecg ? Math.min(20, Math.round(R.ecg.score / 5)) : 0;
+    R.xp = { base, bonus, total: base + bonus, first: R.prevBest == null };
+    const before = _levelOf(P.xp).L.n;
+    R.earned = BADGES.filter(bd => { try { return bd.test(R, c, scn); } catch (e) { return false; } }).map(bd => bd.id);
+    R.newBadges = R.earned.filter(id => !P.badges[id]);
+    R.newBadges.forEach(id => { P.badges[id] = new Date().toISOString(); });
+    P.xp += R.xp.total; P.runs++;
+    P.best[scn.id] = Math.max(R.prevBest || 0, R.total);
+    R.level = { before, after: _levelOf(P.xp).L.n, xp: P.xp };
+    c.res = R; c.stage = 'bilan'; c.saved = true;
+    const b = _bilanData();
+    st.history.unshift({ scenarioId: scn.id, date: new Date().toISOString(), keyFound: b.keyFound, keyTotal: b.keyTotal,
+                         gFound: b.gFound, gTotal: b.gTotal, secs: Math.round(c.secs || 0), score: R.total, xp: R.xp.total });
+    if (st.history.length > MAX_HISTORY) st.history.length = MAX_HISTORY;
+    _save(); render(); _top();
+  }
+
   function closeBilan() { st.current = null; _save(); screen = 'liste'; render(); }
   function replay() { const id = _cur() && _cur().scenarioId; st.current = null; _save(); if (id) start(id); }
 
@@ -425,6 +862,7 @@ App.Sim = (() => {
     st.current = { scenarioId: id, startedAt: Date.now(), stage: 'couloir', tab: 'dialogue', log: [], found: {}, done: {},
                    asked: {}, seenObj: {}, pending: {}, entered: {}, errors: 0, misplaced: 0,
                    actions: 0, firstCare: null, secs: 0, dossierOpen: false, misses: 0, last: null, saved: false };
+    _fix(st.current);
     _gReset();
     _confirmFinish = false; _menuOpen = false;
     screen = 'jeu';
@@ -446,6 +884,8 @@ App.Sim = (() => {
     if (screen === 'jeu' && c) {
       if (c.stage === 'couloir') return _renderCouloir(root);
       if (c.stage === 'chambre') return _renderChambreShell(root);
+      if (c.stage === 'decision') return _renderDecision(root);
+      if (c.stage === 'transmissions') return _renderTrans(root);
       if (c.stage === 'bilan')   return _renderBilan(root);
     }
     screen = 'liste';
@@ -473,9 +913,10 @@ App.Sim = (() => {
     let resumeHtml = '';
     if (c && scn) {
       const bil = c.stage === 'bilan';
+      const where = { couloir: 'devant la chambre', chambre: 'dans la chambre', decision: 'à l\'étape Décision', transmissions: 'à l\'étape Transmissions' }[c.stage] || '';
       resumeHtml = `<div class="sim-card sim-resume">
         <div><b>${bil ? 'Dernière partie terminée' : 'Partie en cours'}</b> · ${_esc(scn.title)}<br>
-        <span class="sim-muted">${bil ? 'Tu peux revoir ton bilan.' : 'Ta progression est sauvegardée sur cet appareil.'}</span></div>
+        <span class="sim-muted">${bil ? 'Tu peux revoir ton bilan.' : (where ? 'Tu es ' + where + '. ' : '') + 'Ta progression est sauvegardée sur cet appareil.'}</span></div>
         <div class="sim-row"><button class="btn btn-primary" onclick="App.Sim.resume()">${bil ? 'Voir le bilan' : 'Reprendre'}</button>
         <button class="btn btn-ghost" onclick="App.Sim.discard()">Abandonner</button></div>
       </div>`;
@@ -494,14 +935,17 @@ App.Sim = (() => {
       const s = _scn(h.scenarioId);
       const d = new Date(h.date);
       const ds = isNaN(d) ? '' : d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-      return `<div class="sim-hist-row"><span>${_esc(ds)}</span><span>${_esc(s ? s.title : h.scenarioId)}</span><span>${h.keyFound}/${h.keyTotal} infos clés · ${h.gFound}/${h.gTotal} gestes</span></div>`;
+      const sc = typeof h.score === 'number' ? `<b>${h.score}/100</b> · ` : '';
+      return `<div class="sim-hist-row"><span>${_esc(ds)}</span><span>${_esc(s ? s.title : h.scenarioId)}</span><span>${sc}${h.keyFound}/${h.keyTotal} infos clés · ${h.gFound}/${h.gTotal} gestes${h.xp ? ' · +' + h.xp + ' XP' : ''}</span></div>`;
     }).join('') + '</div></div>' : '';
     root.innerHTML = `<div class="sim-wrap">
       <div class="sim-top"><button class="btn btn-ghost btn-sm" onclick="App.Sim.close()">← Entraînement</button></div>
       <h2 class="sim-title">🩺 Simulation clinique</h2>
       <p class="sim-lead">Entraîne-toi à entrer chez un résident, faire son recueil de données, repérer ce qui doit alerter, puis transmettre l'essentiel. Les patients sont fictifs : aucune donnée réelle.</p>
-      <div class="sim-note">✅ <b>Fonctionne hors ligne</b> : les questions que tu tapes sont comprises directement par l'application, sans internet. <br>
-      🛠️ <b>Étape 1 sur 6</b> : cette version couvre la préparation et le recueil de données. La décision, l'appel de l'infirmier référent, les transmissions corrigées et la progression (niveaux, badges) arrivent ensuite.</div>
+      <div class="sim-note">✅ <b>Fonctionne hors ligne</b> : tes phrases sont comprises et tes écrits sont corrigés directement par l'application, sans internet. La correction repère des éléments attendus (mots-clés) : ce n'est pas une IA. <br>
+      🤖 <b>IA facultative</b> : si tu as ajouté une clé Gemini dans les réglages, un bouton permet de demander un avis plus fin sur ton appel et ta transmission (internet nécessaire, hors score). <br>
+      🏅 <b>Ta progression</b> (niveau, XP, badges) reste sur cet appareil.</div>
+      ${_progHtml()}
       ${resumeHtml}
       <h3 class="sim-h">Scénarios</h3>
       ${cards}
@@ -512,6 +956,17 @@ App.Sim = (() => {
     </div>`;
   }
   function discard() { st.current = null; _save(); render(); }
+  function _progHtml() {
+    const P = st.prog, lv = _levelOf(P.xp), nb = BADGES.filter(b => P.badges[b.id]).length;
+    const best = Object.keys(P.best).reduce((m, k) => Math.max(m, P.best[k] || 0), 0);
+    return `<div class="sim-card sim-xp">
+      <div class="sim-xp-top"><div class="sim-xp-n">Niv. ${lv.L.n}</div><div class="sim-xp-t"><b>${_esc(lv.L.name)}</b>
+        <div class="sim-muted sim-small">${P.xp} XP${lv.next ? ' · prochain niveau (' + _esc(lv.next.name) + ') à ' + lv.next.xp + ' XP' : ' · niveau maximum'}${best ? ' · meilleur score ' + best + '/100' : ''}</div></div></div>
+      <div class="sim-xpbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${lv.pct}"><i style="width:${lv.pct}%"></i></div>
+      <details class="sim-bdgs"><summary>🏅 Mes badges (${nb}/${BADGES.length})</summary>
+        <div class="sim-bdg-grid">${BADGES.map(b => `<div class="sim-bdg ${P.badges[b.id] ? 'on' : 'off'}" title="${_esc(b.desc)}"><span class="sim-bdg-i">${P.badges[b.id] ? b.ico : '🔒'}</span><b>${_esc(b.name)}</b><span class="sim-small sim-muted">${_esc(b.desc)}</span></div>`).join('')}</div></details>
+    </div>`;
+  }
 
   // ── Écran : préparation (couloir) ──
   function _dossierHtml(scn, c) {
@@ -630,7 +1085,7 @@ App.Sim = (() => {
   function _renderFinish() {
     const el = _el('sim-finish'), scn = _curScn(); if (!el || !scn) return;
     el.innerHTML = _confirmFinish
-      ? `<div class="sim-confirm"><p><b>Terminer le recueil ?</b><br><span class="sim-muted">Tu passeras au bilan. Tu ne pourras plus poser de questions à ${_esc(scn.patient.civ)} ${_esc(scn.patient.nom)}.</span></p>
+      ? `<div class="sim-confirm"><p><b>Terminer le recueil ?</b><br><span class="sim-muted">Tu passeras à la décision. Tu ne pourras plus retourner dans la chambre ni poser de questions à ${_esc(scn.patient.civ)} ${_esc(scn.patient.nom)}.</span></p>
          <div class="sim-row"><button class="btn btn-ghost" onclick="App.Sim.cancelFinish()">Continuer le recueil</button><button class="btn btn-primary" onclick="App.Sim.finish()">Oui, terminer</button></div></div>`
       : `<div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.askFinish()">Terminer le recueil →</button></div>`;
   }
@@ -751,7 +1206,11 @@ App.Sim = (() => {
     const c = _cur(); return c ? Object.keys(c.found).length : 0;
   }
   function _renderRecueil() {
-    const p = _el('sim-p-recueil'), c = _cur(), scn = _curScn(); if (!p || !c || !scn) return;
+    const p = _el('sim-p-recueil'); if (!p || !_cur() || !_curScn()) return;
+    p.innerHTML = _recueilHtml(false);
+  }
+  function _recueilHtml(ro) {            // ro : lecture seule (après le recueil, pas de bouton « à noter »)
+    const c = _cur(), scn = _curScn(); if (!c || !scn) return '';
     const tableFacts = new Set(scn.constTable.map(r => r.fact)); tableFacts.add('d_const_hab');
     const keys = Object.keys(scn.facts);
     const usualKnown = !!c.found.d_const_hab;
@@ -759,7 +1218,7 @@ App.Sim = (() => {
       if (sid === 'constantes') {
         const trs = scn.constTable.map(r => {
           const f = scn.facts[r.fact], got = c.found[r.fact], tk = _toolOfFact(scn, r.fact);
-          const cell = got ? _esc(f.text) : (tk && c.pending[tk] ? `<button type="button" class="sim-pend" onclick="App.Sim.reopen('${tk}')">✎ à noter</button>` : '—');
+          const cell = got ? _esc(f.text) : (!ro && tk && c.pending[tk] ? `<button type="button" class="sim-pend" onclick="App.Sim.reopen('${tk}')">✎ à noter</button>` : '—');
           return `<tr><th>${_esc(r.label)}</th><td class="${got ? 'v' : 'n'}">${cell}</td><td>${usualKnown ? _esc(r.usual) : '<span class="n" title="Lis le dossier de soins">?</span>'}</td><td class="sim-norm">${_esc(r.norm)}</td></tr>`;
         }).join('');
         return `<div class="sim-sec"><div class="sim-sec-h">${_esc(sname)}</div>
@@ -774,7 +1233,7 @@ App.Sim = (() => {
         : '<div class="sim-fact-none">Pas encore renseigné</div>';
       return `<div class="sim-sec"><div class="sim-sec-h">${_esc(sname)}</div>${body}</div>`;
     }).join('');
-    p.innerHTML = `<h3 class="sim-h">📋 Recueil de données <span class="sim-count">${_countFound()} notée${_countFound() > 1 ? 's' : ''}</span></h3>
+    return `<h3 class="sim-h">📋 Recueil de données <span class="sim-count">${_countFound()} notée${_countFound() > 1 ? 's' : ''}</span></h3>
       <p class="sim-muted sim-small">Tout ce que tu apprends s'ajoute ici. « Dit par la résidente » = ce qu'elle ressent ; « Mesure » et « Observation » = ce que tu constates toi-même.</p>${rows}`;
   }
   function _renderTabs() {
@@ -796,8 +1255,22 @@ App.Sim = (() => {
   }
 
   // ── Écran : bilan ──
+  function _tips(R) {
+    const t = [];
+    if (R.recueil.pts / R.recueil.max < 0.7) t.push("Recueil : reprends les informations clés que tu n'as pas trouvées (liste plus bas) et la façon de les obtenir.");
+    if (R.gestes.pts / R.gestes.max < 0.7) t.push('Gestes : revois ceux marqués ✗ ou ◐ dans la grille (hygiène des mains, présentation, accord, identité).');
+    if (R.niveau.pts < 10 || R.actions.pts < 10) t.push("Décision : l'étudiant alerte vite, sécurise la résidente et ne donne aucun médicament sans l'infirmière.");
+    if (R.appel.pts < 12) t.push("Appel : entraîne-toi à dire le SAED à voix haute en moins d'une minute, avec les valeurs chiffrées et ce que tu demandes.");
+    if (R.trans.pts < 12) t.push("Transmission : une cible courte, puis des données chiffrées comparées à l'habituel, des actions, un résultat et la suite.");
+    return t;
+  }
+  function _brk(label, pts, max, note) {
+    const pc = max ? Math.round(100 * pts / max) : 0;
+    return `<div class="sim-brk"><div class="sim-brk-l"><b>${_esc(label)}</b><div class="sim-muted sim-small">${_esc(note)}</div></div>
+      <div class="sim-brk-p">${fmt(pts)}<small>/${max}</small></div><div class="sim-brk-bar"><i style="width:${pc}%"></i></div></div>`;
+  }
   function _renderBilan(root) {
-    const c = _cur(), scn = _curScn();
+    const c = _cur(), scn = _curScn(), R = c.res || null;
     const b = _bilanData();
     const keyRows = b.keys.map(k => {
       const f = scn.facts[k], ok = !!c.found[k];
@@ -818,30 +1291,80 @@ App.Sim = (() => {
     }).join('');
     const sources = scn.sources.map(s => `<li>${s.url ? `<a href="${_esc(s.url)}" target="_blank" rel="noopener noreferrer">${_esc(s.label)}</a>` : _esc(s.label)}<div class="sim-muted sim-small">${_esc(s.note)}</div></li>`).join('');
     const comps = scn.competences.map(k => `<li>Compétence ${k.n} : ${_esc(k.label)}</li>`).join('');
-    root.innerHTML = `<div class="sim-wrap">
-      <div class="sim-bar"><button class="btn btn-ghost btn-sm" onclick="App.Sim.toList()">← Menu</button>
-        <div class="sim-bar-title">Bilan · ${_esc(scn.title)}</div><div class="sim-bar-time" id="sim-clock" title="Temps actif">${_hms(c.secs)}</div></div>
-      ${_stepper()}
-      <div class="sim-card sim-sum">
-        <div class="sim-sum-box"><div class="sim-sum-n">${b.keyFound}<small>/${b.keyTotal}</small></div><div>informations clés trouvées</div></div>
-        <div class="sim-sum-box"><div class="sim-sum-n">${b.gFound}<small>/${b.gTotal}</small></div><div>gestes professionnels réussis</div></div>
-        <div class="sim-sum-box"><div class="sim-sum-n">${_hms(c.secs)}</div><div>temps actif</div></div>
+    const head = `<div class="sim-bar"><button class="btn btn-ghost btn-sm" onclick="App.Sim.toList()">← Menu</button>
+        <div class="sim-bar-title">Bilan · ${_esc(scn.title)}</div><div class="sim-bar-time" id="sim-clock" title="Temps actif">${_hms(c.secs)}</div></div>${_stepper()}`;
+    const stats = `<p class="sim-muted sim-small sim-stats">${Object.keys(c.entered).length} mesure${Object.keys(c.entered).length > 1 ? 's' : ''} notée${Object.keys(c.entered).length > 1 ? 's' : ''} sur ${scn.toolOrder.length} · ${c.errors || 0} erreur${(c.errors || 0) > 1 ? 's' : ''} de saisie · ${c.misplaced || 0} instrument${(c.misplaced || 0) > 1 ? 's' : ''} mal placé${(c.misplaced || 0) > 1 ? 's' : ''}</p>`;
+    const tail = `<h3 class="sim-h">Compétences travaillées</h3><div class="sim-card"><ul class="sim-ul">${comps}</ul></div>
+      <h3 class="sim-h">Sources</h3>
+      <div class="sim-card"><ul class="sim-ul">${sources}</ul>
+        <div class="sim-muted sim-small">Scénario fictif. ${_esc(scn.status)}. En cas de différence, ton cours et les protocoles de ton stage priment.</div></div>
+      <div class="sim-row sim-enter"><button class="btn btn-ghost" onclick="App.Sim.replay()">🔁 Rejouer</button><button class="btn btn-primary" onclick="App.Sim.closeBilan()">Terminer</button></div>`;
+
+    if (!R) {                     // partie terminée avec une version précédente : seul le recueil était noté
+      root.innerHTML = `<div class="sim-wrap">${head}
+        <div class="sim-card sim-sum">
+          <div class="sim-sum-box"><div class="sim-sum-n">${b.keyFound}<small>/${b.keyTotal}</small></div><div>informations clés trouvées</div></div>
+          <div class="sim-sum-box"><div class="sim-sum-n">${b.gFound}<small>/${b.gTotal}</small></div><div>gestes professionnels réussis</div></div>
+          <div class="sim-sum-box"><div class="sim-sum-n">${_hms(c.secs)}</div><div>temps actif</div></div>
+        </div>${stats}
+        <div class="sim-note">ℹ️ Cette partie a été jouée avant l'ajout de la décision, de l'appel SAED, des transmissions et du score. Seul le recueil est noté ici : <b>rejoue</b> pour obtenir le score complet, le niveau et les badges.</div>
+        <h3 class="sim-h">Informations clés</h3><div class="sim-card">${keyRows}</div>
+        <h3 class="sim-h">🔎 Ce qu'il fallait retenir</h3><div class="sim-card sim-retain">${_esc(scn.alertSummary)}</div>
+        <h3 class="sim-h">Tes gestes</h3>
+        <div class="sim-card">${gridRows}<div class="sim-muted sim-small" style="margin-top:8px">✓ réussi · ↺ réussi après une correction · ◐ fait trop tard · ✗ non fait</div></div>${tail}</div>`;
+      return;
+    }
+
+    const lv = _levelOf(R.level.xp), lvName = L => (LEVELS[L - 1] || LEVELS[0]).name;
+    const word = R.total >= 90 ? 'Excellent' : R.total >= 75 ? 'Très bien' : R.total >= 60 ? 'Bien' : R.total >= 40 ? 'À consolider' : 'À reprendre';
+    const dec = scn.decision, chosen = dec.levels.find(l => l.id === c.dec.level);
+    const unsafe = R.unsafe.length ? `<div class="sim-fb danger" role="alert"><b>⚠ Sécurité de la résidente${R.capped ? ' : score plafonné à 50/100' : ''}</b><ul class="sim-ul">${R.unsafe.map(u => `<li>${_esc(u)}</li>`).join('')}</ul>
+      <p>En situation réelle, ces choix mettent la résidente en danger. C'est la règle n° 1 : on ne prend jamais de risque pour elle, même dans un exercice.</p></div>` : '';
+    const earned = R.earned.length ? `<h3 class="sim-h">🏅 Badges de cette partie</h3><div class="sim-card"><div class="sim-bdg-grid">${R.earned.map(id => { const bd = BADGES.find(x => x.id === id); return `<div class="sim-bdg on${R.newBadges.indexOf(id) >= 0 ? ' new' : ''}"><span class="sim-bdg-i">${bd.ico}</span><b>${_esc(bd.name)}</b>${R.newBadges.indexOf(id) >= 0 ? '<em class="sim-new">Nouveau</em>' : ''}<span class="sim-small sim-muted">${_esc(bd.desc)}</span></div>`; }).join('')}</div></div>` : '';
+    const allergyNote = c.found.q_allerg_pen
+      ? (R.allergySaid ? '✓ Tu as transmis l\'allergie possible à la pénicilline, absente du dossier : c\'est exactement le réflexe attendu.' : '⚠ Tu avais appris que Mme Martin ne supportait peut-être pas la pénicilline, mais tu ne l\'as pas transmis à Sophie. Une information discordante se transmet toujours : elle sera vérifiée par l\'équipe.')
+      : '⚠ Tu n\'as pas demandé à Mme Martin si elle était allergique à un médicament. Elle t\'aurait parlé de la pénicilline, absente du dossier : toujours vérifier les allergies.';
+    const tips = _tips(R);
+    root.innerHTML = `<div class="sim-wrap">${head}
+      <div class="sim-card sim-result">
+        <div class="sim-result-score"><b>${R.total}</b><span>/100</span></div>
+        <div class="sim-result-t"><div class="sim-result-w">${word}</div>
+          <div class="sim-muted sim-small">+${R.xp.total} XP${R.xp.first ? ' (dont 10 pour une première partie)' : ' (tu gagnes des XP quand tu progresses)'}${R.xp.bonus ? ' · ECG +' + R.xp.bonus : ''} · temps actif ${_hms(c.secs)}</div>
+          <div class="sim-result-lv">Niveau ${lv.L.n} · ${_esc(lv.L.name)}${R.level.after > R.level.before ? ' <em class="sim-new">Niveau gagné</em>' : ''}</div>
+          <div class="sim-xpbar"><i style="width:${lv.pct}%"></i></div></div>
       </div>
-      <p class="sim-muted sim-small sim-stats">${Object.keys(c.entered).length} mesure${Object.keys(c.entered).length > 1 ? 's' : ''} notée${Object.keys(c.entered).length > 1 ? 's' : ''} sur ${scn.toolOrder.length} · ${c.errors || 0} erreur${(c.errors || 0) > 1 ? 's' : ''} de saisie · ${c.misplaced || 0} instrument${(c.misplaced || 0) > 1 ? 's' : ''} mal placé${(c.misplaced || 0) > 1 ? 's' : ''}</p>
-      <div class="sim-note">🛠️ <b>Bilan provisoire (étape 1)</b> : il porte sur le recueil. La décision, l'appel de l'infirmier référent, tes transmissions écrites et le score complet arrivent aux étapes suivantes.</div>
+      ${unsafe}
+      <div class="sim-card">
+        ${_brk('Recueil de données', R.recueil.pts, 30, R.recueil.found + '/' + R.recueil.total + ' informations clés trouvées')}
+        ${_brk('Gestes professionnels', R.gestes.pts, 15, 'hygiène, contact, mesures, observation')}
+        ${_brk('Décision : niveau d\'alerte', R.niveau.pts, 10, chosen ? chosen.label : 'non renseigné')}
+        ${_brk('Décision : gestes en attendant', R.actions.pts, 15, R.actions.good + '/' + R.actions.goodTotal + ' bons gestes · ' + R.actions.avoid + ' à éviter · ' + R.actions.danger + ' dangereux')}
+        ${_brk('Appel à l\'infirmière (SAED)', R.appel.pts, 15, R.appel.tries > 1 ? '2 essais, le meilleur est retenu' : '1 essai')}
+        ${_brk('Transmission écrite', R.trans.pts, 15, 'cible, données, actions, résultats')}
+        ${R.ecg ? `<p class="sim-muted sim-small">🫀 ECG de la prescription réalisé : ${R.ecg.score}/100 (bonus d'XP, hors score).</p>` : ''}
+        ${R.capped ? `<p class="sim-warn sim-small">Total avant plafond : ${fmt(R.raw)}/100.</p>` : ''}
+      </div>
+      ${earned}${stats}
+      ${tips.length ? `<h3 class="sim-h">Pour progresser</h3><div class="sim-card"><ul class="sim-ul">${tips.map(t => `<li>${_esc(t)}</li>`).join('')}</ul></div>` : ''}
       <h3 class="sim-h">Informations clés</h3>
       <div class="sim-card">${keyRows}</div>
       <h3 class="sim-h">🔎 Ce qu'il fallait retenir</h3>
       <div class="sim-card sim-retain">${_esc(scn.alertSummary)}</div>
+      <h3 class="sim-h">Ta décision</h3>
+      <div class="sim-card">${chosen ? `<div class="sim-fb ${chosen.verdict}"><b>${_esc(chosen.label)}</b><p>${_esc(chosen.feedback)}</p></div>` : ''}
+        <details class="sim-why"><summary>Voir le détail de tes choix en attendant Sophie</summary><div class="sim-revs">${_actionsReview(c, scn)}</div></details></div>
+      <h3 class="sim-h">Ton appel à Sophie</h3>
+      <div class="sim-card">${_corrHtml(_grade(scn.call.sections, c.saed.txt))}
+        <p class="sim-small ${R.allergySaid ? '' : 'sim-warn'}">${allergyNote}</p>
+        <details class="sim-why"><summary>Voir un exemple de message SAED</summary><div class="sim-model">${['S', 'A', 'E', 'D'].map(k => `<p><b>${k}</b> · ${_esc(scn.call.model[k])}</p>`).join('')}</div></details>
+        ${c.ai && c.ai.saed && c.ai.saed.state === 'ok' ? _aiBlock('saed', c) : ''}</div>
+      <h3 class="sim-h">Ta transmission écrite</h3>
+      <div class="sim-card">${_corrHtml(_grade(scn.written.fields, c.wr.txt))}
+        <details class="sim-why"><summary>Voir un exemple de transmission ciblée</summary><div class="sim-model">${scn.written.fields.map(f => `<p><b>${_esc(f.label)}</b> · ${_esc(scn.written.model[f.id])}</p>`).join('')}</div></details>
+        ${c.ai && c.ai.transmission && c.ai.transmission.state === 'ok' ? _aiBlock('transmission', c) : ''}</div>
       <h3 class="sim-h">Tes gestes</h3>
       <div class="sim-card">${gridRows}<div class="sim-muted sim-small" style="margin-top:8px">✓ réussi · ↺ réussi après une correction · ◐ fait trop tard · ✗ non fait</div></div>
-      <h3 class="sim-h">Compétences travaillées</h3>
-      <div class="sim-card"><ul class="sim-ul">${comps}</ul></div>
-      <h3 class="sim-h">Sources</h3>
-      <div class="sim-card"><ul class="sim-ul">${sources}</ul>
-        <div class="sim-muted sim-small">Scénario fictif. ${_esc(scn.status)}. En cas de différence, ton cours et les protocoles de ton stage priment.</div></div>
-      <div class="sim-row sim-enter"><button class="btn btn-ghost" onclick="App.Sim.replay()">🔁 Rejouer</button><button class="btn btn-primary" onclick="App.Sim.closeBilan()">Terminer</button></div>
-    </div>`;
+      ${tail}</div>`;
   }
 
   // ── Chrono d'activité (même principe que l'onglet Anglais) ────
@@ -891,6 +1414,7 @@ App.Sim = (() => {
   return {
     open, close, start, resume, toList, discard, setTab, say, submit, askMenu, toggleMenu, thToggle,
     pickTool, dropTool, hot, gStartCount, gTap, gRecount, gPlace, gInflate, gSubmit, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
-    parse, _t: { norm: _norm, state: () => st, tick: _tick }
+    decLevel, decLevelOk, decPick, decActionsOk, decNext, txt, sendSaed, saedRetry, saedDone, rxEcg, rxSkip, rxNext, wrSubmit, wrDone, aiReview,
+    parse, _t: { norm: _norm, state: () => st, tick: _tick, grade: (kind, texts) => { const scn = _curScn() || _scenarios()[0]; return _grade(kind === 'saed' ? scn.call.sections : scn.written.fields, texts); }, results: () => _results(), levelOf: _levelOf }
   };
 })();
