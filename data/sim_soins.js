@@ -175,6 +175,43 @@ App.SimSoins = {
                   why: "Un fort débit d'oxygène chez un BPCO peut faire monter le CO₂ (hypercapnie) : somnolence, jusqu'au coma. C'est le piège classique : faible débit, surveillance, et c'est l'infirmière ou le médecin qui règle." }
       },
       nurse: { vitalOk: "Je suis là, j'appelle le 15. Reste auprès de lui, assis, continue tes constantes (fréquence respiratoire, saturation), ne lui donne rien à boire ni calmant, puis fais-moi ton point (SAED)." }
+    },
+
+    // ───────────── M. Vasseur : détresse respiratoire à l'hôpital (insuffisance cardiaque décompensée, œdème pulmonaire) ─────────────
+    hop_oap_6: {
+      vital: true,
+      pos: {
+        assise:   { v: 'good',  pat: "(M. Vasseur, penché en avant, pose ses mains sur ses genoux et respire un peu mieux.)",
+                    why: "Assis, le thorax libre, il respire plus facilement : c'est la position qu'il prend naturellement quand il manque d'air (il ne peut pas s'allonger)." },
+        demi:     { v: 'good',  pat: "(Tu relèves le dossier, tu cales les oreillers : il respire un peu moins vite.)",
+                    why: "Assis ou demi-assis (dossier à plus de 30°), bien calé : c'est la position qui soulage une personne qui manque d'air." },
+        bord:     { v: 'good',  pat: "(Tu l'aides à s'asseoir au bord du lit, les jambes pendantes, tu le soutiens par l'épaule : il respire un peu mieux.)",
+                    why: "Assis, les jambes qui pendent, le sang stagne un peu dans les jambes et le cœur travaille moins. C'est une position classique en cas de gêne respiratoire d'origine cardiaque, à condition de le soutenir, de ne pas le laisser seul et de ne pas le faire marcher." },
+        allongee: { v: 'danger', pat: "(Dès que le dossier descend, il s'agrippe aux draps, la bouche ouverte.) « J'étouffe… » (Tu le rassois tout de suite.)",
+                    why: "À plat, le liquide qui encombre ses poumons remonte et il s'étouffe : on ne l'allonge jamais à plat. Assis ou demi-assis." },
+        jambes:   { v: 'danger', pat: "(Il se débat, le souffle coupé.) « J'étouffe… » (Tu le rassois tout de suite.)",
+                    why: "Jambes surélevées, plus de sang revient vers un cœur déjà fatigué : le liquide dans les poumons augmente. À éviter absolument." },
+        pls:      { v: 'avoid', pat: "(Il te regarde, essoufflé, en secouant la tête.)",
+                    why: "La PLS est pour une personne inconsciente qui respire. M. Vasseur est éveillé : il doit rester assis. Si tu ne parviens plus à le réveiller, tu appelles aussitôt." }
+      },
+      // Oxygène : pas de maladie pulmonaire connue → il faut un débit suffisant (masque), prescrit ou selon protocole, réglé par l'infirmière
+      o2: { mode: 'allow', indicated: true, rule: 'high',
+        good:   { pat: "(Le masque se pose, la buée apparaît à l'intérieur. Il respire un peu moins vite, ses épaules se détendent.)",
+                  why: "Il a une saturation très basse (84 %) et aucune maladie respiratoire chronique connue : l'oxygène est utile, au masque et à un débit suffisant (repère à valider avec ton cours et le protocole du service). C'est l'infirmière qui décide, prescrit ou applique le protocole et règle : alerte-la d'abord." },
+        avoid:  { pat: "(Il tire sur les lunettes, toujours essoufflé : « ça… ne suffit pas… ».)",
+                  why: "Des lunettes à petit débit ne suffisent pas pour une saturation à 84 % avec une telle gêne : il faut un masque et un débit plus élevé. C'est l'infirmière qui décide : préviens-la." },
+        nurseGood: "Oui, un masque, c'est bien. Je prends le relais pour la prescription et le réglage : j'adapte à sa saturation. Surveille-la sur le scope, sa respiration et sa vigilance." },
+      nurse: {
+        vitalOk: "Je suis là, j'ai vu. J'appelle le médecin de garde tout de suite. Reste auprès de lui, assis, branche le scope si ce n'est pas fait, continue ses constantes, ne lui donne rien à boire ni à manger, puis fais-moi ton point (SAED).",
+        prompt:  "Je passe te voir. Termine ton recueil, constantes comprises, puis fais-moi ton point : Situation, Antécédents, Évaluation, Demande.",
+        left:    "Ne laisse jamais le patient seul quand il manque d'air : appuie sur la sonnette ou fais venir Karim, tu restes dans la chambre. Je viens tout de suite.",
+        again:   "Je suis déjà là, je m'en occupe avec toi. Continue ton recueil.",
+        whyGood: "Quand une personne manque d'air, on alerte tout de suite et on reste près d'elle : sonnette ou Karim, sans la laisser seule pour aller chercher de l'aide.",
+        whyOk:   "Tu as prévenu Claire : c'est un bon réflexe, mais ici il faut le faire sans attendre.",
+        whyLeft: "Tu as bien alerté, mais tu as laissé le patient seul dans la chambre. Quand on manque d'air, on reste près de lui : sonnette ou Karim."
+      },
+      rester: { pat: "(Tu restes près de M. Vasseur, une main posée sur son épaule. Il hoche la tête, un peu rassuré.)",
+                why: "Il a peur de mourir : rester près de lui, lui parler lentement et surveiller sa respiration le rassure (l'anxiété augmente l'essoufflement)." }
     }
   }
 };

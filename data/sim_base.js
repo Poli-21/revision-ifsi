@@ -10,12 +10,12 @@ App.SimBase = (() => {
 
   // Mots qui changent selon le sexe du résident
   function words(p) {
-    const m = p.sexe === 'M';
+    const m = p.sexe === 'M', h = p.statut === 'patient';          // h : cas hospitalier (« patient » et non « résident »)
     return {
       m,
-      res: m ? 'le résident' : 'la résidente',
-      Res: m ? 'Le résident' : 'La résidente',
-      du: m ? 'du résident' : 'de la résidente',
+      res: h ? (m ? 'le patient' : 'la patiente') : (m ? 'le résident' : 'la résidente'),
+      Res: h ? (m ? 'Le patient' : 'La patiente') : (m ? 'Le résident' : 'La résidente'),
+      du: h ? (m ? 'du patient' : 'de la patiente') : (m ? 'du résident' : 'de la résidente'),
       il: m ? 'il' : 'elle',
       lui: m ? 'lui' : 'elle',
       deLui: m ? 'de lui' : "d'elle",
@@ -41,6 +41,38 @@ App.SimBase = (() => {
 
   // Instruments : mêmes gestes que le scénario de Mme Martin, valeurs propres à chaque résident.
   // spec = { de, temp, fc:{rate, rhythm}, pa:[sys,dia], fr, spo2, douleur:{val, says, noted}, glyc:{val, ...} }
+  const CUFF = [
+    { id: 'epaule', label: "En haut du bras, près de l'épaule", ok: false, hint: 'Trop haut : le brassard se place juste au-dessus du pli du coude.' },
+    { id: 'bon',    label: 'À 2 ou 3 cm au-dessus du pli du coude', ok: true },
+    { id: 'coude',  label: 'Sur le pli du coude', ok: false, hint: 'Trop bas : le brassard gêne le pli du coude et fausse la mesure.' }
+  ];
+  // Scope (cas hospitaliers) : trois capteurs à poser (thorax, bras, doigt), puis FC, SpO₂, pression non invasive et FR s'affichent ensemble
+  function scopeTool(spec) {
+    const de = spec.de, rhythm = spec.fc.rhythm || 'régulier', pa = spec.pa[0] + '/' + spec.pa[1];
+    return {
+      label: 'Scope', icon: '📟', kind: 'scope', zone: '*', fact: 'm_spo2', seconds: 7,
+      intro: "Le scope surveille en continu le cœur, la saturation, la tension et la respiration. Pour le brancher, touche sur le patient les trois endroits : le thorax (électrodes), le bras (brassard) et le doigt (capteur de saturation).",
+      where: "Le scope se branche avec trois capteurs : électrodes sur le thorax, brassard sur le bras, capteur de saturation au doigt. Touche l'un de ces trois endroits sur le patient.",
+      sensors: [
+        { id: 'ecg', zone: 'zone-thorax', label: 'Électrodes sur le thorax', hint: 'Trois électrodes autocollantes, reliées au câble du scope.',
+          start: `Tu colles les trois électrodes sur le thorax ${de} et tu les relies au câble du scope.` },
+        { id: 'bras', zone: 'zone-bras', label: 'Brassard au bras', hint: '2 à 3 cm au-dessus du pli du coude.',
+          start: `Tu enroules le brassard du scope autour du bras ${de}, bien placé au-dessus du pli du coude.` },
+        { id: 'doigt', zone: 'zone-doigt', label: 'Capteur de saturation au doigt', hint: 'Pince au bout d\'un doigt.',
+          start: `Tu poses le capteur de saturation au bout d'un doigt ${de}.` }
+      ],
+      cuff: CUFF,
+      ready: "Les trois capteurs sont branchés : le scope s'allume, le brassard se gonfle tout seul et les courbes apparaissent.",
+      display: { fc: spec.fc.rate, spo2: spec.spo2, pa: spec.pa[0] + ' / ' + spec.pa[1], fr: spec.fr, irregular: /irr/i.test(rhythm), alarms: spec.alarms || [],
+        note: spec.scopeNote || "Le scope donne les valeurs au moment où tu le branches. Les alarmes préviennent, mais c'est toi qui regardes le patient et qui prévient l'infirmière." },
+      multi: [
+        { fact: 'm_spo2', label: 'SpO₂', unit: '%', value: spec.spo2, tol: 0, noted: `Saturation : ${spec.spo2} % ${spec.spo2note || 'en air ambiant'}` },
+        { fact: 'm_fc', label: 'FC', unit: '/min', value: spec.fc.rate, tol: 0, noted: `Pouls : ${spec.fc.rate} /min, ${rhythm}` },
+        { fact: 'm_pa', type: 'bp', label: 'PA', sys: spec.pa[0], dia: spec.pa[1], tol: 1, noted: `Pression artérielle : ${pa} mmHg` },
+        { fact: 'm_fr', label: 'FR', unit: '/min', value: spec.fr, tol: 0, noted: `Fréquence respiratoire : ${spec.fr} /min` }
+      ]
+    };
+  }
   function tools(spec) {
     const T = {}, order = [], scene = { 'tool-thermometre': 'thermometre', 'tool-tension': 'tension', 'tool-saturometre': 'saturometre', 'tool-montre': 'respiration' };
     const de = spec.de;
@@ -53,11 +85,7 @@ App.SimBase = (() => {
     T.tension = { label: 'Tensiomètre', icon: '🩺', zone: 'zone-bras', kind: 'cuff', seconds: 6, fact: 'm_pa',
       where: 'Le brassard se place sur le bras.',
       start: `Tu prends le tensiomètre et tu t'occupes du bras ${de}.`,
-      cuff: [
-        { id: 'epaule', label: "En haut du bras, près de l'épaule", ok: false, hint: 'Trop haut : le brassard se place juste au-dessus du pli du coude.' },
-        { id: 'bon',    label: 'À 2 ou 3 cm au-dessus du pli du coude', ok: true },
-        { id: 'coude',  label: 'Sur le pli du coude', ok: false, hint: 'Trop bas : le brassard gêne le pli du coude et fausse la mesure.' }
-      ],
+      cuff: CUFF,
       display: { big: spec.pa[0] + ' / ' + spec.pa[1], unit: 'mmHg' },
       input: { type: 'bp', label: 'Pression artérielle lue', unit: 'mmHg', sys: spec.pa[0], dia: spec.pa[1], tol: 1 },
       noted: `Pression artérielle : ${spec.pa[0]}/${spec.pa[1]} mmHg` };
@@ -76,6 +104,7 @@ App.SimBase = (() => {
       also: { fact: 'm_fc', input: { label: 'Pouls lu', unit: '/min', value: spec.fc.rate, tol: 0 }, noted: `Pouls : ${spec.fc.rate} /min, ${spec.fc.rhythm || 'régulier'}` },
       noted: `Saturation : ${spec.spo2} % en air ambiant` };
     order.push('thermometre', 'tension', 'respiration', 'saturometre');
+    if (spec.scope) { T.scope = scopeTool(spec); order.unshift('scope'); scene['tool-scope'] = 'scope'; }
     if (spec.glyc) {
       T.glucometre = { label: 'Glycémie capillaire', icon: '🩸', zone: 'zone-doigt', kind: 'wait', seconds: 5, fact: 'm_glyc',
         where: 'La goutte de sang se prélève sur le côté de la pulpe d\'un doigt (jamais le bout), après avoir mis des gants.',
@@ -110,7 +139,7 @@ App.SimBase = (() => {
         why: "Prévention des infections associées aux soins : l'hygiène des mains avant le contact fait partie des précautions standard.",
         ref: 'UE B3 S1 : TD 1 et TD 2 (hygiène des mains, précautions standard)' },
       { id: 'g_frapper', stage: 'entree', label: 'Frapper et attendre avant d\'entrer',
-        why: `La chambre est le lieu de vie ${w.du} : on la respecte comme son domicile.`,
+        why: p.statut === 'patient' ? `La chambre est l'espace privé ${w.du} pendant son séjour : on la respecte comme son domicile.` : `La chambre est le lieu de vie ${w.du} : on la respecte comme son domicile.`,
         ref: 'Posture professionnelle (à confirmer avec ton formateur)' },
       { id: 'g_presentation', stage: 'contact', label: 'Te présenter (nom, étudiant infirmier)',
         why: `${w.Res} doit savoir qui s'occupe ${w.deLui} et quel est ton rôle.`,
@@ -185,5 +214,5 @@ App.SimBase = (() => {
     }, o || {});
   }
 
-  return { words, contact, tools, grid, autoGestures, constTable, narration, fr };
+  return { words, contact, tools, scopeTool, grid, autoGestures, constTable, narration, fr };
 })();

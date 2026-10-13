@@ -7,8 +7,9 @@ window.App = window.App || {};
 App.SimScene = (() => {
   // ── Projection isométrique ──────────────────────────────────────────────
   const S = 52, K = 0.866, OX = 304, OY = 246;      // échelle, cos 30°, origine écran
-  const W = 7.2, D = 6.4, H = 4.4;                  // salle : largeur (x), profondeur (y), hauteur (z)
-  const VB = '0 0 640 640';
+  let W = 7.2, D = 6.4;                              // salle : largeur (x), profondeur (y) ; chambre d'hôpital plus grande (voir svg())
+  const H = 4.4;                                     // hauteur (z)
+  const VB = '0 0 640 640', VB_H = '-46 -30 736 736';
   const P = (x, y, z = 0) => [OX + (x - y) * K * S, OY + (x + y) * 0.5 * S - z * S];
   const r1 = n => Math.round(n * 10) / 10;
   const pts = a => a.map(p => P(p[0], p[1], p[2] || 0).map(r1).join(',')).join(' ');
@@ -33,6 +34,10 @@ App.SimScene = (() => {
 
   let defs, uid, out;
   let CLK = { h: 7, m: 40 };
+  let HOSP = false;                                  // style « hôpital » : chambre de service, rampe de gaz, scope, lit blanc et bleu
+  const PAL_E = { board: C.yellow, ins1: '#f9dc8c', ins2: '#ecbb4a', blanket: C.cream, blanketTop: '#fff4d6', blanketTop2: '#fffaea', fold: '#f0dcb4', foldTop: '#f6e6c4' };
+  const PAL_H = { board: '#e3ebf2', ins1: '#8dbaea', ins2: '#4f8fd0', blanket: '#d3e5f5', blanketTop: '#eaf3fb', blanketTop2: '#f3f9fe', fold: '#c0d7ec', foldTop: '#d3e4f3' };
+  let PAL = PAL_E;
   const grad = (c1, c2, horizontal) => {            // c1 en haut (ou à gauche), c2 en bas (ou à droite)
     const id = 'ss' + (uid++);
     defs.push(`<linearGradient id="${id}" x1="0" y1="0" x2="${horizontal ? 1 : 0}" y2="${horizontal ? 0 : 1}"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient>`);
@@ -70,7 +75,7 @@ App.SimScene = (() => {
     // épaisseur du sol (diorama)
     add(`<polygon points="${pts([[0, D, 0], [W, D, 0], [W, D, -T], [0, D, -T]])}" fill="${grad('#e6d3b0', '#cdb68f')}" stroke="#dcc7a2" stroke-width="2" stroke-linejoin="round"/>`);
     add(`<polygon points="${pts([[W, D, 0], [W, 0, 0], [W, 0, -T], [W, D, -T]])}" fill="${grad('#d9c29b', '#bda57c')}" stroke="#d2bb94" stroke-width="2" stroke-linejoin="round"/>`);
-    add(`<polygon points="${pts([[0, 0], [W, 0], [W, D], [0, D]])}" fill="${grad(C.floorA, C.floorB)}"/>`);
+    add(`<polygon points="${pts([[0, 0], [W, 0], [W, D], [0, D]])}" fill="${HOSP ? grad('#e4ebf0', '#d2dde5') : grad(C.floorA, C.floorB)}"/>`);
     let t = '';
     for (let i = 0; i < W; i++) for (let j = 0; j < D; j++) if ((i + j) % 2 === 0) t += `<polygon points="${pts([[i, j], [i + 1, j], [i + 1, j + 1], [i, j + 1]])}" fill="rgba(255,255,255,.22)"/>`;
     add(t);
@@ -79,31 +84,34 @@ App.SimScene = (() => {
     for (let j = 1; j < D; j++) l += `<line x1="${P(0, j)[0]}" y1="${P(0, j)[1]}" x2="${P(W, j)[0]}" y2="${P(W, j)[1]}"/>`;
     add(`<g stroke="rgba(150,118,84,.2)" stroke-width="1.2">${l}</g>`);
     // flaque de soleil venant de la fenêtre
-    add(`<polygon points="${pts([[4.6, 0.2], [6.9, 0.2], [7.0, 3.6], [4.2, 3.6]])}" fill="rgba(255,250,222,.6)" filter="url(#ssb3)"/>`);
+    const sx = HOSP ? 0.8 : 0;
+    add(`<polygon points="${pts([[4.6 + sx, 0.2], [6.9 + sx, 0.2], [7.0 + sx, 3.6], [4.2 + sx, 3.6]])}" fill="rgba(255,250,222,.6)" filter="url(#ssb3)"/>`);
   }
   function walls() {
     // Mur de gauche (plan x=0) : le mur du fond à gauche, avec la porte
-    add(`<polygon points="${pts([[0, 0, 0], [0, D, 0], [0, D, H], [0, 0, H]])}" fill="${grad('#c6ebe4', '#b4e1d9')}"/>`);
-    add(`<polygon points="${pts([[0, 0, 0], [0, D, 0], [0, D, 1.05], [0, 0, 1.05]])}" fill="${grad('#a9dcd2', '#9bd2c8')}"/>`);
+    add(`<polygon points="${pts([[0, 0, 0], [0, D, 0], [0, D, H], [0, 0, H]])}" fill="${HOSP ? grad('#ecf3f8', '#dbe7f0') : grad('#c6ebe4', '#b4e1d9')}"/>`);
+    add(`<polygon points="${pts([[0, 0, 0], [0, D, 0], [0, D, 1.05], [0, 0, 1.05]])}" fill="${HOSP ? grad('#c3d6e4', '#b3c9da') : grad('#a9dcd2', '#9bd2c8')}"/>`);
     add(`<polyline points="${pts([[0, 0, 1.05], [0, D, 1.05]])}" fill="none" stroke="${C.trim}" stroke-width="4"/>`);
     add(`<polygon points="${pts([[-T, 0, H], [0, 0, H], [0, D, H], [-T, D, H]])}" fill="${C.trim}"/>`);
     add(`<polygon points="${pts([[-T, D, 0], [0, D, 0], [0, D, H], [-T, D, H]])}" fill="${grad('#f1e4c9', '#e0cfae')}"/>`);
     // Mur de droite (plan y=0) : fenêtre, horloge
-    add(`<polygon points="${pts([[0, 0, 0], [W, 0, 0], [W, 0, H], [0, 0, H]])}" fill="${grad('#d6f2ed', '#c4eae3')}"/>`);
-    add(`<polygon points="${pts([[0, 0, 0], [W, 0, 0], [W, 0, 1.05], [0, 0, 1.05]])}" fill="${grad('#b4e2d9', '#a6d9cf')}"/>`);
+    add(`<polygon points="${pts([[0, 0, 0], [W, 0, 0], [W, 0, H], [0, 0, H]])}" fill="${HOSP ? grad('#f1f7fb', '#e1ecf3') : grad('#d6f2ed', '#c4eae3')}"/>`);
+    add(`<polygon points="${pts([[0, 0, 0], [W, 0, 0], [W, 0, 1.05], [0, 0, 1.05]])}" fill="${HOSP ? grad('#cadbe8', '#bad0e1') : grad('#b4e2d9', '#a6d9cf')}"/>`);
     add(`<polyline points="${pts([[0, 0, 1.05], [W, 0, 1.05]])}" fill="none" stroke="${C.trim}" stroke-width="4"/>`);
     add(`<polygon points="${pts([[0, -T, H], [W, -T, H], [W, 0, H], [0, 0, H]])}" fill="${C.trim}"/>`);
     add(`<polygon points="${pts([[W, -T, 0], [W, 0, 0], [W, 0, H], [W, -T, H]])}" fill="${grad('#ecdcbc', '#d8c4a0')}"/>`);
     add(`<polygon points="${pts([[-T, -T, H], [0, -T, H], [0, 0, H], [-T, 0, H]])}" fill="${C.trim}"/>`);
     // main courante en bois le long des deux murs (couloir et chambre d'EHPAD)
     [[[0, 0, 1.42], [0, D, 1.42]], [[0, 0, 1.42], [W, 0, 1.42]]].forEach(l => {
-      add(`<polyline points="${pts(l)}" fill="none" stroke="#c99a5f" stroke-width="7" stroke-linecap="round"/><polyline points="${pts(l)}" fill="none" stroke="#e8c48c" stroke-width="3" stroke-linecap="round"/>`);
+      if (HOSP) add(`<polyline points="${pts(l)}" fill="none" stroke="#8fa9be" stroke-width="7" stroke-linecap="round"/><polyline points="${pts(l)}" fill="none" stroke="#d3e1ec" stroke-width="3" stroke-linecap="round"/>`);     // lisse de protection
+      else add(`<polyline points="${pts(l)}" fill="none" stroke="#c99a5f" stroke-width="7" stroke-linecap="round"/><polyline points="${pts(l)}" fill="none" stroke="#e8c48c" stroke-width="3" stroke-linecap="round"/>`);
     });
   }
   function windowAndCurtains() {
     // Fenêtre sur le mur y=0 : x de 4.5 à 6.9, z de 1.5 à 3.7
     const g = grad('#f0faff', '#bfe3f7');                 // en repère de plan (v monte) : c1 = bas
-    add(`<g transform="${mWallA(0)}">
+    const wdx = HOSP ? 0.8 : 0;                           // à l'hôpital la fenêtre est plus à droite : la tête du lit et la rampe d'oxygène restent dégagées
+    add(`<g transform="${mWallA(0)} translate(${wdx} 0)">
       <rect x="4.4" y="1.4" width="2.6" height="2.4" rx="0.14" fill="#fff8e8"/>
       <rect x="4.55" y="1.55" width="2.3" height="2.1" rx="0.08" fill="${g}"/>
       <path d="M4.7 2.2 Q5.4 2.7 6.2 2.45 Q6.6 2.35 6.8 2.55 L6.8 3.6 L4.7 3.6Z" fill="rgba(255,255,255,.55)"/>
@@ -116,9 +124,9 @@ App.SimScene = (() => {
       let f = '';
       const n = 4, w = (x1 - x0) / n;
       for (let i = 0; i < n; i++) f += `<rect x="${r1(x0 + i * w + 0.02)}" y="1.0" width="${r1(w * 0.55)}" height="3.0" rx="0.1" fill="rgba(255,255,255,.22)"/>`;
-      return `<rect x="${x0}" y="0.9" width="${x1 - x0}" height="3.15" rx="0.14" fill="${grad('#62d0c4', '#35aea2')}"/>${f}`;
+      return `<rect x="${x0}" y="0.9" width="${x1 - x0}" height="3.15" rx="0.14" fill="${HOSP ? grad('#9cc3e8', '#6c9fd0') : grad('#62d0c4', '#35aea2')}"/>${f}`;
     };
-    add(`<g transform="${mWallA(-0.02)}">${cur(3.85, 4.75)}${cur(6.7, 7.1 + 0.0)}
+    add(`<g transform="${mWallA(-0.02)} translate(${wdx} 0)">${cur(3.85, 4.75)}${cur(6.7, 7.1 + 0.0)}
       <rect x="3.7" y="4.02" width="3.6" height="0.12" rx="0.06" fill="#d8b97c"/>
       <ellipse cx="4.3" cy="2.2" rx="0.2" ry="0.1" fill="#f4d99a" opacity=".0"/></g>`);
     // Horloge : l'heure du scénario (7 h 40 par défaut)
@@ -190,7 +198,7 @@ App.SimScene = (() => {
     rbox(1.27, 2.25, 1.22, 1.0, 0.8, 0.04, '#cfe7f6', { rim: 3 });
     // assiette + tartine, tasse de café, yaourt : tout est intact
     const a = P(1.85, 2.7, 1.26), b = P(1.45, 2.6, 1.26), y = P(2.05, 2.35, 1.26);
-    add(`<g data-hot="plateau">
+    if (!HOSP) add(`<g data-hot="plateau">
       ${ell(a[0], a[1], 15, 7.5, '#ffffff', 'stroke="#e9eef2" stroke-width="2"')}
       <path d="M${r1(a[0] - 11)} ${r1(a[1] - 2)} q0 -9 11 -9 q11 0 11 9 q0 4 -4 4 L${r1(a[0] - 7)} ${r1(a[1] + 2)} q-4 0 -4 -4Z" fill="${grad('#f1c78a', '#d9a35a')}" stroke="#e6b873" stroke-width="2" stroke-linejoin="round"/>
       <path d="M${r1(a[0] - 7)} ${r1(a[1] - 4)} q7 -6 14 0" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2" stroke-linecap="round"/>
@@ -222,17 +230,17 @@ App.SimScene = (() => {
     wheel(3.55, 0.65); wheel(3.55, 3.95);
     rbox(3.4, 0.45, 0.26, 1.8, 3.7, 0.2, '#c7d1d8', { rim: 4 });
     wheel(5.05, 0.65); wheel(5.05, 3.95);
-    rbox(3.32, 0.28, 0.4, 2.0, 0.2, 1.7, C.yellow, { rim: 6 });                    // tête de lit
-    add(`<g transform="${mWallA(0.48)}"><rect x="3.5" y="0.75" width="1.65" height="1.0" rx="0.18" fill="${grad('#f9dc8c', '#ecbb4a')}" opacity=".9"/></g>`);
+    rbox(3.32, 0.28, 0.4, 2.0, 0.2, 1.7, PAL.board, { rim: 6 });                    // tête de lit
+    add(`<g transform="${mWallA(0.48)}"><rect x="3.5" y="0.75" width="1.65" height="1.0" rx="0.18" fill="${grad(PAL.ins1, PAL.ins2)}" opacity=".9"/></g>`);
     rbox(3.35, 0.46, 0.46, 1.9, 3.7, 0.36, '#fcf8ee', { rim: 5 });                 // matelas
-    rbox(3.32, 1.35, 0.78, 0.13, 2.2, 0.62, C.yellow, { rim: 5 });                 // barrière côté fenêtre (lointaine)
+    rbox(3.32, 1.35, 0.78, 0.13, 2.2, 0.62, HOSP ? '#cfdae3' : C.yellow, { rim: 5 });                 // barrière côté fenêtre (lointaine)
     add(`<g transform="${mWallB(3.45)}"><rect x="1.5" y="0.95" width="2.0" height="0.32" rx="0.08" fill="#9ccbe3"/></g>`);
     if (G.pos !== 'demi' && G.pos !== 'assise') rbox(3.62, 0.5, 0.82, 1.3, 0.78, 0.24, '#ffffff', { rim: 6, top: '#ffffff' });   // oreiller
     patientBody(state, G);
-    rbox(3.32, 4.12, 0.4, 2.0, 0.2, 1.05, C.yellow, { rim: 6 });                   // pied de lit
-    add(`<g transform="${mWallA(4.32)}"><rect x="3.5" y="0.62" width="1.65" height="0.55" rx="0.14" fill="${grad('#f9dc8c', '#ecbb4a')}" opacity=".9"/></g>`);
+    rbox(3.32, 4.12, 0.4, 2.0, 0.2, 1.05, PAL.board, { rim: 6 });                   // pied de lit
+    add(`<g transform="${mWallA(4.32)}"><rect x="3.5" y="0.62" width="1.65" height="0.55" rx="0.14" fill="${grad(PAL.ins1, PAL.ins2)}" opacity=".9"/></g>`);
     // poire d'appel accrochée au bord du lit
-    const b = P(5.42, 1.55, 0.7), t = P(5.28, 1.5, 0.95);
+    const sy = HOSP ? 2.3 : 1.55, b = P(5.42, sy, 0.7), t = P(5.28, sy - 0.05, 0.95);   // à l'hôpital : décalée vers le pied du lit, loin du scope
     add(`<g data-hot="sonnette"><path d="M${r1(t[0])} ${r1(t[1])} Q${r1(t[0] + 6)} ${r1(t[1] + 14)} ${r1(b[0])} ${r1(b[1] - 8)}" fill="none" stroke="#6b7782" stroke-width="2.4" stroke-linecap="round"/>
       <rect x="${r1(b[0] - 7)}" y="${r1(b[1] - 8)}" width="14" height="17" rx="6" fill="${grad('#ff8a7a', '#e14d44')}" stroke="#ef6a5e" stroke-width="2"/><circle cx="${r1(b[0])}" cy="${r1(b[1] + 0.5)}" r="3.4" fill="#fff" opacity=".9"/></g>`);
   }
@@ -282,8 +290,8 @@ App.SimScene = (() => {
   }
 
   function blanketFlat(y0, yEnd) {
-    rbox(3.4, y0, 0.8, 1.75, yEnd - y0, 0.34, C.cream, { rim: 6 });
-    rbox(3.4, y0, 0.8, 1.75, 0.4, 0.37, '#fff4d6', { rim: 6, top: '#fffaea' });
+    rbox(3.4, y0, 0.8, 1.75, yEnd - y0, 0.34, PAL.blanket, { rim: 6 });
+    rbox(3.4, y0, 0.8, 1.75, 0.4, 0.37, PAL.blanketTop, { rim: 6, top: PAL.blanketTop2 });
   }
 
   function patientBody(state, G) {
@@ -301,7 +309,7 @@ App.SimScene = (() => {
       slabAt(0.5, 1.12, 0, 0.24, 3.62, 4.92, '#ffffff', { rim: 6, top: '#ffffff' });                    // oreiller
       slabAt(pos === 'demi' ? 0.72 : 0.68, G.B[0] - 0.12, 0.02, 0.3, 3.82, 5.18, gown, { rim: 6 });                              // buste
       blanketFlat(G.blanketY, 4.1);
-      rbox(3.88, G.blanketY + 0.65, 1.1, 1.15, 1.35, 0.08, '#f0dcb4', { rim: 5, top: '#f6e6c4' });
+      rbox(3.88, G.blanketY + 0.65, 1.1, 1.15, 1.35, 0.08, PAL.fold, { rim: 5, top: PAL.foldTop });
       slabAt(1.1, G.B[0] - 0.3, 0.26, 0.56, 4.98, 5.32, gown, { rim: 5 });                               // manche
       rbox(5.0, 2.05, 1.12, 0.3, 0.7, 0.2, skinC, { rim: 5 });                                           // avant-bras sur la couverture
       handEl(G.hand);
@@ -315,21 +323,21 @@ App.SimScene = (() => {
       handEl([5.22, 2.98, 1.34], 20);
     } else if (pos === 'jambes') {
       rbox(3.78, 1.2, 0.8, 1.38, 0.95, 0.3, gown, { rim: 6 });
-      prism(3.4, 5.15, [[1.95, 0.8], [3.75, 0.8], [3.75, 1.62], [1.95, 1.14]], C.cream, { rim: 6, top: '#fff4d6' });      // jambes sur un coussin
+      prism(3.4, 5.15, [[1.95, 0.8], [3.75, 0.8], [3.75, 1.62], [1.95, 1.14]], PAL.blanket, { rim: 6, top: PAL.blanketTop });      // jambes sur un coussin
       rbox(4.98, 1.28, 0.98, 0.34, 0.8, 0.3, gown, { rim: 5 });
       rbox(5.0, 2.05, 1.02, 0.3, 0.78, 0.24, skinC, { rim: 5 });
       handEl(G.hand);
     } else if (pos === 'pls') {
       rbox(3.78, 1.15, 0.8, 1.0, 1.0, 0.5, gown, { rim: 6 });                                            // buste sur le côté
-      rbox(3.4, 1.95, 0.8, 1.75, 2.15, 0.34, C.cream, { rim: 6 });
-      rbox(3.55, 2.65, 1.14, 1.0, 0.9, 0.22, '#fff4d6', { rim: 5, top: '#fffaea' });                     // genou fléchi
+      rbox(3.4, 1.95, 0.8, 1.75, 2.15, 0.34, PAL.blanket, { rim: 6 });
+      rbox(3.55, 2.65, 1.14, 1.0, 0.9, 0.22, PAL.blanketTop, { rim: 5, top: PAL.blanketTop2 });                     // genou fléchi
       rbox(4.6, 1.25, 1.0, 0.3, 0.8, 0.26, gown, { rim: 5 });
       handEl(G.hand);
     } else {
       // allongé à plat (position d'origine)
       rbox(3.78, 1.2, 0.8, 1.38, 0.95, 0.3, gown, { rim: 6 });
       blanketFlat(1.95, 4.1);
-      rbox(3.88, 2.6, 1.1, 1.15, 1.35, 0.08, '#f0dcb4', { rim: 5, top: '#f6e6c4' });
+      rbox(3.88, 2.6, 1.1, 1.15, 1.35, 0.08, PAL.fold, { rim: 5, top: PAL.foldTop });
       rbox(4.98, 1.28, 0.98, 0.34, 0.8, 0.3, gown, { rim: 5 });
       rbox(5.0, 2.05, 1.02, 0.3, 0.78, 0.24, skinC, { rim: 5 });
       handEl(G.hand);
@@ -411,7 +419,7 @@ App.SimScene = (() => {
   }
   function o2Tube(o2, G) {
     if (!o2) return;
-    const a = P(G.head[0], G.head[1], G.head[2]), b = P(2.96, 0, 1.6);
+    const a = P(G.head[0], G.head[1], G.head[2]), b = HOSP ? P(3.62, 0, 2.3) : P(2.96, 0, 1.6);
     const mx = (a[0] + b[0]) / 2 - 10, my = Math.max(a[1], b[1]) + 20;
     // départ : sous le menton, côté épaule
     const sx = a[0] + (G.pos === 'flat' ? -4 : -2), sy = a[1] + (G.pos === 'flat' ? 14 : 30);
@@ -531,6 +539,68 @@ App.SimScene = (() => {
     rbox(6.22, 4.79, 0.62, 0.48, 0.48, 0.07, '#e3b92f', { rim: 3 });
   }
 
+
+  // ── Décor d'hôpital : tableau de l'équipe, rampe murale (O₂, air, vide), scope sur pied, capteurs posés ──
+  function whiteboard() {
+    add(`<g transform="${mWallB(0)}">
+      <rect x="4.45" y="2.0" width="1.65" height="1.15" rx="0.06" fill="#aab8c4"/>
+      <rect x="4.5" y="2.05" width="1.55" height="1.05" rx="0.04" fill="#ffffff"/>
+      <rect x="4.5" y="2.84" width="1.55" height="0.26" fill="#e6f0f8"/></g>
+      ${wtext(mWallB(0), -1, 5.27, 2.9, 'ÉQUIPE DU JOUR', 0.1, '#3b6fa3')}
+      ${wtext(mWallB(0), -1, 5.27, 2.62, 'IDE : Claire', 0.12, '#334a5f')}
+      ${wtext(mWallB(0), -1, 5.27, 2.4, 'AS : Karim', 0.12, '#334a5f')}
+      ${wtext(mWallB(0), -1, 5.27, 2.18, 'Dr Morel (garde)', 0.1, '#6b7c8c', 700)}`);
+  }
+  function rampe(o2) {
+    const deb = o2 ? String(o2.deb).replace('.', ',') : '', k = o2 ? Math.max(0, Math.min(1, (+o2.deb || 0) / 15)) : 0;
+    const sock = (u, ring) => `<circle cx="${u}" cy="2.4" r="0.1" fill="#ffffff" stroke="${ring}" stroke-width="0.05"/><circle cx="${u}" cy="2.4" r="0.04" fill="#3a4a58"/>`;
+    const dx = 0.1;                                        // prise murale : au-dessus de la tête du lit, loin de la fenêtre et des rideaux
+    add(`<g transform="${mWallA(0)} translate(${dx} 0)">
+      <rect x="3.36" y="2.08" width="1.02" height="1.06" rx="0.1" fill="#f7fafc" stroke="#b9c7d3" stroke-width="0.03"/>
+      <rect x="3.36" y="2.96" width="1.02" height="0.18" rx="0.08" fill="${grad('#fffbe8', '#f2e7b8')}"/>
+      ${sock(3.62, '#cfd8df')}${sock(3.9, '#3b4651')}${sock(4.17, '#e3b82e')}
+      <rect x="3.54" y="2.55" width="0.16" height="0.4" rx="0.07" fill="#eaf5ff" stroke="#9ec0dc" stroke-width="0.025"/>
+      <circle cx="3.62" cy="${Math.round((2.62 + 0.24 * k) * 100) / 100}" r="0.045" fill="${o2 ? '#2f9d68' : '#9fb3c1'}"/></g>
+      ${wtext(mWallA(0), 1, 3.62 + dx, 2.2, 'O₂', 0.09, '#2f9d68')}${wtext(mWallA(0), 1, 3.9 + dx, 2.2, 'AIR', 0.09, '#3b4651')}${wtext(mWallA(0), 1, 4.17 + dx, 2.2, 'VIDE', 0.08, '#a07a10')}
+      ${o2 ? wtext(mWallA(0), 1, 4.0 + dx, 2.78, deb, 0.17, '#1c7a4d', 900) + wtext(mWallA(0), 1, 4.0 + dx, 2.62, 'L/min', 0.08, '#1c7a4d', 700) : wtext(mWallA(0), 1, 3.95 + dx, 2.72, '0 L/min', 0.09, '#8fa3b2')}`);
+  }
+  const ecgPts = (u0, u1, v0, amp, irr, on) => {
+    if (!on) return `${u0},${v0} ${u1},${v0}`;
+    const gaps = irr ? [0.17, 0.1, 0.2, 0.13, 0.16] : [0.15, 0.15, 0.15, 0.15, 0.15], pt = [];
+    let u = u0 + 0.03; pt.push([u0, v0]);
+    gaps.forEach(g => { pt.push([u, v0], [u + 0.015, v0 + amp * 0.18], [u + 0.03, v0], [u + 0.05, v0 - amp * 0.2], [u + 0.065, v0 + amp], [u + 0.085, v0 - amp * 0.4], [u + 0.1, v0], [u + 0.13, v0 + amp * 0.2], [u + 0.16, v0]); u += g + 0.12; });
+    pt.push([Math.min(u, u1), v0]);
+    return pt.filter(q => q[0] <= u1).map(q => q[0].toFixed(3) + ',' + q[1].toFixed(3)).join(' ');
+  };
+  function scopeStand(sc) {
+    sc = sc || {};
+    const on = !!sc.on, yf = 2.12, alarm = on && sc.alarms && sc.alarms.length;
+    shadow(5.8, 1.5, 7.05, 2.45, 0.22, 2);
+    rbox(6.05, 1.6, 0.06, 0.8, 0.7, 0.1, '#9aa7b2', { rim: 3 });
+    [[6.1, 1.65], [6.7, 1.65], [6.1, 2.2], [6.7, 2.2]].forEach(([x, y]) => rbox(x, y, 0, 0.12, 0.12, 0.08, '#4b5560', { rim: 2 }));
+    rbox(6.38, 1.9, 0.14, 0.1, 0.1, 1.1, '#b5c1ca', { rim: 3 });
+    rbox(5.9, 1.82, 1.18, 1.1, 0.3, 0.74, '#2b3743', { rim: 4, id: 'tool-scope' });
+    const T = (u, v, str, sz, fill) => wtext(mWallA(yf), 1, u, v, str, sz, fill, 900);
+    add(`<g data-hot="tool-scope"><g transform="${mWallA(yf)}">
+        <rect x="5.96" y="1.24" width="0.98" height="0.62" rx="0.04" fill="${on ? '#06140f' : '#101a1f'}" stroke="${alarm ? '#ff5a4d' : '#46586a'}" stroke-width="0.03"/>
+        <polyline points="${ecgPts(5.99, 6.91, 1.69, 0.1, !!sc.irregular, on)}" fill="none" stroke="${on ? '#5dff8f' : '#2f6a4a'}" stroke-width="0.022" stroke-linejoin="round"/>
+        ${on ? '<polyline points="5.99,1.5 6.2,1.5 6.26,1.56 6.34,1.46 6.4,1.5 6.9,1.5" fill="none" stroke="#5ad7ff" stroke-width="0.018" opacity=".85"/>' : ''}
+        ${alarm ? '<circle cx="6.89" cy="1.8" r="0.035" fill="#ff4b3f"/>' : ''}</g>
+      ${on ? T(6.08, 1.3, sc.fc, 0.14, '#6dff9f') + T(6.31, 1.3, sc.spo2, 0.14, '#5ad7ff') + T(6.59, 1.31, sc.pa, 0.07, '#ffffff') + T(6.87, 1.3, sc.fr, 0.12, '#ffe066') : wtext(mWallA(yf), 1, 6.45, 1.34, 'SCOPE', 0.12, '#6f8497', 800)}</g>`);
+  }
+  function monitorSensors(state, G) {
+    const m = state.mon; if (!m) return;
+    const hub = P(5.9, 2.0, 1.45), cab = (a, col, w) => { const mx = (a[0] + hub[0]) / 2, my = Math.max(a[1], hub[1]) + 22;
+      return `<path d="M${r1(a[0])} ${r1(a[1])} Q${r1(mx)} ${r1(my)} ${r1(hub[0])} ${r1(hub[1])}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`; };
+    let sv = '';
+    if (m.ecg) { const t = P(G.thorax[0], G.thorax[1], G.thorax[2]);
+      sv += cab([t[0] + 2, t[1] + 6], '#2fa56a', 2) + [[-9, -3, '#d94b4b'], [9, -3, '#e8c13a'], [0, 9, '#4fb06b']].map(d => `<circle cx="${r1(t[0] + d[0])}" cy="${r1(t[1] + d[1])}" r="3.6" fill="${d[2]}" stroke="#ffffff" stroke-width="1.2"/>`).join(''); }
+    if (m.bras) { const a = P(G.arm[0], G.arm[1], G.arm[2]);
+      sv += cab([a[0] + 6, a[1] + 4], '#cfd8df', 2.4) + `<g transform="translate(${r1(a[0])} ${r1(a[1])}) rotate(-28)"><rect x="-12" y="-6.5" width="24" height="13" rx="4" fill="${grad('#5b8fc4', '#3f6f9e')}" stroke="#2c5075" stroke-width="1.6"/><rect x="-8" y="-1.6" width="16" height="3" rx="1.5" fill="rgba(255,255,255,.35)"/></g>`; }
+    if (m.doigt) { const f = P(G.finger[0], G.finger[1], G.finger[2]); sv += cab([f[0] + 6, f[1] + 2], '#3c6aa3', 1.8); }
+    add(sv);
+  }
+
   // ── Assemblage ──────────────────────────────────────────────────────────
   const T = 0.32;
   function svg(opts) {
@@ -538,15 +608,28 @@ App.SimScene = (() => {
     const state = Object.assign({ eyes: 'closed', pale: true }, opts.patient || {});
     CLK = Object.assign({ h: 7, m: 40 }, opts.clock || {});
     defs = []; uid = 0; out = [];
+    HOSP = opts.style === 'hopital'; PAL = HOSP ? PAL_H : PAL_E;
+    W = HOSP ? 8.2 : 7.2; D = HOSP ? 7.2 : 6.4;
     const G = geom(state);
-    floor(); walls(); windowAndCurtains(); door(); nameplate(opts.room); picture(); dispenser();
-    wardrobe(); mat(); o2Unit(state.o2); overbedTable(); slippers();
+    floor(); walls(); windowAndCurtains(); door(); nameplate(opts.room);
+    if (HOSP) { whiteboard(); dispenser(); wardrobe(); rampe(state.o2); overbedTable(); }
+    else { picture(); dispenser(); wardrobe(); mat(); o2Unit(state.o2); overbedTable(); slippers(); }
     if (opts.nurse) nurse();
     bed(state, G);
+    monitorSensors(state, G);
     o2Tube(state.o2, G); satClip(state.sat, G);
-    bedsideTable(); framePhoto(); plant(); armchair(); walker(); trolley(opts); wasteBin();
+    bedsideTable();
+    if (HOSP) scopeStand(opts.scope); else { framePhoto(); plant(); armchair(); walker(); }
+    trolley(opts); wasteBin();
     // Zones cliquables (au-dessus de tout)
-    const hs = [
+    const hs = (HOSP ? [
+      hot('patiente', opts.male === false ? 'Observer la patiente' : 'Observer le patient', G.thorax[0], G.thorax[1] + 0.1, G.thorax[2], 30),
+      hot('table', 'Table de chevet', 5.95, 0.9, 1.5, 24),
+      hot('o2wall', "Prise d'oxygène murale et débitmètre", 3.8, 0, 2.55, 24),
+      hot('lit', 'Le lit : dossier et position', 5.15, 3.35, 0.95, 28),
+      hot('sonnette', 'Sonnette', 5.42, 2.3, 0.7, 11),
+      hot('dispenser', 'Distributeur de solution hydro-alcoolique', 0, 4.17, 2.2, 22)
+    ] : [
       hot('patiente', 'Observer la résidente', G.thorax[0], G.thorax[1] + 0.1, G.thorax[2], 30),
       hot('table', 'Table de chevet', 5.95, 0.9, 1.5, 24),
       hot('plateau', 'Plateau du petit déjeuner', 1.85, 2.6, 1.45, 26),
@@ -554,12 +637,13 @@ App.SimScene = (() => {
       hot('chaussons', 'Chaussons', 2.58, 4.08, 0.1, 24),
       hot('sonnette', 'Sonnette', 5.42, 1.55, 0.7, 14),
       hot('dispenser', 'Distributeur de solution hydro-alcoolique', 0, 4.17, 2.2, 22)
-    ].join('');
+    ]).join('');
     const toolHs = [
       hot('tool-thermometre', 'Thermomètre', 6.37, 3.54, 1.35, 10, 2),
       hot('tool-tension', 'Tensiomètre', 6.82, 3.5, 1.45, 11, 2),
       hot('tool-saturometre', 'Saturomètre', 6.45, 4.08, 1.3, 10, 2),
       hot('tool-montre', 'Montre', 6.82, 4.42, 1.3, 9, 2),
+      HOSP && opts.scope ? hot('tool-scope', 'Scope', 6.4, 2.12, 1.55, 18, 2) : '',
       opts.glucometre ? hot('tool-glucometre', 'Lecteur de glycémie', 6.87, 3.98, 1.34, 9, 2) : ''
     ].join('');
     const spots = [
@@ -571,12 +655,12 @@ App.SimScene = (() => {
     const f = '<filter id="ssb1" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3"/></filter>' +
       '<filter id="ssb2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>' +
       '<filter id="ssb3" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="8"/></filter>';
-    return `<svg class="sim-scene-svg" viewBox="${opts.viewBox || VB}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${(opts.label || 'Chambre 12 : Mme Martin est dans son lit').replace(/"/g, '&quot;')}">
+    return `<svg class="sim-scene-svg" viewBox="${opts.viewBox || (HOSP ? VB_H : VB)}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${(opts.label || 'Chambre 12 : Mme Martin est dans son lit').replace(/"/g, '&quot;')}">
       <defs>${f}${defs.join('')}</defs>
       ${out.join('')}
       <g class="sim-hots">${hs}${toolHs}</g><g class="sim-spots">${spots}</g>
     </svg>`;
   }
 
-  return { svg, P, VIEW: { room: VB, patient: '318 232 256 232' } };
+  return { svg, P, VIEW: { get room() { return HOSP ? VB_H : VB; }, patient: '318 232 256 232' } };
 })();

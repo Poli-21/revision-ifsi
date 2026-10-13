@@ -34,6 +34,7 @@ App.SimIntents = {
     { id: 'diabete',   label: 'Diabète, sueurs, tremblements' },
     { id: 'urgence',   label: 'Parole, force, vue, tête' },
     { id: 'respi',     label: 'Souffle, spray, somnolence' },
+    { id: 'cardio',    label: 'Cœur, jambes, poids' },
     { id: 'equipe',    label: "Demander à l'équipe" }
   ],
 
@@ -337,6 +338,27 @@ App.SimIntents = {
       menu: 'Avez-vous utilisé votre spray (Ventoline) ? Cela vous a-t-il soulagé ?', ask: 'Avez-vous utilisé votre spray, la Ventoline ? Est-ce que cela vous a soulagé ?',
       strong: [/\bventol/, /\bsalbut/, /\bspray\b/, /\binhalateur\b/, /\bbouffees?\b/, /\bpompe\b/, /\baerosol\b/, /\bbronchodilat/, /\bsoulag/, /\bspiriva\b/, /\btiotropium\b/],
       kw: ['ventoline', 'salbutamol', 'inhalateur'] },
+
+    // Insuffisance cardiaque (cas hospitalier) : s'allonger, jambes gonflées, poids, cœur qui s'emballe
+    { id: 'q_orthopnee', theme: 'cardio', extra: true, over: ['q_sommeil'],
+      menu: 'Arrivez-vous à vous allonger ? Avez-vous dormi assis ?', ask: 'Est-ce que vous arrivez à vous allonger ? Avez-vous dormi assis cette nuit ?',
+      strong: [/\b(arrivez|pouvez|reussissez|parvenez) vous (a )?(vous )?(allonger|coucher|recoucher)\b/, /\bvous allonger\b/, /\bvous (re)?coucher\b/, /\ballong\w* (a plat|completement|tout a fait)\b/,
+               /\bdormi (assis|a moitie|sur plusieurs|avec plusieurs|sur des)\b/, /\bplusieurs oreillers\b/, /\bcombien d oreillers\b/, /\bassis (pour|la nuit|cette nuit)\b/, /\borthopn/, /\b(position|positions) pour (dormir|respirer)\b/],
+      weak: [/\boreillers?\b/, /\ballong\w*\b/],
+      kw: ['orthopn', 'oreiller', 'allonger', 'coucher'] },
+    { id: 'q_oedemes', theme: 'cardio', extra: true,
+      menu: 'Vos jambes ou vos chevilles sont-elles gonflées ?', ask: 'Est-ce que vos jambes ou vos chevilles sont gonflées ?',
+      strong: [/\b(jambes?|chevilles?|pieds?|mollets?)\b[^.?]*\b(gonfl\w*|enfl\w*|lourd\w*|serre\w*|oedem\w*)\b/, /\b(gonfl\w*|enfl\w*)\b/, /\boedem\w*/, /\bchaussettes?\b/, /\bchaussons? (vous )?serr/, /\bchaussures? (vous )?serr/, /\bjambes? lourdes?\b/],
+      kw: ['oedem', 'gonfl', 'cheville'] },
+    { id: 'q_poids', theme: 'cardio', extra: true,
+      menu: 'Avez-vous pris du poids ces derniers jours ?', ask: 'Avez-vous pris du poids ces derniers jours ? Vos vêtements vous serrent-ils ?',
+      strong: [/\bpoids\b/, /\b(pris|perdu|gagne) (du |des |quelques )?kilos?\b/, /\bkilos?\b/, /\bpesee\b/, /\bpese\w*\b/, /\bgrossi\b/, /\bmaigri\b/, /\bvos (vetements|habits|pantalons?) (vous )?serr/, /\bballance\b/, /\bbalance\b/],
+      kw: ['poids', 'pesee', 'kilos'] },
+    { id: 'q_palpit', theme: 'cardio', extra: true,
+      menu: 'Votre cœur bat-il vite ? Sentez-vous des palpitations ?', ask: 'Est-ce que votre cœur bat très vite ? Sentez-vous des palpitations ?',
+      strong: [/\bpalpit/, /\bcoeur (qui )?(bat|cogne|s emballe|s affole|palpite|galope|tape)\b/, /\btachycard/, /\bbat (tres |trop )?vite\b/, /\b(sentez|ressentez) (vous )?(votre |le )?coeur\b/, /\bbattements?\b/, /\bcoeur\b[^.?]*\bvite\b/],
+      weak: [/\bcoeur\b/],
+      kw: ['palpit', 'tachycard', 'battement'] },
 
     // Équipe
     { id: 'q_equipe', theme: 'equipe', extra: true, over: ['q_vue'],

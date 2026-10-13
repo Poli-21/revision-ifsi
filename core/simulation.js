@@ -44,10 +44,13 @@ App.Sim = (() => {
     ['une résidente', 'un résident'], ['Résidente', 'Résident'], ['résidente', 'résident'], ['sur la patiente', 'sur le patient'], ['la patiente', 'le patient'],
     ['Madame', 'Monsieur'], ['tombée', 'tombé'], ['allée', 'allé'], ['arrivée', 'arrivé'], ['opérée', 'opéré'], ['hospitalisée', 'hospitalisé'],
     ['levée', 'levé'], ['réveillée', 'réveillé'], ["qu'elle ressent", "qu'il ressent"], ["ce qu'elle", "ce qu'il"]];
+  // Scénarios hospitaliers : on parle d'un « patient » (et non d'un « résident »)
+  const _hosp = scn => !!(scn && scn.patient && scn.patient.statut === 'patient');
+  const _HOSP = [['résidente', 'patiente'], ['résident', 'patient'], ['Résidente', 'Patiente'], ['Résident', 'Patient']];
   function _gen(txt, scn) {
     let t = String(txt == null ? '' : txt);
-    if (!_male(scn)) return t;
-    _MASC.forEach(([a, b]) => { t = t.split(a).join(b); });
+    if (_male(scn)) _MASC.forEach(([a, b]) => { t = t.split(a).join(b); });
+    if (_hosp(scn)) _HOSP.forEach(([a, b]) => { t = t.split(a).join(b); });
     return t;
   }
   const STAGE_GRID = { entree: "Avant d'entrer", contact: 'Premier contact', recueil: 'Recueil de données' };
@@ -285,7 +288,7 @@ App.Sim = (() => {
     _urgentHint();
     _save();
     if (!_cur() || _cur().stage !== 'chambre') return;
-    _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs();
+    _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderSheet();
   }
 
   function say(text) {
@@ -368,11 +371,11 @@ App.Sim = (() => {
     assise: /\b(assis|assise|assoi\w*|assie\w*|asseoir|assoir|position assise|(?:cale\w*|calage) (?:par |avec )?(?:les |des )?oreillers?)\b/,
     allong: /\b(?:je |j |on )?(?:le |la |l |vous )?(?:allonge\w*|couche\w*|recouche\w*|mets? a plat|mettre a plat|baisse\w* (?:le |la |son )?dossier)\b/,
     alV: /\b(appel\w*|alerte\w*|alerter|prevenir|previens|preven\w*|sonne\w*|sonner|appuie\w*|appuyer|declenche\w*|hele|crie\w*|fais venir|fait venir|faire venir|demande\w* (?:de )?l aide)\b/,
-    alT: /\b(infirmi\w*|tutri\w*|tuteur|sophie|ide|referente|karim|aide soignant\w*|collegue|equipe|renfort\w*|quelqu un|aide|secours|medecin|samu|sonnette|bouton d appel|bouton rouge|poire|cadre|le 15|pompiers?)\b/,
+    alT: /\b(infirmi\w*|tutri\w*|tuteur|sophie|claire|ide|referente|karim|aide soignant\w*|collegue|equipe|renfort\w*|quelqu un|aide|secours|medecin|samu|sonnette|bouton d appel|bouton rouge|poire|cadre|le 15|pompiers?)\b/,
     alGo: /\b(vais|cours|pars|file|vole|monte|descends|retourne)\b[^.?]*\b(chercher|voir|prevenir|appeler|poste)\b/,
     alC: /\b(?:vais|cours|pars|file|vole)\b[^.?]*\b(?:chercher|voir|trouver)\b/,
     alY: /\b(venez|viens|accourez|vite|urgence|a l aide|au secours)\b/,
-    alP: /\b(infirmi\w*|tutri\w*|sophie|ide|karim|aide soignant\w*|referente|collegue)\b/,
+    alP: /\b(infirmi\w*|tutri\w*|sophie|claire|ide|karim|aide soignant\w*|referente|collegue)\b/,
     alSamu: /\b(samu|le 15|pompiers?)\b/,
     o2N: /\b(oxygen\w*|o2|o 2|o deux|deux ?o|masque a oxygene|lunettes? a oxygene|lunettes? nasales?|sonde nasale|haute concentration|mhc)\b/,
     o2On: /\b(met\w*|mett\w*|install\w*|branch\w*|donn\w*|pos\w*|lance\w*|demarr\w*|administr\w*|ouvr\w*|regl\w*|place\w*|sous|met)\b/,
@@ -402,7 +405,7 @@ App.Sim = (() => {
     if (pos) out.acts.push({ k: 'pos', id: pos });
     // alerte
     if ((R.alV.test(n) && R.alT.test(n)) || (R.alC.test(n) && R.alP.test(n))) {
-      out.acts.push({ k: 'alerte', how: R.alGo.test(n) ? 'chercher' : (R.alSamu.test(n) && !/\b(infirmi\w*|tutri\w*|sophie|ide)\b/.test(n) ? 'samu' : 'sonnette') });
+      out.acts.push({ k: 'alerte', how: R.alGo.test(n) ? 'chercher' : (R.alSamu.test(n) && !/\b(infirmi\w*|tutri\w*|sophie|claire|ide)\b/.test(n) ? 'samu' : 'sonnette') });
     }
     // oxygène
     if (R.o2N.test(n) || (/\bdebit\b/.test(n) && /\b(baisse\w*|diminue\w*|reduis\w*|monte\w*|augmente\w*|regle\w*)\b/.test(n))) {
@@ -421,12 +424,14 @@ App.Sim = (() => {
   function _careSay(who, text) { _log(who, _gx(text, _curScn())); }
   function _verdictLine(v, why) {
     if (!why) return;
+    const scn = _curScn();
     if (v === 'good') _careSay('good', '✓ ' + why);
     else if (v === 'ok') _careSay('narr', why);
     else if (v === 'avoid') _careSay('sys', '⚠ À éviter. ' + why);
-    else _careSay('bad', '⛔ Dangereux. ' + why + ' Corrige tout de suite avec « Agir ».');
+    else _careSay('bad', '⛔ Dangereux. ' + why + ' Corrige tout de suite ' + _agir(scn) + '.');
   }
   const _nurse = scn => (scn.call && scn.call.who) || 'Sophie';
+  const _agir = scn => scn && scn.direct ? 'sur le dessin de la chambre (lit, prise d\'oxygène au mur, sonnette)' : 'avec « 🩺 Agir »';
   function _runPos(id) {
     const c = _cur(), scn = _curScn(), S = _soinsOf(scn), P = _SO().POS.find(p => p.id === id); if (!P) return;
     const r = S.pos[id] || { v: 'ok', pat: '', why: '' };
@@ -451,6 +456,10 @@ App.Sim = (() => {
   }
   function _o2Level(S, dev, deb) {                       // ce que vaut un réglage d'oxygène chez CE patient
     const o = S.o2;
+    if (o.rule === 'high') {                            // détresse avec hypoxémie, sans risque d'hypercapnie : il faut un débit suffisant
+      if (dev === 'mhc' || (dev === 'masque' && deb >= 6)) return 'good';
+      return 'avoid';                                   // lunettes ou petit débit : insuffisant
+    }
     if (!o.byDeb) return 'ok';                          // autorisé (urgence vitale) mais sans bénéfice ici : le texte du cas l'explique
     if (dev === 'mhc' || deb >= 10) return 'danger';
     if (dev === 'lunettes' && deb > 0 && deb <= 2) return 'good';
@@ -465,19 +474,19 @@ App.Sim = (() => {
     if (deb == null && dev === 'mhc') deb = 15;
     if (deb == null || !(deb > 0)) {                      // pas de débit précisé : on demande, sans rien lancer
       _menuAct = true; _menuOpen = false;
-      _log('sys', '💡 À quel débit ? Précise-le (par exemple « de l\'oxygène aux lunettes à 2 litres ») ou choisis dans « 🩺 Agir ». L\'oxygène est un médicament : le débit compte.');
+      _log('sys', '💡 À quel débit ? Précise-le (par exemple « de l\'oxygène aux lunettes à 2 litres ») ou ' + (_curScn() && _curScn().direct ? 'touche la prise d\'oxygène au mur, sur le dessin de la chambre' : 'choisis dans « 🩺 Agir »') + '. L\'oxygène est un médicament : le débit compte.');
       return;
     }
     if (!dev) dev = deb >= 6 ? 'masque' : (c.care.o2 ? c.care.o2.dev : 'lunettes');
     const v = _o2Level(S, dev, deb);
     c.care.o2 = { dev, deb, v }; _careEv('o2', dev + ' ' + deb, v);
-    const r = o.byDeb ? (o[v] || {}) : { pat: o.pat, why: o.why };
+    const r = (o.byDeb || o.rule) ? (o[v] || {}) : { pat: o.pat, why: o.why };
     if (r.pat) _careSay('pat', r.pat);
     _verdictLine(v === 'good' ? 'good' : v, r.why);
-    if (v === 'good' && !c.care.alert) _log('sys', '💡 Dans la réalité, c\'est l\'infirmière qui décide et règle l\'oxygène : alerte ' + who + ' d\'abord (« 🩺 Agir » → sonnette).');
+    if (v === 'good' && !c.care.alert) _log('sys', '💡 Dans la réalité, c\'est l\'infirmière qui décide et règle l\'oxygène : alerte ' + who + ' d\'abord (' + (scn.direct ? 'touche la sonnette sur le dessin' : '« 🩺 Agir » → sonnette') + ').');
     if (c.care.alert) {                                   // l'infirmière est dans la chambre : elle réagit
       if (v === 'danger') _careSay('ide', who + ' : « Stop ! Baisse le débit tout de suite : c\'est moi qui règle l\'oxygène. »');
-      else if (v === 'good') _careSay('ide', who + ' : « Oui, à faible débit, c\'est bien. Je prends le relais pour la prescription et le réglage ; surveille sa saturation et sa vigilance. »');
+      else if (v === 'good') _careSay('ide', who + ' : « ' + (o.nurseGood || 'Oui, à faible débit, c\'est bien. Je prends le relais pour la prescription et le réglage ; surveille sa saturation et sa vigilance.') + ' »');
     }
     if (v !== 'good') c.care.bad = (c.care.bad || 0) + 1;
   }
@@ -499,7 +508,7 @@ App.Sim = (() => {
     else if (a.k === 'o2stop') _runO2Stop();
     else if (a.k === 'reste') _runStay();
   }
-  const MEASURE_HINT = '🩺 Pour mesurer ou relever une constante, c\'est toi qui fais le geste : ouvre l\'onglet « Chambre » et choisis l\'instrument (le pouls se lit sur le saturomètre). Ici, tu parles au résident ou tu agis (position, alerte, oxygène).';
+  const MEASURE_HINT = '🩺 Pour mesurer ou relever une constante, c\'est toi qui fais le geste : ouvre l\'onglet « Chambre » et choisis l\'instrument (le pouls se lit sur le saturomètre ou sur le scope). Ici, tu parles au résident ou tu agis (position, alerte, oxygène).';
   function _handleAct(A, text, noParse) {
     const c = _cur();
     _log('me', text); c.last = null; c.misses = 0; c.suggest = null;
@@ -533,7 +542,7 @@ App.Sim = (() => {
     if (!_menuAct) return;
     const S = _SO(), cp = c.care.pos ? c.care.pos.id : null, co = c.care.o2, who = _nurse(scn);
     const btn = (on, js, txt) => `<button type="button" class="sim-q ${on ? 'done' : ''}" onclick="${js}">${on ? '✓ ' : ''}${_esc(txt)}</button>`;
-    m.innerHTML = `<div class="sim-actgrp"><div class="sim-acth">Installer ${_male(scn) ? 'le résident' : 'la résidente'}</div>
+    m.innerHTML = `<div class="sim-actgrp"><div class="sim-acth">Installer ${_gen('la résidente', scn)}</div>
         ${S.POS.map(p => btn(cp === p.id, `App.Sim.act('pos','${p.id}')`, p.ico + ' ' + _gx(p.label, scn))).join('')}</div>
       <div class="sim-actgrp"><div class="sim-acth">Appeler à l'aide</div>
         ${btn(!!(c.care.alert && c.care.alert.how !== 'chercher'), `App.Sim.act('alerte','sonnette')`, '🔔 Appuyer sur la sonnette d\'appel : ' + who + ' arrive')}
@@ -573,7 +582,7 @@ App.Sim = (() => {
     if (so.pos) { const r = (S.pos[so.pos.id] || {}), L = P.find(p => p.id === so.pos.id);
       rows.push(`<div class="sim-row-res ${so.pos.v === 'good' || so.pos.v === 'ok' ? 'ok' : 'late'}"><span class="sim-mark">${mk(so.pos.v)}</span><div><b>Position à la fin du recueil : ${_esc(_gx(L ? L.short : so.pos.id, scn).toLowerCase())}</b><div class="sim-muted sim-small">${_esc(_gx(r.why || '', scn))}</div></div></div>`); }
     if (so.o2) rows.push(`<div class="sim-row-res ${so.o2.v === 'good' ? 'ok' : 'late'}"><span class="sim-mark">${mk(so.o2.v)}</span><div><b>Oxygène en route à la fin du recueil : ${_esc(so.o2.dev === 'mhc' ? 'masque haute concentration' : so.o2.dev)}, ${_esc(String(so.o2.deb).replace('.', ','))} L/min</b><div class="sim-muted sim-small">${_esc(_gx((S.o2.byDeb ? (S.o2[so.o2.v] || {}) : S.o2).why || '', scn))}</div></div></div>`);
-    if (so.stay) rows.push(`<div class="sim-row-res ok"><span class="sim-mark">✓</span><div><b>Tu es resté(e) près ${_male(scn) ? 'du résident' : 'de la résidente'}</b><div class="sim-muted sim-small">Rester auprès de la personne qui va mal la rassure et permet de surveiller sa respiration et sa vigilance.</div></div></div>`);
+    if (so.stay) rows.push(`<div class="sim-row-res ok"><span class="sim-mark">✓</span><div><b>Tu es resté(e) près ${_gen('de la résidente', scn)}</b><div class="sim-muted sim-small">Rester auprès de la personne qui va mal la rassure et permet de surveiller sa respiration et sa vigilance.</div></div></div>`);
     if (!rows.length) return so.vital ? `<h3 class="sim-h">🩺 Gestes de sécurité pendant le recueil</h3><div class="sim-card"><p class="sim-muted sim-small">Tu n'as fait aucun geste de sécurité pendant le recueil (alerter, installer, rester près de ${_male(scn) ? 'lui' : 'elle'}). Dans ce cas d'urgence, ils comptent : tu peux les faire dès que tu repères des signes de gravité, avec « 🩺 Agir » ou en tapant ce que tu fais.</p></div>` : '';
     return `<h3 class="sim-h">🩺 Gestes de sécurité pendant le recueil</h3><div class="sim-card">${rows.join('')}<div class="sim-muted sim-small" style="margin-top:8px">${so.bonus ? '+' + so.bonus + ' XP pour ces gestes (hors score). ' : ''}Repères à valider avec ton formateur et les protocoles de ton stage ; l'oxygène est un médicament.</div></div>`;
   }
@@ -581,8 +590,12 @@ App.Sim = (() => {
   // ── Instruments : c'est l'étudiant qui fait le geste ──────────
   // Choisir l'instrument → le poser au bon endroit sur la patiente → attendre ou compter → lire l'écran →
   // NOTER lui-même la valeur dans le recueil. Rien n'est ajouté au recueil tant qu'il ne l'a pas noté.
-  function _toolOfFact(scn, fid) { return Object.keys(scn.tools).find(k => scn.tools[k].fact === fid || (scn.tools[k].also && scn.tools[k].also.fact === fid)) || null; }
-  const _nMeas = scn => scn.toolOrder.reduce((a, k) => a + 1 + (scn.tools[k].also ? 1 : 0), 0);
+  const _toolFacts = t => t.multi ? t.multi.map(m => m.fact) : [t.fact].concat(t.also ? [t.also.fact] : []);
+  function _toolOfFact(scn, fid, c) {
+    const ks = Object.keys(scn.tools).filter(k => _toolFacts(scn.tools[k]).indexOf(fid) >= 0);
+    return (c && ks.find(k => c.pending[k])) || ks[0] || null;
+  }
+  const _nMeas = scn => { const set = {}; scn.toolOrder.forEach(k => _toolFacts(scn.tools[k]).forEach(f => { set[f] = 1; })); return Object.keys(set).length; };
   function _gClear() { _timers.forEach(t => { clearInterval(t); clearTimeout(t); }); _timers = []; _G = null; _hint = ''; }
   function _gReset() { _gClear(); _tool = null; _zoom = 'room'; _autoZoom = false; if (_anim) { cancelAnimationFrame(_anim); _anim = null; } }
 
@@ -605,10 +618,43 @@ App.Sim = (() => {
     if (_tool && (id === 'patiente' || id.indexOf('zone-') === 0)) return _applyTool(id);
     if (id.indexOf('zone-') === 0) return;
     if (id === 'dispenser') return sha();
+    if (scn.sceneActs && scn.sceneActs[id]) { _sheet = _sheet === id ? null : id; _renderSheet(); return; }
     if (scn.objects[id]) return useObject(id);
   }
+  // ── Actions directes sur le dessin (cas « direct ») : on touche le lit, la prise d'oxygène, la sonnette, le patient ──
+  // scn.sceneActs[id] = { ico, title, hint, opts: [{ ico, label, do: ['pos', id] | ['o2', id] | ['o2stop'] | ['alerte', 'sonnette'] | ['reste'] | ['obs', objetId] }] }
+  let _sheet = null;
+  function _sheetOn(o, c) {
+    const d = o.do || [];
+    if (d[0] === 'pos') return !!(c.care.pos && c.care.pos.id === d[1]);
+    if (d[0] === 'o2') { const O = _SO().O2.find(x => x.id === d[1]); return !!(O && c.care.o2 && c.care.o2.dev === O.dev && c.care.o2.deb === O.deb); }
+    if (d[0] === 'alerte') return !!(c.care.alert && c.care.alert.how !== 'chercher');
+    if (d[0] === 'reste') return !!c.care.stay;
+    if (d[0] === 'obs') return !!c.seenObj[d[1]];
+    return false;
+  }
+  function _renderSheet() {
+    const el = _el('sim-sheet'), c = _cur(), scn = _curScn(); if (!el) return;
+    const d = _sheet && scn && scn.sceneActs && scn.sceneActs[_sheet];
+    if (!d || !c || c.stage !== 'chambre') { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML = `<div class="sim-sheet-h"><b>${_esc(d.ico || '')} ${_esc(_gx(d.title, scn))}</b><button type="button" class="btn btn-ghost btn-sm" onclick="App.Sim.sheetClose()">✕ Fermer</button></div>
+      ${d.hint ? `<div class="sim-muted sim-small">${_esc(_gx(d.hint, scn))}</div>` : ''}
+      <div class="sim-sheet-opts">${d.opts.map((o, i) => { const on = _sheetOn(o, c);
+        return `<button type="button" class="sim-q ${on ? 'done' : ''}" onclick="App.Sim.sheetDo('${_esc(_sheet)}',${i})">${on ? '✓ ' : ''}${_esc(o.ico || '')} ${_esc(_gx(o.label, scn))}</button>`; }).join('')}</div>`;
+  }
+  function sheetDo(id, i) {
+    const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre') return;
+    const d = scn.sceneActs && scn.sceneActs[id], o = d && d.opts[i]; if (!o) return;
+    const a = o.do || [];
+    _sheet = null;
+    if (a[0] === 'obs') useObject(a[1]); else act(a[0], a[1]);
+    _renderSheet();
+  }
+  function sheetClose() { _sheet = null; _renderSheet(); }
   function _applyTool(zone) {
     const c = _cur(), scn = _curScn(), t = scn.tools[_tool];
+    if (t.kind === 'scope') return _scopeZone(zone);
     if (_G) return;                                                  // un geste est déjà en cours
     const ok = t.zone === '*' ? (zone === 'patiente' || zone.indexOf('zone-') === 0) : zone === t.zone;
     if (!ok) { c.misplaced++; _hint = t.where; _save(); _renderGesture(); return; }
@@ -666,6 +712,32 @@ App.Sim = (() => {
     _gToRead();
   }
   function gRecount() { if (!_G) return; _G.phase = 'ready'; _G.n = 0; _renderGesture(); }
+  // ── Scope : trois capteurs à poser (thorax, bras, doigt), puis le scope donne FC, SpO₂, PA et FR ──
+  function _scopeZone(zone) {
+    const c = _cur(), scn = _curScn(), t = scn.tools[_tool]; if (!t) return;
+    if (_G && _G.phase !== 'sensors') return;                        // mesure en cours ou lecture
+    const sn = t.sensors.find(x => x.zone === zone);
+    if (!sn) { c.misplaced++; _hint = t.where; _save(); _renderGesture(); return; }
+    if (!_G) { if (c.firstCare === null) c.firstCare = c.actions; _G = { tool: _tool, kind: 'scope', phase: 'sensors', errs: 0, placeErrs: 0, n: 0, placed: {}, sub: null }; }
+    if (_G.placed[sn.id]) { _hint = 'Ce capteur est déjà en place : pose les autres.'; _renderGesture(); return; }
+    c.actions++; _hint = '';
+    if (sn.id === 'bras') { _G.sub = 'cuff'; _save(); _renderGesture(); return; }
+    _scopePlace(sn);
+  }
+  function _scopePlace(sn) {
+    const c = _cur(), t = _curScn().tools[_G.tool];
+    _G.placed[sn.id] = true; _G.sub = null;
+    _log('narr', sn.start); c.last = { text: sn.start, facts: [] };
+    if (t.sensors.every(x => _G.placed[x.id])) { _log('narr', t.ready); _G.sub = 'scope'; _gMeasure(t.seconds); }
+    _save(); _renderLog(); _renderChambre(); _renderGesture();
+  }
+  function gScopeCuff(id) {
+    if (!_G || _G.kind !== 'scope' || _G.sub !== 'cuff') return;
+    const t = _curScn().tools[_G.tool], p = t.cuff.find(x => x.id === id), sn = t.sensors.find(x => x.id === 'bras'); if (!p || !sn) return;
+    if (!p.ok) { _G.placeErrs++; _hint = p.hint; _renderGesture(); return; }
+    _hint = ''; _markDone('g_brassard', { retry: _G.placeErrs > 0 });
+    _scopePlace(sn);
+  }
   // pose du brassard
   function gPlace(id) {
     const c = _cur(); if (!_G || _G.phase !== 'place') return;
@@ -684,6 +756,17 @@ App.Sim = (() => {
     if (e && e.preventDefault) e.preventDefault();
     const c = _cur(), scn = _curScn(); if (!c || !scn || !_G || _G.phase !== 'read') return false;
     const key = _G.tool, t = scn.tools[key], inp = t.input;
+    if (t.multi) {                                                    // scope : SpO₂, FC, PA (2 champs), FR
+      let n = 0, blank = false; const wrong = [], val = () => _num((_el('sim-in-' + (++n)) || {}).value);
+      _G.vals = []; for (let i = 1; i <= 5; i++) _G.vals.push(((_el('sim-in-' + i) || {}).value) || '');   // on garde ce qui est tapé si l'écran est redessiné
+      t.multi.forEach(m => {
+        if (m.type === 'bp') { const x = val(), y = val(); if (x === null || y === null) blank = true; else if (!(Math.abs(x - m.sys) <= m.tol && Math.abs(y - m.dia) <= m.tol)) wrong.push(m.label); }
+        else { const x = val(); if (x === null) blank = true; else if (Math.abs(x - m.value) > (m.tol || 0)) wrong.push(m.label); }
+      });
+      if (blank) { _hint = 'Écris toutes les valeurs lues sur l\'écran du scope, en chiffres.'; _save(); _renderGesture(true); return false; }
+      if (wrong.length) { c.errors++; _G.errs++; _hint = 'Relis bien l\'écran du scope. À revoir : ' + wrong.join(', ') + '.'; _save(); _renderGesture(true); return false; }
+      _record(key); return false;
+    }
     const a = _num((_el('sim-in-1') || {}).value), b = _num((_el('sim-in-2') || {}).value);
     let ok = false, msg = '', count = true;
     if (a === null || ((inp.type === 'bp' || t.also) && b === null)) { msg = t.also ? 'Écris les deux valeurs lues sur l\'écran, en chiffres : la saturation et le pouls.' : 'Écris la valeur lue, en chiffres.'; count = false; }
@@ -711,9 +794,12 @@ App.Sim = (() => {
   }
   function _record(key) {
     const c = _cur(), scn = _curScn(), t = scn.tools[key];
-    delete c.pending[key]; c.entered[t.fact] = true; _find(t.fact);
-    let noted = t.noted; const facts = [t.fact];
-    if (t.also) { c.entered[t.also.fact] = true; _find(t.also.fact); noted += ' · ' + t.also.noted; facts.push(t.also.fact); }
+    delete c.pending[key];
+    const list = t.multi ? t.multi : [{ fact: t.fact, noted: t.noted }].concat(t.also ? [{ fact: t.also.fact, noted: t.also.noted }] : []);
+    const facts = [], notes = [];
+    list.forEach(m => { c.entered[m.fact] = true; _find(m.fact); facts.push(m.fact); notes.push(m.noted); });
+    const noted = notes.join(' · ');
+    if (t.kind === 'scope') c.mon = { live: true };                 // le scope reste branché sur le patient
     _log('narr', 'Tu notes dans le recueil : ' + noted + '.');
     c.last = { text: '✓ Noté dans le recueil : ' + noted, facts };
     _gClear(); _tool = null;
@@ -726,6 +812,7 @@ App.Sim = (() => {
     const t = scn.tools[key];
     _gClear(); _tool = key;
     _G = { tool: key, kind: t.kind, phase: 'read', errs: 0, placeErrs: 0, n: (c.pending[key] && c.pending[key].n) || 0 };
+    if (t.kind === 'scope') _G.placed = { ecg: true, bras: true, doigt: true };
     if (_zoom === 'room') _setZoom('patient', true);
     setTab('chambre');
     _renderToolbar(); _renderGesture(true); _syncScene();
@@ -1472,7 +1559,7 @@ App.Sim = (() => {
       <nav class="sim-tabbar" id="sim-tabbar" aria-label="Panneaux"></nav>
       <div class="sim-play" id="sim-play" data-tab="${_esc(c.tab || 'dialogue')}">
         <section class="sim-panel sim-p-dialogue" id="sim-p-dialogue" aria-label="Dialogue">
-          <div class="sim-pt"><span class="sim-avatar" aria-hidden="true">${scn.patient.avatar || '👵'}</span><div><b>${_esc(scn.patient.civ)} ${_esc(scn.patient.nom)}</b><div class="sim-muted sim-small">${_male(scn) ? 'Résident' : 'Résidente'} · chambre ${_esc(scn.patient.chambre)}</div></div></div>
+          <div class="sim-pt"><span class="sim-avatar" aria-hidden="true">${scn.patient.avatar || '👵'}</span><div><b>${_esc(scn.patient.civ)} ${_esc(scn.patient.nom)}</b><div class="sim-muted sim-small">${_gen('Résidente', scn)} · chambre ${_esc(scn.patient.chambre)}</div></div></div>
           <div class="sim-status" id="sim-status" hidden aria-label="Ce que tu as mis en place"></div>
           <div class="sim-log" id="sim-log" role="log" aria-live="polite"></div>
           <form class="sim-form" id="sim-form" onsubmit="return App.Sim.submit(event)">
@@ -1481,7 +1568,7 @@ App.Sim = (() => {
           </form>
           <div class="sim-toggles">
             <button class="sim-menu-toggle" type="button" id="sim-menu-btn" onclick="App.Sim.toggleMenu()" aria-expanded="false">📋 Questions possibles</button>
-            <button class="sim-menu-toggle sim-act-toggle" type="button" id="sim-act-btn" onclick="App.Sim.toggleAct()" aria-expanded="false">🩺 Agir</button>
+            <button class="sim-menu-toggle sim-act-toggle" type="button" id="sim-act-btn" onclick="App.Sim.toggleAct()" aria-expanded="false" ${scn.direct ? 'hidden' : ''}>🩺 Agir</button>
           </div>
           <div class="sim-menu" id="sim-menu"></div>
           <div class="sim-menu sim-actmenu" id="sim-actmenu"></div>
@@ -1490,6 +1577,7 @@ App.Sim = (() => {
           <div class="sim-scene-bar"><h3 class="sim-h">🛏️ Dans la chambre</h3>
             <button type="button" class="btn btn-ghost btn-sm" id="sim-zoom" onclick="App.Sim.toggleZoom()">🔍 Zoom sur ${_male(scn) ? 'le patient' : 'la patiente'}</button></div>
           <div class="sim-scene" id="sim-scene" data-tool="">${_sceneSvg(scn)}</div>
+          <div class="sim-sheet" id="sim-sheet" hidden aria-live="polite"></div>
           <div class="sim-toolbar" id="sim-toolbar" role="group" aria-label="Instruments"></div>
           <div class="sim-gesture" id="sim-gesture" aria-live="polite"></div>
           <div class="sim-last" id="sim-last" hidden></div>
@@ -1509,7 +1597,7 @@ App.Sim = (() => {
         if (g) { ev.preventDefault(); hot(g.getAttribute('data-hot')); }
       });
     }
-    _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderGesture();
+    _sheet = null; _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderGesture(); _renderSheet();
     setTimeout(_scrollLog, 0);
   }
 
@@ -1526,16 +1614,29 @@ App.Sim = (() => {
       const live = !!c.entered[st.fact] || !!c.pending.saturometre || !!(_G && _G.tool === 'saturometre' && _G.phase === 'read');
       if (placed) patient.sat = { live, spo2: st.display.big, pr: st.display.pulse };
     }
-    return Object.assign({}, o, { patient, nurse: !!k.alert, room: scn.patient && scn.patient.chambre });
+    // scope (cas hospitaliers) : capteurs posés sur le patient, écran allumé une fois la mesure faite
+    let scope = null; const sc = scn.tools && scn.tools.scope;
+    if (c && sc && o.scope) {
+      const gp = _G && _G.kind === 'scope' ? _G.placed : null;
+      const live = !!(c.mon && c.mon.live) || !!c.pending.scope || !!(_G && _G.kind === 'scope' && _G.phase === 'read');
+      const placed = live ? { ecg: true, bras: true, doigt: true } : gp;
+      if (placed) {
+        patient.mon = { ecg: !!placed.ecg, bras: !!placed.bras, doigt: !!placed.doigt, live };
+        if (placed.doigt && !patient.sat) patient.sat = { live, spo2: sc.display.spo2, pr: sc.display.fc };
+      }
+      scope = Object.assign({}, o.scope, { on: live });
+    }
+    return Object.assign({}, o, { patient, scope, nurse: !!k.alert, room: scn.patient && scn.patient.chambre });
   }
+  const _sceneSigOf = o => JSON.stringify([o.patient.pos, o.patient.o2, o.patient.sat, o.patient.mon, o.nurse, o.scope && o.scope.on]);
   let _sceneSig = '';
   function _sceneSvg(scn) {
-    const o = _sceneOpts(scn); _sceneSig = JSON.stringify([o.patient.pos, o.patient.o2, o.patient.sat, o.nurse]);
+    const o = _sceneOpts(scn); _sceneSig = _sceneSigOf(o);
     return App.SimScene.svg(o);
   }
   function _refreshScene() {                 // redessine seulement si quelque chose a changé (le zoom en cours est conservé)
     const sc = _el('sim-scene'), scn = _curScn(); if (!sc || !scn || !_cur()) return;
-    const o = _sceneOpts(scn), sig = JSON.stringify([o.patient.pos, o.patient.o2, o.patient.sat, o.nurse]);
+    const o = _sceneOpts(scn), sig = _sceneSigOf(o);
     if (sig === _sceneSig) return;
     const old = sc.querySelector('svg'), vb = old ? old.getAttribute('viewBox') : null;
     _sceneSig = sig; sc.innerHTML = App.SimScene.svg(o);
@@ -1563,7 +1664,7 @@ App.Sim = (() => {
         <summary>${_esc(_gen(t.label, scn))}</summary>
         ${items.map(i => `<button type="button" class="sim-q ${c.asked[i.id] ? 'done' : ''}" onclick="App.Sim.askMenu('${_esc(i.id)}')">${c.asked[i.id] ? '✓ ' : ''}${_esc(_gen(i.menu, scn))}</button>`).join('')}
       </details>`;
-    }).join('') + '<div class="sim-muted sim-small sim-menu-tip">Tu peux aussi taper ta propre phrase dans la zone de texte. Pour agir (installer le résident, alerter, oxygène) : bouton « 🩺 Agir ».</div>';
+    }).join('') + '<div class="sim-muted sim-small sim-menu-tip">Tu peux aussi taper ta propre phrase dans la zone de texte. ' + (scn.direct ? 'Pour agir, touche le dessin de la chambre dans l\'onglet « Chambre » : le lit (position), la prise d\'oxygène au mur, la sonnette, le patient (observer).' : 'Pour agir (installer le résident, alerter, oxygène) : bouton « 🩺 Agir ».') + '</div>';
   }
   function thToggle(id, open) { if (open) _openThemes[id] = true; else delete _openThemes[id]; }
   function toggleMenu() { _menuOpen = !_menuOpen; if (_menuOpen) _menuAct = false; _renderMenu(); _renderActMenu(); }
@@ -1591,7 +1692,7 @@ App.Sim = (() => {
   function _renderToolbar() {
     const el = _el('sim-toolbar'), c = _cur(), scn = _curScn(); if (!el || !c || !scn) return;
     el.innerHTML = scn.toolOrder.map(k => {
-      const t = scn.tools[k], done = !!c.found[t.fact], pend = !!c.pending[k] && !done, held = _tool === k;
+      const t = scn.tools[k], done = _toolFacts(t).every(f => !!c.found[f]), pend = !!c.pending[k] && !done, held = _tool === k;
       return `<button type="button" class="sim-tool ${held ? 'held' : ''} ${done ? 'done' : ''}" aria-pressed="${held}" onclick="App.Sim.pickTool('${k}')">
         <span class="sim-tool-ico">${t.icon}</span><span class="sim-tool-lbl">${_esc(t.label)}</span>${done ? '<span class="sim-act-ok">✓</span>' : (pend ? '<span class="sim-pend-dot" title="Valeur à noter">✎</span>' : '')}</button>`;
     }).join('');
@@ -1609,6 +1710,27 @@ App.Sim = (() => {
     }
     return `<div class="sim-lcd" role="img" aria-label="Écran de l'appareil : ${_esc(d.big)} ${_esc(d.unit)}">${d.sub ? `<span class="sim-lcd-sub">${_esc(d.sub)}</span>` : ''}<span class="sim-lcd-v">${_esc(d.big)}</span><span class="sim-lcd-u">${_esc(d.unit)}</span></div>`;
   }
+  // Écran du scope : tracé du rythme, FC, SpO₂, pression non invasive, FR ; une alarme sonne si une valeur sort des seuils
+  function _ecgPath(irregular) {
+    const gaps = irregular ? [38, 24, 44, 30, 36, 22] : [34, 34, 34, 34, 34, 34];
+    let x = 4, d = 'M0 24';
+    gaps.forEach(g => { d += ` L${x} 24 L${x + 3} 20 L${x + 5} 24 L${x + 8} 24 L${x + 10} 4 L${x + 13} 40 L${x + 15} 24 L${x + 20} 24 L${x + 25} 19 L${x + 30} 24`; x += g + 12; });
+    return d + ` L${x} 24`;
+  }
+  function _scopeLcd(t) {
+    const d = t.display, al = d.alarms || [];
+    const tile = (cls, lbl, val, unit) => `<div class="sc-t ${cls}"><small>${lbl}</small><b>${_esc(val)}</b><i>${_esc(unit)}</i></div>`;
+    return `<div class="sim-scope" role="img" aria-label="Écran du scope : fréquence cardiaque ${_esc(d.fc)}, SpO₂ ${_esc(d.spo2)} %, pression artérielle ${_esc(d.pa)}, fréquence respiratoire ${_esc(d.fr)}">
+      <svg class="sim-scope-ecg" viewBox="0 0 330 44" preserveAspectRatio="none" aria-hidden="true"><path d="${_ecgPath(d.irregular)}" fill="none" stroke="#5dff8f" stroke-width="1.6" stroke-linejoin="round" pathLength="400"/></svg>
+      <div class="sim-scope-grid">${tile('fc', 'FC', d.fc, '/min')}${tile('sp', 'SpO₂', d.spo2, '%')}${tile('pa', 'PNI', d.pa, 'mmHg')}${tile('fr', 'FR', d.fr, '/min')}</div>
+      ${al.length ? `<div class="sim-scope-alarm" role="status">🔔 ${al.map(_esc).join(' · ')}</div>` : ''}</div>`;
+  }
+  function _scopeSensors(t) {
+    const g = _G || { placed: {} };
+    const list = `<ul class="sim-sens">${t.sensors.map(x => `<li class="${g.placed[x.id] ? 'done' : ''}"><span class="sim-sens-i" aria-hidden="true">${g.placed[x.id] ? '✓' : '○'}</span><span>${_esc(x.label)}<small>${_esc(x.hint)}</small></span></li>`).join('')}</ul>`;
+    const cuff = g.sub === 'cuff' ? `<div class="sim-g-note">Où places-tu le brassard du scope ?</div><div class="sim-cuff">${_arm(t, null, 'gScopeCuff')}<div class="sim-cuff-list">${t.cuff.map(p => `<button type="button" class="sim-q" onclick="App.Sim.gScopeCuff('${p.id}')">${_esc(p.label)}</button>`).join('')}</div></div>` : '';
+    return `<div class="sim-g-note">${_esc(t.intro)}</div>${list}${cuff}`;
+  }
   function _scale(t) {
     let cells = '';
     for (let i = 0; i <= 10; i++) {
@@ -1617,11 +1739,12 @@ App.Sim = (() => {
     }
     return `<div class="sim-scale" role="img" aria-label="Échelle de douleur de 0 à 10 : ${_gen('la résidente', _curScn())} montre ${t.scale}">${cells}</div><div class="sim-quote">${_esc(t.patientSays)}</div>`;
   }
-  function _arm(t, placed) {
+  function _arm(t, placed, fn) {
+    fn = fn || 'gPlace';
     const band = { epaule: [14, 36], bon: [84, 108], coude: [112, 138] };
     const bands = t.cuff.map(p => {
       const [y0, y1] = band[p.id];
-      return `<g class="sim-band ${placed === p.id ? 'on' : ''}" onclick="App.Sim.gPlace('${p.id}')"><rect x="36" y="${y0}" width="78" height="${y1 - y0}" rx="8"/></g>`;
+      return `<g class="sim-band ${placed === p.id ? 'on' : ''}" onclick="App.Sim.${fn}('${p.id}')"><rect x="36" y="${y0}" width="78" height="${y1 - y0}" rx="8"/></g>`;
     }).join('');
     return `<svg class="sim-arm" viewBox="0 0 150 215" role="img" aria-label="Schéma du bras">
       <path d="M48 8 Q75 -2 102 8 L106 112 Q75 132 44 112Z" fill="#f4cba9"/><path d="M46 112 Q75 134 104 112 L98 205 Q75 214 52 205Z" fill="#efc09b"/>
@@ -1633,10 +1756,11 @@ App.Sim = (() => {
     const key = _G ? _G.tool : _tool; const t = scn.tools[key];
     const head = `<div class="sim-g-head"><span class="sim-g-ico">${t.icon}</span><div><b>${_G ? _esc(t.label) : 'Dans ta main : ' + _esc(t.label)}</b>${_G ? '' : `<div class="sim-muted sim-small">${_esc(_gen("Touche sur la patiente l'endroit où tu l'utilises.", scn))}</div>`}</div><button type="button" class="btn btn-ghost btn-sm" onclick="App.Sim.dropTool()">${_G && _G.phase === 'running' ? 'Annuler' : 'Reposer'}</button></div>`;
     const warn = _hint ? `<div class="sim-g-warn" role="alert">${_esc(_hint)}</div>` : '';
+    if (t.kind === 'scope' && (!_G || _G.phase === 'sensors')) return head + warn + _scopeSensors(t);
     if (!_G) return head + warn;
     const g = _G;
     if (g.phase === 'measuring') {
-      const txt = g.sub === 'inflate' ? 'Le brassard se gonfle… Reste immobile et ne parle pas.' : 'Mesure en cours… patiente quelques secondes.';
+      const txt = g.sub === 'inflate' ? 'Le brassard se gonfle… Reste immobile et ne parle pas.' : (g.sub === 'scope' ? 'Le scope démarre : le brassard se gonfle tout seul et les courbes apparaissent… patiente quelques secondes.' : 'Mesure en cours… patiente quelques secondes.');
       return head + `<div class="sim-g-note">${txt}</div><div class="sim-prog"><i id="sim-g-bar" style="width:0%"></i></div>`;
     }
     if (g.phase === 'place') {
@@ -1662,6 +1786,16 @@ App.Sim = (() => {
         <div class="sim-row"><button type="button" class="btn btn-primary" onclick="App.Sim.gRecount()">↺ Recompter</button></div>`;
     }
     // phase « read » : lire l'écran puis noter
+    if (t.multi) {
+      let k = 0;
+      const f = (m, id, ph, lab) => `<label class="sim-mf"><span>${_esc(lab)}</span><input id="sim-in-${id}" type="text" inputmode="numeric" autocomplete="off" aria-label="${_esc(lab)}" placeholder="${ph}" value="${_esc((g.vals && g.vals[id - 1]) || '')}"></label>`;
+      const fields = t.multi.map(m => m.type === 'bp'
+        ? `<span class="sim-mf2">${f(m, ++k, '0', 'PA systolique')}<span class="sim-slash">/</span>${f(m, ++k, '0', 'PA diastolique')}<span class="sim-unit">mmHg</span></span>`
+        : `<span class="sim-mf2">${f(m, ++k, '0', m.label)}<span class="sim-unit">${_esc(m.unit)}</span></span>`).join('');
+      return head + `<form class="sim-readform" onsubmit="return App.Sim.gSubmit(event)">${_scopeLcd(t)}${t.display.note ? `<p class="sim-muted sim-small">${_esc(t.display.note)}</p>` : ''}${warn}
+        <div class="sim-readlbl">Lis l'écran du scope et note chaque valeur : une alarme qui sonne ne remplace pas ton regard sur le patient.</div>
+        <div class="sim-multi">${fields}</div><div class="sim-readrow"><button type="submit" class="btn btn-primary">✎ Noter dans le recueil</button></div></form>`;
+    }
     const inp = t.input;
     let disp;
     if (t.kind === 'count') disp = `<div class="sim-g-note">Tu as compté <b>${g.n}</b> ${t.tap === 'Battement' ? 'battements' : 'respirations'} en ${t.seconds} secondes.</div>`;
@@ -1728,7 +1862,7 @@ App.Sim = (() => {
     const rows = SECTIONS.map(([sid, sname]) => {
       if (sid === 'constantes') {
         const trs = scn.constTable.map(r => {
-          const f = scn.facts[r.fact], got = c.found[r.fact], tk = _toolOfFact(scn, r.fact);
+          const f = scn.facts[r.fact], got = c.found[r.fact], tk = _toolOfFact(scn, r.fact, c);
           const cell = got ? _esc(f.text) : (!ro && tk && c.pending[tk] ? `<button type="button" class="sim-pend" onclick="App.Sim.reopen('${tk}')">✎ à noter</button>` : '—');
           return `<tr><th>${_esc(r.label)}</th><td class="${got ? 'v' : 'n'}">${cell}</td><td>${usualKnown ? _esc(r.usual) : '<span class="n" title="Lis le dossier de soins">?</span>'}</td><td class="sim-norm">${_esc(r.norm)}</td></tr>`;
         }).join('');
@@ -1829,8 +1963,8 @@ App.Sim = (() => {
     const lv = _levelOf(R.level.xp), lvName = L => (LEVELS[L - 1] || LEVELS[0]).name;
     const word = R.total >= 90 ? 'Excellent' : R.total >= 75 ? 'Très bien' : R.total >= 60 ? 'Bien' : R.total >= 40 ? 'À consolider' : 'À reprendre';
     const dec = scn.decision, chosen = dec.levels.find(l => l.id === c.dec.level);
-    const unsafe = R.unsafe.length ? `<div class="sim-fb danger" role="alert"><b>⚠ Sécurité ${_male(scn) ? 'du résident' : 'de la résidente'}${R.capped ? ' : score plafonné à 50/100' : ''}</b><ul class="sim-ul">${R.unsafe.map(u => `<li>${_esc(u)}</li>`).join('')}</ul>
-      <p>En situation réelle, ces choix mettent ${_male(scn) ? 'le résident' : 'la résidente'} en danger. C'est la règle n° 1 : on ne prend jamais de risque pour elle, même dans un exercice.</p></div>` : '';
+    const unsafe = R.unsafe.length ? `<div class="sim-fb danger" role="alert"><b>⚠ Sécurité ${_gen('de la résidente', scn)}${R.capped ? ' : score plafonné à 50/100' : ''}</b><ul class="sim-ul">${R.unsafe.map(u => `<li>${_esc(u)}</li>`).join('')}</ul>
+      <p>En situation réelle, ces choix mettent ${_gen('la résidente', scn)} en danger. C'est la règle n° 1 : on ne prend jamais de risque pour elle, même dans un exercice.</p></div>` : '';
     const earned = R.earned.length ? `<h3 class="sim-h">🏅 Badges de cette partie</h3><div class="sim-card"><div class="sim-bdg-grid">${R.earned.map(id => { const bd = BADGES.find(x => x.id === id); return `<div class="sim-bdg on${R.newBadges.indexOf(id) >= 0 ? ' new' : ''}"><span class="sim-bdg-i">${bd.ico}</span><b>${_esc(bd.name)}</b>${R.newBadges.indexOf(id) >= 0 ? '<em class="sim-new">Nouveau</em>' : ''}<span class="sim-small sim-muted">${_esc(bd.desc)}</span></div>`; }).join('')}</div></div>` : '';
     const dsc = scn.discordance;
     const allergyNote = !dsc ? '' : (c.found[dsc.fact] ? (R.allergySaid ? dsc.said : dsc.heard) : dsc.missed);
@@ -1925,7 +2059,7 @@ App.Sim = (() => {
 
   return {
     open, close, start, resume, toList, discard, setTab, say, submit, askMenu, toggleMenu, toggleAct, act, thToggle,
-    pickTool, dropTool, hot, gStartCount, gTap, gRecount, gPlace, gInflate, gSubmit, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
+    pickTool, dropTool, hot, sheetDo, sheetClose, gScopeCuff, gStartCount, gTap, gRecount, gPlace, gInflate, gSubmit, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
     decLevel, decLevelOk, decPick, decActionsOk, decNext, txt, sendSaed, saedRetry, saedDone, rxEcg, rxSkip, rxGazo, rxGazoSkip, rxNext, unkCopy, unkClear, wrSubmit, wrDone, aiReview,
     parse, parseAct, _t: { norm: _norm, prep: _prep, suggest: _suggest, unk: _unkRead, state: () => st, tick: _tick, grade: (kind, texts) => { const scn = _curScn() || _scenarios()[0]; return _grade(kind === 'saed' ? scn.call.sections : scn.written.fields, texts); }, results: () => _results(), levelOf: _levelOf }
   };
