@@ -184,9 +184,9 @@ App.Store = (() => {
   }
 
   // Temps passé en ENTRAÎNEMENT (jeux, orthographe, pharmaco, gaz du sang) : s'ajoute à « Temps » (seconds) et est
-  // détaillé dans trainSecs (total) + gameSecs / orthoSecs / pharmaSecs / gazoSecs. Aucune carte comptée, aucun
+  // détaillé dans trainSecs (total) + gameSecs / orthoSecs / pharmaSecs / gazoSecs / secoursSecs. Aucune carte comptée, aucun
   // effet sur l'objectif de 100 ni sur la série.
-  const TRAIN_KINDS = { game: 'gameSecs', ortho: 'orthoSecs', pharma: 'pharmaSecs', gazo: 'gazoSecs' };
+  const TRAIN_KINDS = { game: 'gameSecs', ortho: 'orthoSecs', pharma: 'pharmaSecs', gazo: 'gazoSecs', secours: 'secoursSecs' };
   function logTraining({ kind = 'game', seconds = 0 } = {}) {
     if (!(seconds > 0)) return;
     const field = TRAIN_KINDS[kind];

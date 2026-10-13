@@ -76,5 +76,9 @@ App.Activity = (() => {
   register('gazo',   () => _shown('games-view') && _shown('gazo-root')
                           && !!(App.Gazo && App.Gazo.isTraining && App.Gazo.isTraining()));
 
+  // Secourisme PSE1 : pendant un cas (étapes, correction). Ni le menu ni le bilan.
+  register('secours', () => _shown('games-view') && _shown('secours-root')
+                          && !!(App.Sec && App.Sec.isTraining && App.Sec.isTraining()));
+
   return { register, markActivity: _mark, _t: { tick: _tick, kinds: () => Object.keys(kinds) } };
 })();
