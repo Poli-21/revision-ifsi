@@ -50,13 +50,6 @@ App.SimBase = (() => {
       display: { big: fr(spec.temp.toFixed(1)), unit: '°C' },
       input: { type: 'num', label: 'Température lue', unit: '°C', value: spec.temp, tol: 0.05 },
       noted: `Température : ${fr(spec.temp.toFixed(1))} °C` };
-    T.pouls = { label: 'Prendre le pouls', icon: '✋', zone: 'zone-poignet', kind: 'count', seconds: 15, factor: 4, rate: spec.fc.rate, tol: 12, fact: 'm_fc',
-      tap: 'Battement', unit: '/min',
-      where: "Le pouls se prend au poignet, avec deux doigts sur l'artère radiale (jamais avec le pouce).",
-      start: `Tu poses deux doigts sur l'artère radiale ${de}.`,
-      intro: 'Sens les battements au poignet. Compte-les pendant 15 secondes en touchant « Battement » à chaque pulsation, puis multiplie par 4.',
-      input: { label: 'Fréquence du pouls', unit: '/min', value: spec.fc.rate, tol: 0 },
-      noted: `Pouls : ${spec.fc.rate} /min, ${spec.fc.rhythm || 'régulier'}` };
     T.tension = { label: 'Tensiomètre', icon: '🩺', zone: 'zone-bras', kind: 'cuff', seconds: 6, fact: 'm_pa',
       where: 'Le brassard se place sur le bras.',
       start: `Tu prends le tensiomètre et tu t'occupes du bras ${de}.`,
@@ -78,10 +71,11 @@ App.SimBase = (() => {
     T.saturometre = { label: 'Saturomètre', icon: '🔴', zone: 'zone-doigt', kind: 'wait', seconds: 5, fact: 'm_spo2',
       where: 'Le saturomètre se pose au bout d\'un doigt.',
       start: `Tu poses la pince du saturomètre sur le doigt ${de}.`,
-      display: { big: String(spec.spo2), unit: '%', sub: 'SpO₂ et pouls, air ambiant', pulse: spec.fc.rate, note: "Note la saturation (SpO₂, en %), pas le pouls (PR). Le pouls affiché n'est qu'une indication : on prend quand même le pouls au poignet pour sentir son rythme." },
+      display: { big: String(spec.spo2), unit: '%', sub: 'SpO₂ et pouls, air ambiant', pulse: spec.fc.rate, note: `Le saturomètre donne deux valeurs : la saturation (SpO₂, en %) et le pouls (PR, en battements par minute). Note les deux : pas besoin de prendre le pouls à la main. Rythme sur la courbe : ${spec.fc.rhythm || 'régulier'}.` },
       input: { type: 'num', label: 'Saturation lue', unit: '%', value: spec.spo2, tol: 0 },
+      also: { fact: 'm_fc', input: { label: 'Pouls lu', unit: '/min', value: spec.fc.rate, tol: 0 }, noted: `Pouls : ${spec.fc.rate} /min, ${spec.fc.rhythm || 'régulier'}` },
       noted: `Saturation : ${spec.spo2} % en air ambiant` };
-    order.push('thermometre', 'pouls', 'tension', 'respiration', 'saturometre');
+    order.push('thermometre', 'tension', 'respiration', 'saturometre');
     if (spec.glyc) {
       T.glucometre = { label: 'Glycémie capillaire', icon: '🩸', zone: 'zone-doigt', kind: 'wait', seconds: 5, fact: 'm_glyc',
         where: 'La goutte de sang se prélève sur le côté de la pulpe d\'un doigt (jamais le bout), après avoir mis des gants.',
@@ -133,7 +127,7 @@ App.SimBase = (() => {
       { id: 'g_intimite', stage: 'contact', label: 'Préserver l\'intimité (porte, rideau)',
         why: 'Respect de la dignité et de la pudeur, surtout avant un examen.',
         ref: 'Posture professionnelle (à confirmer avec ton formateur)' },
-      { id: 'g_constantes', stage: 'recueil', label: 'Mesurer les cinq constantes (température, pouls, pression artérielle, fréquence respiratoire, saturation)',
+      { id: 'g_constantes', stage: 'recueil', label: 'Mesurer les cinq constantes (température, pression artérielle, fréquence respiratoire, saturation et pouls lus sur le saturomètre)',
         why: 'Les constantes sont des données objectives : elles se comparent à la normale et à l\'habituel de la personne.',
         ref: 'UE B3 S1 : CM 6, analyse et surveillance des paramètres vitaux' }
     ];

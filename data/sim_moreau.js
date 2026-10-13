@@ -57,7 +57,7 @@ App.SimScenarios = App.SimScenarios || [];
 
     patient,
     scene: { clock: { h: 7, m: 50 }, label: 'Chambre 14 : M. Moreau est dans son lit, le dos calé par des oreillers',
-      patient: { eyes: 'open', pale: true, sweat: true, male: true, gasp: true, cyan: true, gown: '#a9cdf0', hair: ['#e9ecef', '#c3c8d0'] } },
+      patient: { pos: 'assise', eyes: 'open', pale: true, sweat: true, male: true, gasp: true, cyan: true, gown: '#a9cdf0', hair: ['#e9ecef', '#c3c8d0'] } },
     dossierOrder: ['d_identite', 'd_motif', 'd_atcd', 'd_allergies', 'd_ttt', 'd_autonomie', 'd_habituel', 'd_const_hab'],
 
     urgent: {

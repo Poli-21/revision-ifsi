@@ -499,7 +499,7 @@ App.Sim = (() => {
     else if (a.k === 'o2stop') _runO2Stop();
     else if (a.k === 'reste') _runStay();
   }
-  const MEASURE_HINT = '🩺 Pour mesurer ou relever une constante, c\'est toi qui fais le geste : ouvre l\'onglet « Chambre » et choisis l\'instrument. Ici, tu parles au patient ou tu agis (position, alerte, oxygène).';
+  const MEASURE_HINT = '🩺 Pour mesurer ou relever une constante, c\'est toi qui fais le geste : ouvre l\'onglet « Chambre » et choisis l\'instrument (le pouls se lit sur le saturomètre). Ici, tu parles au résident ou tu agis (position, alerte, oxygène).';
   function _handleAct(A, text, noParse) {
     const c = _cur();
     _log('me', text); c.last = null; c.misses = 0; c.suggest = null;
@@ -581,7 +581,8 @@ App.Sim = (() => {
   // ── Instruments : c'est l'étudiant qui fait le geste ──────────
   // Choisir l'instrument → le poser au bon endroit sur la patiente → attendre ou compter → lire l'écran →
   // NOTER lui-même la valeur dans le recueil. Rien n'est ajouté au recueil tant qu'il ne l'a pas noté.
-  function _toolOfFact(scn, fid) { return Object.keys(scn.tools).find(k => scn.tools[k].fact === fid) || null; }
+  function _toolOfFact(scn, fid) { return Object.keys(scn.tools).find(k => scn.tools[k].fact === fid || (scn.tools[k].also && scn.tools[k].also.fact === fid)) || null; }
+  const _nMeas = scn => scn.toolOrder.reduce((a, k) => a + 1 + (scn.tools[k].also ? 1 : 0), 0);
   function _gClear() { _timers.forEach(t => { clearInterval(t); clearTimeout(t); }); _timers = []; _G = null; _hint = ''; }
   function _gReset() { _gClear(); _tool = null; _zoom = 'room'; _autoZoom = false; if (_anim) { cancelAnimationFrame(_anim); _anim = null; } }
 
@@ -636,7 +637,7 @@ App.Sim = (() => {
     const c = _cur(); if (!_G) return;
     _G.phase = 'read';
     c.pending[_G.tool] = _G.kind === 'count' ? { n: _G.n } : true;
-    _save(); _renderRecueil(); _renderToolbar(); _renderGesture(true);
+    _save(); _renderRecueil(); _renderToolbar(); _renderGesture(true); _syncScene();
   }
   // comptage chronométré (pouls, respiration)
   function gStartCount() {
@@ -685,13 +686,21 @@ App.Sim = (() => {
     const key = _G.tool, t = scn.tools[key], inp = t.input;
     const a = _num((_el('sim-in-1') || {}).value), b = _num((_el('sim-in-2') || {}).value);
     let ok = false, msg = '', count = true;
-    if (a === null || (inp.type === 'bp' && b === null)) { msg = 'Écris la valeur lue, en chiffres.'; count = false; }
+    if (a === null || ((inp.type === 'bp' || t.also) && b === null)) { msg = t.also ? 'Écris les deux valeurs lues sur l\'écran, en chiffres : la saturation et le pouls.' : 'Écris la valeur lue, en chiffres.'; count = false; }
     else if (inp.type === 'bp') ok = Math.abs(a - inp.sys) <= inp.tol && Math.abs(b - inp.dia) <= inp.tol;
     else if (t.kind === 'count') {
       const n = (c.pending[key] && c.pending[key].n != null) ? c.pending[key].n : _G.n;
       ok = a === n * t.factor;
       if (!ok) msg = 'Vérifie ton calcul : ' + n + ' × ' + t.factor + ' = ?';
-    } else ok = Math.abs(a - inp.value) <= (inp.tol || 0);
+    } else {
+      ok = Math.abs(a - inp.value) <= (inp.tol || 0);
+      if (t.also) {
+        const okB = Math.abs(b - t.also.input.value) <= (t.also.input.tol || 0);
+        if (ok && !okB) msg = 'La saturation est juste. Relis le pouls (PR) affiché sous la saturation.';
+        else if (!ok && okB) msg = 'Le pouls est juste. Relis la saturation (SpO₂) affichée en grand.';
+        ok = ok && okB;
+      }
+    }
     if (!ok) {
       if (!msg) msg = 'Relis bien l\'écran : cette valeur n\'est pas celle qui est affichée.';
       if (count) { c.errors++; _G.errs++; }
@@ -703,8 +712,10 @@ App.Sim = (() => {
   function _record(key) {
     const c = _cur(), scn = _curScn(), t = scn.tools[key];
     delete c.pending[key]; c.entered[t.fact] = true; _find(t.fact);
-    _log('narr', 'Tu notes dans le recueil : ' + t.noted + '.');
-    c.last = { text: '✓ Noté dans le recueil : ' + t.noted, facts: [t.fact] };
+    let noted = t.noted; const facts = [t.fact];
+    if (t.also) { c.entered[t.also.fact] = true; _find(t.also.fact); noted += ' · ' + t.also.noted; facts.push(t.also.fact); }
+    _log('narr', 'Tu notes dans le recueil : ' + noted + '.');
+    c.last = { text: '✓ Noté dans le recueil : ' + noted, facts };
     _gClear(); _tool = null;
     if (_autoZoom) _setZoom('room', false);
     _renderToolbar(); _renderGesture(); _syncScene();
@@ -1502,9 +1513,33 @@ App.Sim = (() => {
     setTimeout(_scrollLog, 0);
   }
 
+  // Le dessin suit ce que fait l'étudiant : position, oxygène, saturomètre au doigt, infirmière présente
+  const _POS_SCENE = { assise: 'assise', demi: 'demi', bord: 'bord', allongee: 'flat', jambes: 'jambes', pls: 'pls' };
+  function _sceneOpts(scn) {
+    const o = scn.scene || {}, c = _cur(), k = (c && c.care) || {};
+    const patient = Object.assign({ eyes: 'closed', pale: true }, o.patient || {});
+    if (k.pos && _POS_SCENE[k.pos.id]) patient.pos = _POS_SCENE[k.pos.id];
+    if (k.o2) patient.o2 = { dev: k.o2.dev, deb: k.o2.deb };
+    const st = scn.tools && scn.tools.saturometre;
+    if (c && st) {
+      const placed = !!c.entered[st.fact] || !!c.pending.saturometre || (_G && _G.tool === 'saturometre');
+      const live = !!c.entered[st.fact] || !!c.pending.saturometre || !!(_G && _G.tool === 'saturometre' && _G.phase === 'read');
+      if (placed) patient.sat = { live, spo2: st.display.big, pr: st.display.pulse };
+    }
+    return Object.assign({}, o, { patient, nurse: !!k.alert, room: scn.patient && scn.patient.chambre });
+  }
+  let _sceneSig = '';
   function _sceneSvg(scn) {
-    const o = scn.scene || {};
-    return App.SimScene.svg(Object.assign({}, o, { patient: Object.assign({ eyes: 'closed', pale: true }, o.patient || {}) }));
+    const o = _sceneOpts(scn); _sceneSig = JSON.stringify([o.patient.pos, o.patient.o2, o.patient.sat, o.nurse]);
+    return App.SimScene.svg(o);
+  }
+  function _refreshScene() {                 // redessine seulement si quelque chose a changé (le zoom en cours est conservé)
+    const sc = _el('sim-scene'), scn = _curScn(); if (!sc || !scn || !_cur()) return;
+    const o = _sceneOpts(scn), sig = JSON.stringify([o.patient.pos, o.patient.o2, o.patient.sat, o.nurse]);
+    if (sig === _sceneSig) return;
+    const old = sc.querySelector('svg'), vb = old ? old.getAttribute('viewBox') : null;
+    _sceneSig = sig; sc.innerHTML = App.SimScene.svg(o);
+    const nw = sc.querySelector('svg'); if (nw && vb) nw.setAttribute('viewBox', vb);
   }
   function _scrollLog() { const l = _el('sim-log'); if (l) l.scrollTop = l.scrollHeight; }
   function _renderLog() {
@@ -1634,11 +1669,13 @@ App.Sim = (() => {
     else disp = _lcd(t.display);
     const inputs = inp.type === 'bp'
       ? '<input id="sim-in-1" type="text" inputmode="numeric" autocomplete="off" aria-label="Pression systolique" placeholder="0"><span class="sim-slash">/</span><input id="sim-in-2" type="text" inputmode="numeric" autocomplete="off" aria-label="Pression diastolique" placeholder="0">'
-      : `<input id="sim-in-1" type="text" inputmode="decimal" autocomplete="off" aria-label="${_esc(inp.label)}" placeholder="0">`;
-    const lbl = t.kind === 'count' ? `Calcule la fréquence par minute (${g.n} × ${t.factor})` : `${_esc(inp.label)} : note la valeur lue`;
+      : (t.also
+        ? `<input id="sim-in-1" type="text" inputmode="decimal" autocomplete="off" aria-label="${_esc(inp.label)}" placeholder="SpO₂"><span class="sim-unit">${_esc(inp.unit)}</span><input id="sim-in-2" type="text" inputmode="decimal" autocomplete="off" aria-label="${_esc(t.also.input.label)}" placeholder="Pouls"><span class="sim-unit">${_esc(t.also.input.unit)}</span>`
+        : `<input id="sim-in-1" type="text" inputmode="decimal" autocomplete="off" aria-label="${_esc(inp.label)}" placeholder="0">`);
+    const lbl = t.kind === 'count' ? `Calcule la fréquence par minute (${g.n} × ${t.factor})` : (t.also ? 'Saturation (SpO₂) et pouls (PR) : note les deux valeurs lues' : `${_esc(inp.label)} : note la valeur lue`);
     return head + `<form class="sim-readform" onsubmit="return App.Sim.gSubmit(event)">${disp}${t.display && t.display.note ? `<p class="sim-muted sim-small">${_esc(t.display.note)}</p>` : ''}${warn}
       <label class="sim-readlbl" for="sim-in-1">${lbl}</label>
-      <div class="sim-readrow">${inputs}<span class="sim-unit">${_esc(inp.unit)}</span><button type="submit" class="btn btn-primary">✎ Noter dans le recueil</button></div></form>`;
+      <div class="sim-readrow">${inputs}${t.also ? '' : `<span class="sim-unit">${_esc(inp.unit)}</span>`}<button type="submit" class="btn btn-primary">✎ Noter dans le recueil</button></div></form>`;
   }
   function _renderGesture(focus) {
     const box = _el('sim-gesture'); if (!box) return;
@@ -1650,6 +1687,7 @@ App.Sim = (() => {
   // Dessin : marques « déjà regardé », instrument en main, zones de la patiente
   function _syncScene() {
     const sc = _el('sim-scene'), c = _cur(), scn = _curScn(); if (!sc || !c || !scn) return;
+    _refreshScene();
     sc.setAttribute('data-tool', _tool || '');
     sc.querySelectorAll('.sim-hot').forEach(g => {
       const id = g.getAttribute('data-hot'), tk = scn.sceneTools && scn.sceneTools[id];
@@ -1766,7 +1804,7 @@ App.Sim = (() => {
     const comps = scn.competences.map(k => `<li>Compétence ${k.n} : ${_esc(k.label)}</li>`).join('');
     const head = `<div class="sim-bar"><button class="btn btn-ghost btn-sm" onclick="App.Sim.toList()">← Menu</button>
         <div class="sim-bar-title">Bilan · ${_esc(scn.title)}</div><div class="sim-bar-time" id="sim-clock" title="Temps actif">${_hms(c.secs)}</div></div>${_stepper()}`;
-    const stats = `<p class="sim-muted sim-small sim-stats">${Object.keys(c.entered).length} mesure${Object.keys(c.entered).length > 1 ? 's' : ''} notée${Object.keys(c.entered).length > 1 ? 's' : ''} sur ${scn.toolOrder.length} · ${c.errors || 0} erreur${(c.errors || 0) > 1 ? 's' : ''} de saisie · ${c.misplaced || 0} instrument${(c.misplaced || 0) > 1 ? 's' : ''} mal placé${(c.misplaced || 0) > 1 ? 's' : ''}</p>`;
+    const stats = `<p class="sim-muted sim-small sim-stats">${Object.keys(c.entered).length} mesure${Object.keys(c.entered).length > 1 ? 's' : ''} notée${Object.keys(c.entered).length > 1 ? 's' : ''} sur ${_nMeas(scn)} · ${c.errors || 0} erreur${(c.errors || 0) > 1 ? 's' : ''} de saisie · ${c.misplaced || 0} instrument${(c.misplaced || 0) > 1 ? 's' : ''} mal placé${(c.misplaced || 0) > 1 ? 's' : ''}</p>`;
     const tail = `<h3 class="sim-h">Compétences travaillées</h3><div class="sim-card"><ul class="sim-ul">${comps}</ul></div>
       <h3 class="sim-h">Sources</h3>
       <div class="sim-card"><ul class="sim-ul">${sources}</ul>
