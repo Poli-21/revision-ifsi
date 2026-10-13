@@ -15,6 +15,8 @@ App.Sim = (() => {
   let _confirmFinish = false;
   let _menuOpen = false;
   let _openThemes = {};
+  // État d'interface (non sauvegardé) : instrument en main, geste en cours, zoom de la scène
+  let _tool = null, _G = null, _hint = '', _zoom = 'room', _autoZoom = false, _timers = [], _anim = null;
 
   const _el  = id => document.getElementById(id);
   const _esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -42,6 +44,12 @@ App.Sim = (() => {
       if (r && r.v === 1) st = { v: 1, current: r.current || null, history: Array.isArray(r.history) ? r.history : [] };
     } catch (e) {}
     if (st.current && !_scn(st.current.scenarioId)) st.current = null;
+    _fix(st.current);
+  }
+  function _fix(c) {                 // parties enregistrées avec une version précédente : on complète les champs manquants
+    if (!c) return;
+    c.log = c.log || []; c.found = c.found || {}; c.done = c.done || {}; c.asked = c.asked || {}; c.seenObj = c.seenObj || {};
+    c.pending = c.pending || {}; c.entered = c.entered || {}; c.errors = c.errors || 0; c.misplaced = c.misplaced || 0;
   }
   function _save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
 
@@ -91,9 +99,9 @@ App.Sim = (() => {
     c.found[fid] = c.actions + 1;   // jamais 0 : reste « vrai »
     return true;
   }
-  function _markDone(gid) {
+  function _markDone(gid, extra) {
     const c = _cur(); if (!c || !gid || c.done[gid]) return;
-    c.done[gid] = { n: c.actions, early: c.firstCare === null };
+    c.done[gid] = Object.assign({ n: c.actions, early: c.firstCare === null }, extra || {});
   }
   function _checkAuto() {
     const c = _cur(), scn = _curScn(); if (!c || !scn) return;
@@ -101,7 +109,7 @@ App.Sim = (() => {
       const ok = (!g.facts || g.facts.every(f => c.found[f]))
               && (!g.asked || g.asked.every(q => c.asked[q]))
               && (!g.objects || g.objects.every(o => c.seenObj[o]));
-      if (ok) _markDone(g.id);
+      if (ok) _markDone(g.id, g.trace ? { retry: (c.errors || 0) > 0 } : null);
     });
   }
   function _factsOf(c, ids) { return (ids || []).filter(f => c.found[f]); }
@@ -151,16 +159,151 @@ App.Sim = (() => {
     _afterAction();
   }
 
-  function useMeasure(key) {
-    const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre') return;
-    const m = scn.measures[key]; if (!m) return;
+  // ── Instruments : c'est l'étudiant qui fait le geste ──────────
+  // Choisir l'instrument → le poser au bon endroit sur la patiente → attendre ou compter → lire l'écran →
+  // NOTER lui-même la valeur dans le recueil. Rien n'est ajouté au recueil tant qu'il ne l'a pas noté.
+  function _toolOfFact(scn, fid) { return Object.keys(scn.tools).find(k => scn.tools[k].fact === fid) || null; }
+  function _gClear() { _timers.forEach(t => { clearInterval(t); clearTimeout(t); }); _timers = []; _G = null; _hint = ''; }
+  function _gReset() { _gClear(); _tool = null; _zoom = 'room'; _autoZoom = false; if (_anim) { cancelAnimationFrame(_anim); _anim = null; } }
+
+  function pickTool(key) {
+    const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre' || !scn.tools[key]) return;
+    if (_tool === key) return dropTool();
+    _gClear(); _tool = key;
+    if (_zoom === 'room') _setZoom('patient', true);
+    _renderToolbar(); _renderGesture(); _syncScene();
+  }
+  function dropTool() {
+    _gClear(); _tool = null;
+    if (_autoZoom) _setZoom('room', false);
+    _renderToolbar(); _renderGesture(); _syncScene();
+  }
+  function hot(id) {                    // touche sur un élément du dessin
+    const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre' || !id) return;
+    const viaScene = scn.sceneTools && scn.sceneTools[id];
+    if (viaScene) return pickTool(viaScene);
+    if (_tool && (id === 'patiente' || id.indexOf('zone-') === 0)) return _applyTool(id);
+    if (id.indexOf('zone-') === 0) return;
+    if (id === 'dispenser') return sha();
+    if (scn.objects[id]) return useObject(id);
+  }
+  function _applyTool(zone) {
+    const c = _cur(), scn = _curScn(), t = scn.tools[_tool];
+    if (_G) return;                                                  // un geste est déjà en cours
+    const ok = t.zone === '*' ? (zone === 'patiente' || zone.indexOf('zone-') === 0) : zone === t.zone;
+    if (!ok) { c.misplaced++; _hint = t.where; _save(); _renderGesture(); return; }
     if (c.firstCare === null) c.firstCare = c.actions;
     c.actions++;
-    _find(m.fact);
-    _log('narr', m.narration);
-    c.last = { text: m.narration, facts: [m.fact] };
+    _hint = '';
+    _log('narr', t.start); c.last = { text: t.start, facts: [] };
+    _G = { tool: _tool, kind: t.kind, phase: 'start', errs: 0, placeErrs: 0, n: 0 };
+    if (t.kind === 'instant' || t.kind === 'wait') _gMeasure(t.seconds);
+    else if (t.kind === 'cuff') _G.phase = 'place';
+    else if (t.kind === 'count') _G.phase = 'ready';
+    else if (t.kind === 'scale') { _G.phase = 'read'; c.pending[_tool] = true; }
+    _save(); _renderLog(); _renderChambre(); _renderRecueil(); _renderGesture(t.kind === 'scale');
+  }
+  function _gMeasure(sec) {              // attente chronométrée (thermomètre, saturomètre, gonflage du brassard)
+    const g = _G; g.phase = 'measuring'; g.t0 = Date.now(); g.dur = sec * 1000;
+    const iv = setInterval(() => {
+      if (_G !== g) { clearInterval(iv); return; }
+      const k = Math.min(1, (Date.now() - g.t0) / g.dur);
+      const bar = _el('sim-g-bar'); if (bar) bar.style.width = Math.round(k * 100) + '%';
+      if (k >= 1) { clearInterval(iv); _gToRead(); }
+    }, 100);
+    _timers.push(iv);
+  }
+  function _gToRead() {                  // l'écran affiche la valeur : à l'étudiant de la lire et de la noter
+    const c = _cur(); if (!_G) return;
+    _G.phase = 'read';
+    c.pending[_G.tool] = _G.kind === 'count' ? { n: _G.n } : true;
+    _save(); _renderRecueil(); _renderToolbar(); _renderGesture(true);
+  }
+  // comptage chronométré (pouls, respiration)
+  function gStartCount() {
+    if (!_G || _G.phase !== 'ready' || _G.kind !== 'count') return;
+    const t = _curScn().tools[_G.tool], g = _G;
+    g.phase = 'running'; g.n = 0; g.t0 = Date.now();
+    _renderGesture();
+    const iv = setInterval(() => {
+      if (_G !== g) { clearInterval(iv); return; }
+      const left = Math.max(0, t.seconds - (Date.now() - g.t0) / 1000);
+      const el = _el('sim-g-time'); if (el) el.textContent = Math.ceil(left);
+      const bar = _el('sim-g-bar'); if (bar) bar.style.width = Math.round((1 - left / t.seconds) * 100) + '%';
+      if (left <= 0) { clearInterval(iv); _gCountDone(); }
+    }, 200);
+    _timers.push(iv);
+  }
+  function gTap() {
+    if (!_G || _G.phase !== 'running') return;
+    _G.n++;
+    const el = _el('sim-g-n'); if (el) el.textContent = _G.n;
+    const b = _el('sim-g-tap'); if (b) { b.classList.remove('hit'); void b.offsetWidth; b.classList.add('hit'); }
+  }
+  function _gCountDone() {
+    const t = _curScn().tools[_G.tool];
+    if (Math.abs(_G.n * t.factor - t.rate) > t.tol) { _G.phase = 'recount'; _renderGesture(); return; }   // comptage trop éloigné : on recommence
+    _gToRead();
+  }
+  function gRecount() { if (!_G) return; _G.phase = 'ready'; _G.n = 0; _renderGesture(); }
+  // pose du brassard
+  function gPlace(id) {
+    const c = _cur(); if (!_G || _G.phase !== 'place') return;
+    const t = _curScn().tools[_G.tool], p = t.cuff.find(x => x.id === id); if (!p) return;
+    if (!p.ok) { _G.placeErrs++; _hint = p.hint; _renderGesture(); return; }
+    _hint = ''; _markDone('g_brassard', { retry: _G.placeErrs > 0 });
+    _G.phase = 'cuffed'; _save(); _renderGesture();
+  }
+  function gInflate() {
+    if (!_G || _G.phase !== 'cuffed') return;
+    _G.sub = 'inflate'; _gMeasure(_curScn().tools[_G.tool].seconds); _renderGesture();
+  }
+  // saisie de la valeur lue
+  function _num(v) { const x = parseFloat(String(v == null ? '' : v).replace(',', '.').replace(/[^\d.\-]/g, '')); return isNaN(x) ? null : x; }
+  function gSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const c = _cur(), scn = _curScn(); if (!c || !scn || !_G || _G.phase !== 'read') return false;
+    const key = _G.tool, t = scn.tools[key], inp = t.input;
+    const a = _num((_el('sim-in-1') || {}).value), b = _num((_el('sim-in-2') || {}).value);
+    let ok = false, msg = '', count = true;
+    if (a === null || (inp.type === 'bp' && b === null)) { msg = 'Écris la valeur lue, en chiffres.'; count = false; }
+    else if (inp.type === 'bp') ok = Math.abs(a - inp.sys) <= inp.tol && Math.abs(b - inp.dia) <= inp.tol;
+    else if (t.kind === 'count') {
+      const n = (c.pending[key] && c.pending[key].n != null) ? c.pending[key].n : _G.n;
+      ok = a === n * t.factor;
+      if (!ok) msg = 'Vérifie ton calcul : ' + n + ' × ' + t.factor + ' = ?';
+    } else ok = Math.abs(a - inp.value) <= (inp.tol || 0);
+    if (!ok) {
+      if (!msg) msg = 'Relis bien l\'écran : cette valeur n\'est pas celle qui est affichée.';
+      if (count) { c.errors++; _G.errs++; }
+      _hint = msg; _save(); _renderGesture(true); return false;
+    }
+    _record(key);
+    return false;
+  }
+  function _record(key) {
+    const c = _cur(), scn = _curScn(), t = scn.tools[key];
+    delete c.pending[key]; c.entered[t.fact] = true; _find(t.fact);
+    _log('narr', 'Tu notes dans le recueil : ' + t.noted + '.');
+    c.last = { text: '✓ Noté dans le recueil : ' + t.noted, facts: [t.fact] };
+    _gClear(); _tool = null;
+    if (_autoZoom) _setZoom('room', false);
+    _renderToolbar(); _renderGesture(); _syncScene();
     _afterAction();
   }
+  function reopen(key) {                 // revenir sur une valeur lue mais pas encore notée
+    const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre' || !c.pending[key]) return;
+    const t = scn.tools[key];
+    _gClear(); _tool = key;
+    _G = { tool: key, kind: t.kind, phase: 'read', errs: 0, placeErrs: 0, n: (c.pending[key] && c.pending[key].n) || 0 };
+    if (_zoom === 'room') _setZoom('patient', true);
+    setTab('chambre');
+    _renderToolbar(); _renderGesture(true); _syncScene();
+  }
+  document.addEventListener('keydown', e => {          // barre d'espace = un battement / une inspiration
+    if (e.code === 'Space' && _G && _G.phase === 'running' && !/^(INPUT|TEXTAREA|BUTTON|SELECT)$/.test((e.target || {}).tagName || '')) { e.preventDefault(); gTap(); }
+  });
+
   function useObject(key) {
     const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre') return;
     const o = scn.objects[key]; if (!o) return;
@@ -210,6 +353,7 @@ App.Sim = (() => {
   function enter() {
     const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'couloir') return;
     c.stage = 'chambre'; c.tab = 'dialogue'; c.last = null;
+    _gReset();
     _log('narr', scn.narration.enter);
     _save(); render();
   }
@@ -220,6 +364,7 @@ App.Sim = (() => {
   function finish() {
     const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre') return;
     _confirmFinish = false;
+    _gReset();
     c.stage = 'bilan';
     if (!c.saved) {
       c.saved = true;
@@ -236,8 +381,8 @@ App.Sim = (() => {
   function _howTo(scn, fid) {
     const f = scn.facts[fid];
     if (f.how) return f.how;
-    const mk = Object.keys(scn.measures).find(k => scn.measures[k].fact === fid);
-    if (mk) return 'Mesure avec « ' + scn.measures[mk].label + ' ».';
+    const tk = _toolOfFact(scn, fid);
+    if (tk) return 'Utilise « ' + scn.tools[tk].label + ' », puis note la valeur lue dans le recueil.';
     return '';
   }
   function _bilanData() {
@@ -246,11 +391,12 @@ App.Sim = (() => {
     const keyFound = keys.filter(k => c.found[k]).length;
     const grid = scn.grid.map(g => {
       const d = c.done[g.id];
-      let state = d ? 'ok' : 'miss';
-      if (d && g.stage === 'contact' && !d.early) state = 'late';
-      return { g, state };
+      let state = d ? 'ok' : 'miss', note = '';
+      if (d && g.stage === 'contact' && !d.early) { state = 'late'; note = 'Fait, mais après le premier soin : à faire avant tout soin.'; }
+      else if (d && d.retry) { state = 'retry'; note = g.id === 'g_trace' ? 'Réussi, mais avec au moins une erreur de saisie corrigée.' : 'Réussi après une correction.'; }
+      return { g, state, note };
     });
-    return { keys, keyFound, keyTotal: keys.length, grid, gFound: grid.filter(x => x.state === 'ok').length, gTotal: grid.length };
+    return { keys, keyFound, keyTotal: keys.length, grid, gFound: grid.filter(x => x.state === 'ok' || x.state === 'retry').length, gTotal: grid.length };
   }
 
   // ── Navigation ────────────────────────────────────────────────
@@ -277,7 +423,9 @@ App.Sim = (() => {
   function start(id) {
     const scn = _scn(id); if (!scn) return;
     st.current = { scenarioId: id, startedAt: Date.now(), stage: 'couloir', tab: 'dialogue', log: [], found: {}, done: {},
-                   asked: {}, seenObj: {}, actions: 0, firstCare: null, secs: 0, dossierOpen: false, misses: 0, last: null, saved: false };
+                   asked: {}, seenObj: {}, pending: {}, entered: {}, errors: 0, misplaced: 0,
+                   actions: 0, firstCare: null, secs: 0, dossierOpen: false, misses: 0, last: null, saved: false };
+    _gReset();
     _confirmFinish = false; _menuOpen = false;
     screen = 'jeu';
     _save(); render();
@@ -294,6 +442,7 @@ App.Sim = (() => {
   function render() {
     const root = _el('sim-root'); if (!root) return;
     const c = _cur();
+    if (!(screen === 'jeu' && c && c.stage === 'chambre')) _gReset();
     if (screen === 'jeu' && c) {
       if (c.stage === 'couloir') return _renderCouloir(root);
       if (c.stage === 'chambre') return _renderChambreShell(root);
@@ -356,6 +505,8 @@ App.Sim = (() => {
       ${resumeHtml}
       <h3 class="sim-h">Scénarios</h3>
       ${cards}
+      <h3 class="sim-h">Ateliers techniques</h3>
+      ${window.App.SimECG ? window.App.SimECG.card() : ''}
       ${hist}
       <p class="sim-muted sim-small sim-disclaimer">Outil d'entraînement. Il ne remplace ni tes cours ni les protocoles de ton lieu de stage. Les valeurs et réponses sont à valider avec ton formateur.</p>
     </div>`;
@@ -413,11 +564,30 @@ App.Sim = (() => {
           <button class="sim-menu-toggle" type="button" id="sim-menu-btn" onclick="App.Sim.toggleMenu()">📋 Questions possibles</button>
           <div class="sim-menu" id="sim-menu"></div>
         </section>
-        <section class="sim-panel sim-p-chambre" id="sim-p-chambre" aria-label="Chambre"></section>
+        <section class="sim-panel sim-p-chambre" id="sim-p-chambre" aria-label="Chambre">
+          <div class="sim-scene-bar"><h3 class="sim-h">🛏️ Dans la chambre</h3>
+            <button type="button" class="btn btn-ghost btn-sm" id="sim-zoom" onclick="App.Sim.toggleZoom()">🔍 Zoom sur la patiente</button></div>
+          <div class="sim-scene" id="sim-scene" data-tool="">${App.SimScene.svg({ patient: { eyes: 'closed', pale: true } })}</div>
+          <div class="sim-toolbar" id="sim-toolbar" role="group" aria-label="Instruments"></div>
+          <div class="sim-gesture" id="sim-gesture" aria-live="polite"></div>
+          <div class="sim-last" id="sim-last" hidden></div>
+          <details class="sim-list"><summary>Voir la liste des objets de la chambre</summary><div class="sim-acts" id="sim-list-body"></div></details>
+          <div id="sim-finish"></div>
+        </section>
         <section class="sim-panel sim-p-recueil" id="sim-p-recueil" aria-label="Recueil de données"></section>
       </div>
     </div>`;
-    _renderLog(); _renderMenu(); _renderChambre(); _renderRecueil(); _renderTabs();
+    _zoom = 'room';
+    const sc = _el('sim-scene');
+    if (sc) {
+      sc.addEventListener('click', ev => { const g = ev.target.closest && ev.target.closest('[data-hot]'); if (g) hot(g.getAttribute('data-hot')); });
+      sc.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        const g = ev.target.closest && ev.target.closest('.sim-hot');
+        if (g) { ev.preventDefault(); hot(g.getAttribute('data-hot')); }
+      });
+    }
+    _renderLog(); _renderMenu(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderGesture();
     setTimeout(_scrollLog, 0);
   }
 
@@ -444,23 +614,138 @@ App.Sim = (() => {
   function thToggle(id, open) { if (open) _openThemes[id] = true; else delete _openThemes[id]; }
   function toggleMenu() { _menuOpen = !_menuOpen; _renderMenu(); }
 
-  function _renderChambre() {
-    const p = _el('sim-p-chambre'), c = _cur(), scn = _curScn(); if (!p || !c || !scn) return;
+  function _renderChambre() { _renderToolbar(); _renderLast(); _renderList(); _renderFinish(); _syncScene(); }
+
+  function _renderLast() {
+    const el = _el('sim-last'), c = _cur(); if (!el || !c) return;
+    el.hidden = !c.last; el.textContent = c.last ? c.last.text : '';
+  }
+  function _renderList() {
+    const el = _el('sim-list-body'), c = _cur(), scn = _curScn(); if (!el || !c || !scn) return;
     const objBtn = k => { const o = scn.objects[k]; const on = !!c.seenObj[k];
       return `<button class="sim-act ${on ? 'on' : ''}" onclick="App.Sim.useObject('${k}')"><span class="sim-act-ico">${o.icon}</span><span>${_esc(o.label)}</span>${on ? '<span class="sim-act-ok">✓</span>' : ''}</button>`; };
-    const mBtn = k => { const m = scn.measures[k]; const on = !!c.found[m.fact];
-      return `<button class="sim-act ${on ? 'on' : ''}" onclick="App.Sim.useMeasure('${k}')"><span class="sim-act-ico">${m.icon}</span><span>${_esc(m.label)}</span>${on ? '<span class="sim-act-ok">✓</span>' : ''}</button>`; };
-    const finishBox = _confirmFinish
+    el.innerHTML = Object.keys(scn.objects).map(objBtn).join('') +
+      `<button class="sim-act ${c.done.g_sha_out ? 'on' : ''}" onclick="App.Sim.sha()"><span class="sim-act-ico">🧴</span><span>Me frictionner les mains</span>${c.done.g_sha_out ? '<span class="sim-act-ok">✓</span>' : ''}</button>`;
+  }
+  function _renderFinish() {
+    const el = _el('sim-finish'), scn = _curScn(); if (!el || !scn) return;
+    el.innerHTML = _confirmFinish
       ? `<div class="sim-confirm"><p><b>Terminer le recueil ?</b><br><span class="sim-muted">Tu passeras au bilan. Tu ne pourras plus poser de questions à ${_esc(scn.patient.civ)} ${_esc(scn.patient.nom)}.</span></p>
          <div class="sim-row"><button class="btn btn-ghost" onclick="App.Sim.cancelFinish()">Continuer le recueil</button><button class="btn btn-primary" onclick="App.Sim.finish()">Oui, terminer</button></div></div>`
       : `<div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.askFinish()">Terminer le recueil →</button></div>`;
-    p.innerHTML = `<h3 class="sim-h">🛏️ Dans la chambre</h3>
-      <div class="sim-last" id="sim-last" ${c.last ? '' : 'hidden'}>${c.last ? _esc(c.last.text) : ''}</div>
-      <div class="sim-h2">Observer</div><div class="sim-acts">${Object.keys(scn.objects).map(objBtn).join('')}</div>
-      <div class="sim-h2">Mesurer</div><div class="sim-acts">${Object.keys(scn.measures).map(mBtn).join('')}</div>
-      <div class="sim-h2">Hygiène</div><div class="sim-acts"><button class="sim-act ${c.done.g_sha_out ? 'on' : ''}" onclick="App.Sim.sha()"><span class="sim-act-ico">🧴</span><span>Me frictionner les mains</span>${c.done.g_sha_out ? '<span class="sim-act-ok">✓</span>' : ''}</button></div>
-      ${finishBox}`;
   }
+  function _renderToolbar() {
+    const el = _el('sim-toolbar'), c = _cur(), scn = _curScn(); if (!el || !c || !scn) return;
+    el.innerHTML = scn.toolOrder.map(k => {
+      const t = scn.tools[k], done = !!c.found[t.fact], pend = !!c.pending[k] && !done, held = _tool === k;
+      return `<button type="button" class="sim-tool ${held ? 'held' : ''} ${done ? 'done' : ''}" aria-pressed="${held}" onclick="App.Sim.pickTool('${k}')">
+        <span class="sim-tool-ico">${t.icon}</span><span class="sim-tool-lbl">${_esc(t.label)}</span>${done ? '<span class="sim-act-ok">✓</span>' : (pend ? '<span class="sim-pend-dot" title="Valeur à noter">✎</span>' : '')}</button>`;
+    }).join('');
+  }
+  // L'instrument en main, ou le geste en cours : tout ce que la patiente et l'écran affichent
+  function _lcd(d) {
+    return `<div class="sim-lcd" role="img" aria-label="Écran de l'appareil : ${_esc(d.big)} ${_esc(d.unit)}">${d.sub ? `<span class="sim-lcd-sub">${_esc(d.sub)}</span>` : ''}<span class="sim-lcd-v">${_esc(d.big)}</span><span class="sim-lcd-u">${_esc(d.unit)}</span></div>`;
+  }
+  function _scale(t) {
+    let cells = '';
+    for (let i = 0; i <= 10; i++) {
+      const face = ['😀', '🙂', '🙂', '😐', '😐', '😕', '😕', '😟', '😣', '😖', '😭'][i];
+      cells += `<div class="sim-sc ${i === t.scale ? 'on' : ''}" style="--h:${Math.round(125 - i * 12.5)}"><span class="sim-sc-f">${face}</span><b>${i}</b>${i === t.scale ? '<span class="sim-sc-hand" aria-hidden="true">👆</span>' : ''}</div>`;
+    }
+    return `<div class="sim-scale" role="img" aria-label="Échelle de douleur de 0 à 10 : la résidente montre ${t.scale}">${cells}</div><div class="sim-quote">${_esc(t.patientSays)}</div>`;
+  }
+  function _arm(t, placed) {
+    const band = { epaule: [14, 36], bon: [84, 108], coude: [112, 138] };
+    const bands = t.cuff.map(p => {
+      const [y0, y1] = band[p.id];
+      return `<g class="sim-band ${placed === p.id ? 'on' : ''}" onclick="App.Sim.gPlace('${p.id}')"><rect x="36" y="${y0}" width="78" height="${y1 - y0}" rx="8"/></g>`;
+    }).join('');
+    return `<svg class="sim-arm" viewBox="0 0 150 215" role="img" aria-label="Schéma du bras">
+      <path d="M48 8 Q75 -2 102 8 L106 112 Q75 132 44 112Z" fill="#f4cba9"/><path d="M46 112 Q75 134 104 112 L98 205 Q75 214 52 205Z" fill="#efc09b"/>
+      <path d="M46 120 Q75 140 104 120" fill="none" stroke="#d9a07a" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="75" y="166" text-anchor="middle" font-size="9" fill="#a4714e">pli du coude ↑</text>${bands}</svg>`;
+  }
+  function _gesture() {                 // contenu du panneau « geste »
+    const c = _cur(), scn = _curScn(); if (!c || !scn) return '';
+    const key = _G ? _G.tool : _tool; const t = scn.tools[key];
+    const head = `<div class="sim-g-head"><span class="sim-g-ico">${t.icon}</span><div><b>${_G ? _esc(t.label) : 'Dans ta main : ' + _esc(t.label)}</b>${_G ? '' : '<div class="sim-muted sim-small">Touche sur la patiente l\'endroit où tu l\'utilises.</div>'}</div><button type="button" class="btn btn-ghost btn-sm" onclick="App.Sim.dropTool()">${_G && _G.phase === 'running' ? 'Annuler' : 'Reposer'}</button></div>`;
+    const warn = _hint ? `<div class="sim-g-warn" role="alert">${_esc(_hint)}</div>` : '';
+    if (!_G) return head + warn;
+    const g = _G;
+    if (g.phase === 'measuring') {
+      const txt = g.sub === 'inflate' ? 'Le brassard se gonfle… Reste immobile et ne parle pas.' : 'Mesure en cours… patiente quelques secondes.';
+      return head + `<div class="sim-g-note">${txt}</div><div class="sim-prog"><i id="sim-g-bar" style="width:0%"></i></div>`;
+    }
+    if (g.phase === 'place') {
+      return head + `<div class="sim-g-note">Où places-tu le brassard ? Touche le bon endroit sur le bras.</div>${warn}
+        <div class="sim-cuff">${_arm(t, null)}<div class="sim-cuff-list">${t.cuff.map(p => `<button type="button" class="sim-q" onclick="App.Sim.gPlace('${p.id}')">${_esc(p.label)}</button>`).join('')}</div></div>`;
+    }
+    if (g.phase === 'cuffed') {
+      return head + `<div class="sim-g-note">Le brassard est bien en place. Quand tu es prêt, lance la mesure.</div><div class="sim-row"><button type="button" class="btn btn-primary" onclick="App.Sim.gInflate()">▶ Lancer la mesure</button></div>`;
+    }
+    if (g.phase === 'ready') {
+      return head + `<div class="sim-g-note">${_esc(t.intro)}</div>${warn}<div class="sim-row"><button type="button" class="btn btn-primary" onclick="App.Sim.gStartCount()">▶ Démarrer le comptage (${t.seconds} s)</button></div>`;
+    }
+    if (g.phase === 'running') {
+      return head + `<div class="sim-count"><div class="sim-count-time"><span id="sim-g-time">${t.seconds}</span><small> s</small></div>
+        <div class="sim-beat" style="animation-duration:${(60 / t.rate).toFixed(3)}s" aria-hidden="true">${t.tap === 'Battement' ? '💗' : '🫁'}</div>
+        <div class="sim-count-n"><span id="sim-g-n">0</span><small> compté(s)</small></div></div>
+        <div class="sim-prog"><i id="sim-g-bar" style="width:0%"></i></div>
+        <button type="button" class="sim-tapbtn" id="sim-g-tap" onclick="App.Sim.gTap()">${_esc(t.tap)} <small>(ou barre d'espace)</small></button>`;
+    }
+    if (g.phase === 'recount') {
+      const val = g.n * t.factor;
+      return head + `<div class="sim-g-warn" role="alert">Tu as compté ${g.n} en ${t.seconds} secondes, soit ${val} /min. Cela ne colle pas avec ce que tu observes : recommence en comptant avec attention.</div>
+        <div class="sim-row"><button type="button" class="btn btn-primary" onclick="App.Sim.gRecount()">↺ Recompter</button></div>`;
+    }
+    // phase « read » : lire l'écran puis noter
+    const inp = t.input;
+    let disp;
+    if (t.kind === 'count') disp = `<div class="sim-g-note">Tu as compté <b>${g.n}</b> ${t.tap === 'Battement' ? 'battements' : 'respirations'} en ${t.seconds} secondes.</div>`;
+    else if (t.kind === 'scale') disp = _scale(t);
+    else disp = _lcd(t.display);
+    const inputs = inp.type === 'bp'
+      ? '<input id="sim-in-1" type="text" inputmode="numeric" autocomplete="off" aria-label="Pression systolique" placeholder="0"><span class="sim-slash">/</span><input id="sim-in-2" type="text" inputmode="numeric" autocomplete="off" aria-label="Pression diastolique" placeholder="0">'
+      : `<input id="sim-in-1" type="text" inputmode="decimal" autocomplete="off" aria-label="${_esc(inp.label)}" placeholder="0">`;
+    const lbl = t.kind === 'count' ? `Calcule la fréquence par minute (${g.n} × ${t.factor})` : `${_esc(inp.label)} : note la valeur lue`;
+    return head + `<form class="sim-readform" onsubmit="return App.Sim.gSubmit(event)">${disp}${warn}
+      <label class="sim-readlbl" for="sim-in-1">${lbl}</label>
+      <div class="sim-readrow">${inputs}<span class="sim-unit">${_esc(inp.unit)}</span><button type="submit" class="btn btn-primary">✎ Noter dans le recueil</button></div></form>`;
+  }
+  function _renderGesture(focus) {
+    const box = _el('sim-gesture'); if (!box) return;
+    const on = !!(_tool || _G);
+    box.classList.toggle('on', on);
+    box.innerHTML = on ? _gesture() : '';
+    if (focus) { const i = _el('sim-in-1'); if (i) { try { i.focus({ preventScroll: false }); } catch (e) { i.focus(); } } }
+  }
+  // Dessin : marques « déjà regardé », instrument en main, zones de la patiente
+  function _syncScene() {
+    const sc = _el('sim-scene'), c = _cur(), scn = _curScn(); if (!sc || !c || !scn) return;
+    sc.setAttribute('data-tool', _tool || '');
+    sc.querySelectorAll('.sim-hot').forEach(g => {
+      const id = g.getAttribute('data-hot'), tk = scn.sceneTools && scn.sceneTools[id];
+      g.classList.toggle('seen', !!c.seenObj[id]);
+      g.classList.toggle('held', !!tk && tk === _tool);
+    });
+    const zb = _el('sim-zoom'); if (zb) zb.textContent = _zoom === 'patient' ? '🏠 Vue de la chambre' : '🔍 Zoom sur la patiente';
+  }
+  function _setZoom(mode, auto) {
+    _zoom = mode; _autoZoom = !!auto && mode === 'patient';
+    const svg = document.querySelector('#sim-scene svg'); if (!svg) return;
+    const to = App.SimScene.VIEW[mode].split(' ').map(Number), from = (svg.getAttribute('viewBox') || App.SimScene.VIEW.room).split(' ').map(Number);
+    if (_anim) cancelAnimationFrame(_anim);
+    const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const t0 = performance.now(), dur = still ? 0 : 380;
+    const step = now => {
+      const k = dur ? Math.min(1, (now - t0) / dur) : 1, e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      svg.setAttribute('viewBox', from.map((v, i) => Math.round((v + (to[i] - v) * e) * 10) / 10).join(' '));
+      _anim = k < 1 ? requestAnimationFrame(step) : null;
+    };
+    _anim = requestAnimationFrame(step);
+    _syncScene();
+  }
+  function toggleZoom() { _setZoom(_zoom === 'room' ? 'patient' : 'room', false); }
 
   function _countFound() {
     const c = _cur(); return c ? Object.keys(c.found).length : 0;
@@ -473,8 +758,9 @@ App.Sim = (() => {
     const rows = SECTIONS.map(([sid, sname]) => {
       if (sid === 'constantes') {
         const trs = scn.constTable.map(r => {
-          const f = scn.facts[r.fact], got = c.found[r.fact];
-          return `<tr><th>${_esc(r.label)}</th><td class="${got ? 'v' : 'n'}">${got ? _esc(f.text) : '—'}</td><td>${usualKnown ? _esc(r.usual) : '<span class="n" title="Lis le dossier de soins">?</span>'}</td><td class="sim-norm">${_esc(r.norm)}</td></tr>`;
+          const f = scn.facts[r.fact], got = c.found[r.fact], tk = _toolOfFact(scn, r.fact);
+          const cell = got ? _esc(f.text) : (tk && c.pending[tk] ? `<button type="button" class="sim-pend" onclick="App.Sim.reopen('${tk}')">✎ à noter</button>` : '—');
+          return `<tr><th>${_esc(r.label)}</th><td class="${got ? 'v' : 'n'}">${cell}</td><td>${usualKnown ? _esc(r.usual) : '<span class="n" title="Lis le dossier de soins">?</span>'}</td><td class="sim-norm">${_esc(r.norm)}</td></tr>`;
         }).join('');
         return `<div class="sim-sec"><div class="sim-sec-h">${_esc(sname)}</div>
           <div class="sim-tablewrap"><table class="sim-const"><thead><tr><th></th><th>Mesuré</th><th>Habituel</th><th>Repère (cours)</th></tr></thead><tbody>${trs}</tbody></table></div></div>`;
@@ -524,8 +810,8 @@ App.Sim = (() => {
     const gridRows = stages.map(sg => {
       const rows = b.grid.filter(x => x.g.stage === sg);
       return `<h4 class="sim-h3">${_esc(STAGE_GRID[sg])}</h4>` + rows.map(x => {
-        const mark = x.state === 'ok' ? '✓' : (x.state === 'late' ? '◐' : '✗');
-        const extra = x.state === 'late' ? '<div class="sim-small sim-warn">Fait, mais après la première mesure : à faire avant tout soin.</div>' : '';
+        const mark = x.state === 'ok' ? '✓' : (x.state === 'late' ? '◐' : (x.state === 'retry' ? '↺' : '✗'));
+        const extra = x.note ? `<div class="sim-small sim-warn">${_esc(x.note)}</div>` : '';
         const why = `<div class="sim-muted sim-small">${_esc(x.g.why)}</div><div class="sim-muted sim-small">Repère : ${_esc(x.g.ref)}</div>`;
         return `<div class="sim-row-res ${x.state}"><span class="sim-mark">${mark}</span><div><b>${_esc(x.g.label)}</b>${extra}${x.state === 'ok' ? `<details class="sim-why"><summary>Pourquoi ?</summary>${why}</details>` : why}</div></div>`;
       }).join('');
@@ -541,13 +827,14 @@ App.Sim = (() => {
         <div class="sim-sum-box"><div class="sim-sum-n">${b.gFound}<small>/${b.gTotal}</small></div><div>gestes professionnels réussis</div></div>
         <div class="sim-sum-box"><div class="sim-sum-n">${_hms(c.secs)}</div><div>temps actif</div></div>
       </div>
+      <p class="sim-muted sim-small sim-stats">${Object.keys(c.entered).length} mesure${Object.keys(c.entered).length > 1 ? 's' : ''} notée${Object.keys(c.entered).length > 1 ? 's' : ''} sur ${scn.toolOrder.length} · ${c.errors || 0} erreur${(c.errors || 0) > 1 ? 's' : ''} de saisie · ${c.misplaced || 0} instrument${(c.misplaced || 0) > 1 ? 's' : ''} mal placé${(c.misplaced || 0) > 1 ? 's' : ''}</p>
       <div class="sim-note">🛠️ <b>Bilan provisoire (étape 1)</b> : il porte sur le recueil. La décision, l'appel de l'infirmier référent, tes transmissions écrites et le score complet arrivent aux étapes suivantes.</div>
       <h3 class="sim-h">Informations clés</h3>
       <div class="sim-card">${keyRows}</div>
       <h3 class="sim-h">🔎 Ce qu'il fallait retenir</h3>
       <div class="sim-card sim-retain">${_esc(scn.alertSummary)}</div>
       <h3 class="sim-h">Tes gestes</h3>
-      <div class="sim-card">${gridRows}<div class="sim-muted sim-small" style="margin-top:8px">✓ réussi · ◐ fait trop tard · ✗ non fait</div></div>
+      <div class="sim-card">${gridRows}<div class="sim-muted sim-small" style="margin-top:8px">✓ réussi · ↺ réussi après une correction · ◐ fait trop tard · ✗ non fait</div></div>
       <h3 class="sim-h">Compétences travaillées</h3>
       <div class="sim-card"><ul class="sim-ul">${comps}</ul></div>
       <h3 class="sim-h">Sources</h3>
@@ -566,7 +853,7 @@ App.Sim = (() => {
   function _shown(id) { const e = _el(id); return !!e && e.style.display !== 'none' && getComputedStyle(e).display !== 'none'; }
   function _simVisible() {
     const c = _cur();
-    return !!c && _shown('games-view') && _shown('sim-root');
+    return !!c && _shown('games-view') && _shown('sim-root') && !_el('sim-ecg');   // l'atelier ECG compte son propre temps
   }
   function _refreshToday() { try { App.Render.todayStats(); } catch (e) {} }
   function _startTimer() {
@@ -603,7 +890,7 @@ App.Sim = (() => {
 
   return {
     open, close, start, resume, toList, discard, setTab, say, submit, askMenu, toggleMenu, thToggle,
-    useMeasure, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
+    pickTool, dropTool, hot, gStartCount, gTap, gRecount, gPlace, gInflate, gSubmit, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
     parse, _t: { norm: _norm, state: () => st, tick: _tick }
   };
 })();
