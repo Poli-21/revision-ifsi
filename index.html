@@ -325,6 +325,15 @@
         <h2 class="games-setup-title">🎯 Modes d'entraînement</h2>
         <p class="games-setup-desc">Choisis un mode pour renforcer ta mémorisation autrement que par les flashcards.</p>
 
+        <button class="sim-entry-card" id="gm-sim" onclick="App.Sim.open()">
+          <span class="sim-entry-ico">🩺</span>
+          <span class="sim-entry-txt">
+            <span class="sim-entry-name">Simulation clinique <em class="sim-new">Nouveau</em></span>
+            <span class="sim-entry-desc">Fais le bilan d'un résident d'EHPAD : dialogue avec le patient, recueil de données, repérage des signes d'alerte. Fonctionne hors ligne.</span>
+          </span>
+          <span class="sim-entry-go">Jouer →</span>
+        </button>
+
         <div class="games-mode-grid">
           <button class="game-mode-card selected" id="gm-tf" onclick="App.Games.selectMode('tf')">
             <span class="gm-icon">⚡</span>
@@ -394,6 +403,9 @@
           <button class="btn btn-ghost"   onclick="App.Games.reset()">Changer de mode</button>
         </div>
       </div>
+
+      <!-- Simulation clinique (rendu par core/simulation.js) -->
+      <div id="sim-root" style="display:none"></div>
 
     </div>
 
@@ -854,6 +866,9 @@
 <script src="ui/modal.js"></script>
 <script src="core/ortho.js"></script>
 <script src="core/games.js"></script>
+<script src="data/sim_intents.js"></script>
+<script src="data/sim_ehpad.js"></script>
+<script src="core/simulation.js"></script>
 <script src="data/english_s1.js"></script>
 <script src="core/english.js"></script>
 <script src="core/partiels.js"></script>
