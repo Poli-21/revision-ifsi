@@ -38,6 +38,18 @@ App.Sim = (() => {
     ['observations', 'Observations'], ['risques', 'Risques dans la chambre']
   ];
   const KIND_LABEL = { dossier: 'Dossier', chercher: 'Dit par la résidente', mesurer: 'Mesure', deduire: 'Observation' };
+  // Scénarios à plusieurs résidents : accord au masculin pour les textes écrits au féminin (menus, aides, bilan)
+  const _male = scn => !!(scn && scn.patient && scn.patient.sexe === 'M');
+  const _MASC = [['de la résidente', 'du résident'], ['à la résidente', 'au résident'], ['la résidente', 'le résident'], ['La résidente', 'Le résident'],
+    ['une résidente', 'un résident'], ['Résidente', 'Résident'], ['résidente', 'résident'], ['sur la patiente', 'sur le patient'], ['la patiente', 'le patient'],
+    ['Madame', 'Monsieur'], ['tombée', 'tombé'], ['allée', 'allé'], ['arrivée', 'arrivé'], ['opérée', 'opéré'], ['hospitalisée', 'hospitalisé'],
+    ['levée', 'levé'], ['réveillée', 'réveillé'], ["qu'elle ressent", "qu'il ressent"], ["ce qu'elle", "ce qu'il"]];
+  function _gen(txt, scn) {
+    let t = String(txt == null ? '' : txt);
+    if (!_male(scn)) return t;
+    _MASC.forEach(([a, b]) => { t = t.split(a).join(b); });
+    return t;
+  }
   const STAGE_GRID = { entree: "Avant d'entrer", contact: 'Premier contact', recueil: 'Recueil de données' };
 
   // ── Sauvegarde ────────────────────────────────────────────────
@@ -78,12 +90,14 @@ App.Sim = (() => {
       .replace(/[’'`´]/g, ' ').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   }
   // Renvoie les identifiants d'intentions reconnues (3 au maximum), dans l'ordre où elles apparaissent.
-  function parse(text) {
+  function parse(text, scnArg) {
     const n = _norm(text);
     if (!n) return [];
+    const sc = scnArg === undefined ? _curScn() : scnArg;
     const list = (window.App.SimIntents && window.App.SimIntents.LIST) || [];
     let hits = [];
     list.forEach(it => {
+      if (it.extra && !(sc && sc.answers && sc.answers[it.id])) return;     // question propre à certains scénarios
       let score = 0, pos = 1e9;
       const probe = (re, pts) => {
         const m = re.exec(n);
@@ -94,6 +108,8 @@ App.Sim = (() => {
       if (score >= (it.min || 2)) hits.push({ it, score, pos });
     });
     if (hits.some(h => !h.it.solo)) hits = hits.filter(h => !h.it.solo);   // « Bonjour » seul seulement
+    const swallowed = new Set(); hits.forEach(h => (h.it.over || []).forEach(o => swallowed.add(o)));
+    if (swallowed.size) hits = hits.filter(h => !swallowed.has(h.it.id));        // une question en « avale » d'autres
     hits.sort((a, b) => b.score - a.score);
     hits = hits.slice(0, 3).sort((a, b) => a.pos - b.pos);
     return hits.map(h => h.it.id);
@@ -127,8 +143,17 @@ App.Sim = (() => {
   }
   function _factsOf(c, ids) { return (ids || []).filter(f => c.found[f]); }
 
+  function _urgentHint() {                // scénario d'urgence : on rappelle qu'il ne faut pas perdre de temps
+    const c = _cur(), scn = _curScn();
+    if (!c || !scn || !scn.urgent || c.urgentShown) return;
+    if ((scn.urgent.facts || []).some(f => c.found[f]) && c.stage === 'chambre') {
+      c.urgentShown = true;
+      _log('sys', scn.urgent.message);
+    }
+  }
   function _afterAction() {
     _checkAuto();
+    _urgentHint();
     _save();
     if (!_cur() || _cur().stage !== 'chambre') return;
     _renderLog(); _renderMenu(); _renderChambre(); _renderRecueil(); _renderTabs();
@@ -143,7 +168,7 @@ App.Sim = (() => {
   }
   function askMenu(id) {
     const it = _intent(id); if (!it) return;
-    _handle([id], it.ask);
+    _handle([id], _gen(it.ask, _curScn()));
   }
   function _handle(ids, studentText) {
     const c = _cur(), scn = _curScn();
@@ -161,10 +186,20 @@ App.Sim = (() => {
     const hasContact = ids.some(i => (_intent(i) || {}).contact);
     if (c.actions === 0 && !c.done.g_presentation && !hasContact) _log('pat', scn.whoAreYou);
     ids.forEach(id => {
-      const a = scn.answers[id];
+      let a = scn.answers[id];
       const it = _intent(id) || {};
-      const again = (c.asked[id] || 0) > 0 && !it.contact;
+      // Réponse alternative : le résident ne dit la vérité que si tu as déjà observé certains indices
+      // (when.found), ou si tu l'as mis en confiance (when.asked). Sans indice, il minimise.
+      let alt = false;
+      if (a && a.alt && a.alt.when) {
+        const w = a.alt.when;
+        alt = (w.found || []).some(f => c.found[f]) || (w.asked || []).some(q => c.asked[q]);
+        if (alt) a = a.alt;
+      }
+      const altKey = id + '#alt';
+      const again = alt ? (c.asked[altKey] || 0) > 0 : ((c.asked[id] || 0) > 0 && !it.contact);
       c.asked[id] = (c.asked[id] || 0) + 1;
+      if (alt) c.asked[altKey] = (c.asked[altKey] || 0) + 1;
       _log('pat', (again ? 'Je vous l\'ai déjà dit… ' : '') + (a ? a.text : scn.fallbackAnswer));
       if (a) { (a.reveals || []).forEach(_find); (a.logs || []).forEach(_markDone); }
     });
@@ -393,11 +428,11 @@ App.Sim = (() => {
     { id: 'premier_pas', ico: '🌱', name: 'Premier pas', desc: 'Terminer une partie complète.', test: () => true },
     { id: 'oeil', ico: '👁️', name: 'Œil de lynx', desc: 'Trouver toutes les informations clés du recueil.', test: R => R.recueil.found === R.recueil.total },
     { id: 'mains', ico: '🧴', name: 'Mains propres', desc: 'Te frictionner les mains avant ET après le contact.', test: (R, c) => !!(c.done.g_sha_in && c.done.g_sha_out) },
-    { id: 'mesures', ico: '🎯', name: 'Mesures justes', desc: 'Noter les six mesures sans aucune erreur de saisie.', test: (R, c, scn) => (c.errors || 0) === 0 && Object.keys(c.entered).length >= scn.toolOrder.length },
+    { id: 'mesures', ico: '🎯', name: 'Mesures justes', desc: 'Noter toutes les mesures sans aucune erreur de saisie.', test: (R, c, scn) => (c.errors || 0) === 0 && Object.keys(c.entered).length >= scn.toolOrder.length },
     { id: 'alerte', ico: '🚨', name: 'Bon réflexe', desc: "Juger qu'il faut alerter l'infirmière maintenant, sans geste dangereux.", test: R => R.niveau.id === 'maintenant' && !R.unsafe.length },
-    { id: 'securite', ico: '🛡️', name: "Sécurité d'abord", desc: "Choisir au moins 5 des 6 bons gestes d'attente, sans geste dangereux.", test: R => R.actions.good >= 5 && !R.unsafe.length },
+    { id: 'securite', ico: '🛡️', name: "Sécurité d'abord", desc: "Choisir au moins 5 des bons gestes d'attente, sans geste dangereux.", test: R => R.actions.good >= 5 && !R.unsafe.length },
     { id: 'saed', ico: '📞', name: 'Message clair', desc: "Obtenir au moins 12/15 à l'appel SAED.", test: R => R.appel.pts >= 12 },
-    { id: 'discordance', ico: '🔎', name: 'Discordance repérée', desc: "Transmettre à l'infirmière l'allergie possible absente du dossier.", test: R => !!R.allergySaid },
+    { id: 'discordance', ico: '🔎', name: 'Discordance repérée', desc: "Repérer une information qui ne colle pas avec le dossier (allergie, chute non signalée, repas non pris…) et la transmettre à l'infirmière.", test: R => !!R.allergySaid },
     { id: 'transmetteur', ico: '📝', name: 'Transmetteur', desc: 'Obtenir au moins 12/15 à la transmission écrite.', test: R => R.trans.pts >= 12 },
     { id: 'ecg', ico: '🫀', name: 'ECG réussi', desc: "Réaliser l'ECG de la prescription avec au moins 70/100.", test: R => !!R.ecg && R.ecg.score >= 70 },
     { id: 'excellence', ico: '⭐', name: 'Excellence', desc: 'Atteindre 90/100 ou plus, sans geste dangereux.', test: R => R.total >= 90 && !R.unsafe.length },
@@ -468,10 +503,11 @@ App.Sim = (() => {
     if (!c.dec.order) c.dec.order = { lv: _shuffle(scn.decision.levels.map(l => l.id), c.startedAt), ac: _shuffle(scn.decision.actions.map(a => a.id), c.startedAt + 7) };
     return c.dec.order;
   }
+  function _rxName(scn) { return (scn && scn.rx && scn.rx.stepName) || 'Prescription'; }
   function _sub(c) {
-    const idx = DEC_STEPS.findIndex(s => s[0] === c.dec.step);
+    const idx = DEC_STEPS.findIndex(s => s[0] === c.dec.step), scn = _curScn();
     return '<ol class="sim-substeps" aria-label="Sous-étapes de la décision">' + DEC_STEPS.map((s, i) =>
-      `<li class="${i < idx ? 'done' : (i === idx ? 'now' : '')}"><b>${i < idx ? '✓' : i + 1}</b> ${_esc(s[1])}</li>`).join('') + '</ol>';
+      `<li class="${i < idx ? 'done' : (i === idx ? 'now' : '')}"><b>${i < idx ? '✓' : i + 1}</b> ${_esc(s[0] === 'rx' ? _rxName(scn) : s[1])}</li>`).join('') + '</ol>';
   }
   function _bar(scn, c, title) {
     return `<div class="sim-bar"><button class="btn btn-ghost btn-sm" onclick="App.Sim.toList()">← Menu</button>
@@ -507,7 +543,7 @@ App.Sim = (() => {
     if (!D.levelDone) foot = `<div class="sim-row sim-enter"><button class="btn btn-primary" ${D.level ? '' : 'disabled'} onclick="App.Sim.decLevelOk()">Valider mon choix</button>${D.level ? '' : '<span class="sim-muted sim-small">Choisis une réponse.</span>'}</div>`;
     else {
       const l = dec.levels.find(x => x.id === D.level);
-      const tag = { good: '✓ Bonne analyse', avoid: '◐ À nuancer', danger: '⚠ Risque pour la résidente' }[l.verdict];
+      const tag = { good: '✓ Bonne analyse', avoid: '◐ À nuancer', danger: _gen('⚠ Risque pour la résidente', scn) }[l.verdict];
       foot = `<div class="sim-fb ${l.verdict}" id="sim-fb"><b>${tag}</b><p>${_esc(l.feedback)}</p></div>
         <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.decNext()">Continuer : que fais-tu en attendant ? →</button></div>`;
     }
@@ -536,16 +572,16 @@ App.Sim = (() => {
         const a = dec.actions.find(x => x.id === id), on = !!D.picks[id];
         return `<button type="button" class="sim-opt chk${on ? ' on' : ''}" data-id="${_esc(id)}" aria-pressed="${on}" onclick="App.Sim.decPick('${_esc(id)}')"><span class="sim-opt-m">${on ? '☑' : '☐'}</span><span>${_esc(a.label)}</span></button>`;
       }).join('');
-      return `<div class="sim-card"><h2 class="sim-title">En attendant Sophie</h2><p class="sim-lead">${_esc(dec.actionsQ)}</p>
+      return `<div class="sim-card"><h2 class="sim-title">En attendant ${_esc(scn.call.who)}</h2><p class="sim-lead">${_esc(dec.actionsQ)}</p>
         <div class="sim-opts">${items}</div>
         <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.decActionsOk()">Valider mes choix (${n})</button><span class="sim-muted sim-small">Aucune limite : coche ce que tu ferais vraiment.</span></div></div>`;
     }
     const R = _results(true);
-    return `<div class="sim-card"><h2 class="sim-title">En attendant Sophie</h2>
+    return `<div class="sim-card"><h2 class="sim-title">En attendant ${_esc(scn.call.who)}</h2>
       <div class="sim-fb ${R.actions.danger ? 'danger' : (R.actions.good >= 5 && !R.actions.avoid ? 'good' : 'avoid')}" id="sim-fb"><b>${R.actions.danger ? '⚠ Au moins un geste dangereux' : 'Bilan de tes choix'}</b>
         <p>${R.actions.good}/${R.actions.goodTotal} bons gestes · ${R.actions.avoid} geste${R.actions.avoid > 1 ? 's' : ''} à éviter · ${R.actions.danger} geste${R.actions.danger > 1 ? 's' : ''} dangereux. <b>${fmt(R.actions.pts)}/${R.actions.max} points.</b>${R.actions.danger ? ' Un geste dangereux plafonne le score final de la partie à 50/100.' : ''}</p></div>
       <div class="sim-revs">${_actionsReview(c, scn)}</div>
-      <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.decNext()">Continuer : appeler Sophie →</button></div></div>`;
+      <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.decNext()">Continuer : appeler ${_esc(scn.call.who)} →</button></div></div>`;
   }
 
   // Appel à l'infirmière référente (SAED)
@@ -577,7 +613,7 @@ App.Sim = (() => {
     if (!S.sent) {
       const miss = (S.tries && S.t1) ? _grade(call.sections, S.t1).secs.reduce((a, s) => a.concat(s.items.filter(x => !x.ok).map(x => x.el.label)), []) : [];
       form = `${S.warn ? `<div class="sim-g-warn" role="alert">${_esc(S.warn)}</div>` : ''}
-        ${S.tries ? `<div class="sim-note">↺ <b>Rappelle Sophie</b> en complétant ton message. Il te manquait :<ul class="sim-ul">${miss.map(m => `<li>${_esc(m)}</li>`).join('')}</ul>Seul le meilleur des deux essais comptera (le 2e à 85 %).</div>` : ''}
+        ${S.tries ? `<div class="sim-note">↺ <b>Rappelle ${_esc(call.who)}</b> en complétant ton message. Il te manquait :<ul class="sim-ul">${miss.map(m => `<li>${_esc(m)}</li>`).join('')}</ul>Seul le meilleur des deux essais comptera (le 2e à 85 %).</div>` : ''}
         ${call.sections.map(s => `<div class="sim-saed"><label for="saed-${s.id}"><b>${_esc(s.label)}</b> <span class="sim-muted sim-small">${_esc(s.hint)}</span></label>
           <textarea id="saed-${s.id}" rows="${s.id === 'E' ? 4 : 2}" maxlength="900" placeholder="${_esc(s.placeholder)}" oninput="App.Sim.txt('saed','${s.id}',this.value)">${_esc(S.txt[s.id])}</textarea></div>`).join('')}
         <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.sendSaed()">📞 ${S.tries ? 'Rappeler' : 'Appeler'} ${_esc(call.who)}</button></div>`;
@@ -590,7 +626,7 @@ App.Sim = (() => {
         <div class="sim-card">${_corrHtml(g)}</div>
         <details class="sim-why"><summary>Voir un exemple de message SAED complet</summary><div class="sim-model">${['S', 'A', 'E', 'D'].map(k => `<p><b>${k}</b> · ${_esc(call.model[k])}</p>`).join('')}</div></details>
         ${_aiBlock('saed', c)}
-        <div class="sim-row sim-enter">${S.canRetry ? `<button class="btn btn-primary" onclick="App.Sim.saedRetry()">↺ Rappeler Sophie avec ces précisions</button><button class="btn btn-ghost" onclick="App.Sim.saedDone()">Continuer sans rappeler</button>` : `<button class="btn btn-primary" onclick="App.Sim.saedDone()">Continuer : la prescription →</button>`}</div>`;
+        <div class="sim-row sim-enter">${S.canRetry ? `<button class="btn btn-primary" onclick="App.Sim.saedRetry()">↺ Rappeler ${_esc(call.who)} avec ces précisions</button><button class="btn btn-ghost" onclick="App.Sim.saedDone()">Continuer sans rappeler</button>` : `<button class="btn btn-primary" onclick="App.Sim.saedDone()">Continuer : ${_esc((scn.rx && scn.rx.nextLabel) || 'la prescription')} →</button>`}</div>`;
     }
     return `<div class="sim-card"><h2 class="sim-title">📞 Appeler ${_esc(call.who)}</h2><p class="sim-lead">${_esc(call.intro)}</p>
       <div class="sim-note"><b>Méthode.</b> ${_esc(call.method)}</div>${_recueilRecap(c, scn)}${logHtml}${form}${after}</div>`;
@@ -598,29 +634,36 @@ App.Sim = (() => {
 
   // Prescription du médecin
   function _decRx(c, scn) {
-    const rx = scn.rx, R = c.rx;
+    const rx = scn.rx, R = c.rx, pt = scn.patient, who = scn.call.who;
     const al = c.saed && c.saed.sent ? _callAllergy(c, scn) : false;
+    const ecgCtx = rx.ecgCtx || {};
+    const ecgWho = ecgCtx.patient ? (pt.civ + ' ' + pt.nom) : '';
     const lines = rx.lines.map(l => {
       let extra = '';
       if (l.ecg) {
         if (R.ecg) extra = `<div class="sim-rx-ecg ok">✓ ECG réalisé · ${R.ecg.score}/100 · mode ${R.ecg.mode === 'auto' ? 'autonome' : 'guidé'} <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxEcg()">Refaire</button></div>`;
-        else if (R.skipped) extra = '<div class="sim-rx-ecg">Sophie réalise l\'ECG à ta place. <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxEcg()">Finalement, je le fais</button></div>';
-        else extra = `<div class="sim-rx-ecg"><button class="btn btn-primary btn-sm" onclick="App.Sim.rxEcg()">🫀 Réaliser l'ECG (atelier)</button><button class="btn btn-ghost btn-sm" onclick="App.Sim.rxSkip()">Laisser Sophie le faire</button><div class="sim-muted sim-small">Facultatif. Sophie reste à côté de toi : en 1re année, un geste technique se fait sous la supervision d'un soignant. L'ECG simulé est celui de Mme Martin (pouls à 104/min).</div></div>`;
+        else if (R.skipped) extra = `<div class="sim-rx-ecg">${_esc(who)} réalise l'ECG à ta place. <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxEcg()">Finalement, je le fais</button></div>`;
+        else extra = `<div class="sim-rx-ecg"><button class="btn btn-primary btn-sm" onclick="App.Sim.rxEcg()">🫀 Réaliser l'ECG (atelier)</button><button class="btn btn-ghost btn-sm" onclick="App.Sim.rxSkip()">Laisser ${_esc(who)} le faire</button><div class="sim-muted sim-small">Facultatif. ${_esc(who)} reste à côté de toi : en 1re année, un geste technique se fait sous la supervision d'un soignant. L'ECG simulé est celui de ${_esc(ecgWho)} (pouls à ${_esc(ecgCtx.rate)}/min).</div></div>`;
       }
       return `<li><span class="sim-rx-i">${l.icon}</span><div>${_esc(l.t)}${extra}</div></li>`;
     }).join('');
-    return `<div class="sim-card"><h2 class="sim-title">Prescription du médecin</h2><p class="sim-lead">${_esc(rx.intro)}</p>
-      <div class="sim-rx"><div class="sim-rx-h">📄 ${_esc(rx.from)}</div><div class="sim-rx-p">Mme Lucienne MARTIN · 86 ans · chambre 12</div>
+    const ident = rx.patientLine || (pt.civ + ' ' + (pt.prenom ? pt.prenom + ' ' : '') + String(pt.nom).toUpperCase() + ' · ' + pt.age + ' ans · chambre ' + pt.chambre);
+    const known = rx.discKnown || rx.allergyKnown, unknown = rx.discUnknown || rx.allergyUnknown;
+    const foot = (al ? known : unknown);
+    return `<div class="sim-card"><h2 class="sim-title">${_esc(rx.title || 'Prescription du médecin')}</h2><p class="sim-lead">${_esc(rx.intro)}</p>
+      <div class="sim-rx"><div class="sim-rx-h">📄 ${_esc(rx.from)}</div><div class="sim-rx-p">${_esc(ident)}</div>
         <ul class="sim-rx-l">${lines}</ul>
-        <div class="sim-rx-a">${_esc(al ? rx.allergyKnown : rx.allergyUnknown)}</div></div>
+        ${foot ? `<div class="sim-rx-a">${_esc(foot)}</div>` : ''}</div>
       <p class="sim-muted sim-small">${_esc(rx.note)}</p>
       <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.rxNext()">Continuer : écrire mes transmissions →</button></div></div>`;
   }
+  // « Discordance » : une information qui ne colle pas avec le dossier (ex. allergie, chute non signalée).
+  // scn.discordance = { fact, el, said, heard, missed, badge? } ; el = élément de l'appel SAED qui la transmet.
   function _callAllergy(c, scn) {
-    const S = c.saed;
-    if (!S || !S.sent) return false;
-    const g = _grade(scn.call.sections, S.txt), sec = g.secs.find(s => s.id === 'A');
-    return !!(sec && sec.items.find(x => x.el.id === 'a_allerg' && x.ok));
+    const S = c.saed, d = scn && scn.discordance;
+    if (!S || !S.sent || !d) return false;
+    const g = _grade(scn.call.sections, S.txt);
+    return g.secs.some(sec => sec.items.some(x => x.el.id === d.el && x.ok));
   }
 
   // ── Handlers de la décision ──
@@ -781,7 +824,7 @@ App.Sim = (() => {
     const appel = { max: 15, pts: _callPts(c.saed), tries: c.saed.tries || 0 };
     const trans = { max: 15, pts: c.wr.graded ? c.wr.pts : 0 };
     const unsafe = [];
-    if (lv && lv.verdict === 'danger') unsafe.push('Tu as jugé qu\'il n\'y avait rien à signaler alors que plusieurs signes allaient dans le même sens.');
+    if (lv && lv.verdict === 'danger') unsafe.push(lv.unsafe || 'Tu as jugé qu\'il n\'y avait rien à signaler alors que plusieurs signes allaient dans le même sens.');
     dangers.forEach(a => unsafe.push('Geste dangereux choisi : ' + a.label));
     const raw = recueil.pts + gestes.pts + niveau.pts + actions.pts + appel.pts + trans.pts;
     const capped = unsafe.length > 0 && raw > 50;
@@ -922,7 +965,7 @@ App.Sim = (() => {
       </div>`;
     }
     const cards = _scenarios().map(s => `<div class="sim-card sim-scn">
-        <div class="sim-scn-head"><span class="sim-scn-ico">🏠</span><div>
+        <div class="sim-scn-head"><span class="sim-scn-ico">${s.icon || '🏠'}</span><div>
           <div class="sim-scn-title">${_esc(s.title)}</div>
           <div class="sim-chips"><span class="sim-chip">${_esc(s.setting)}</span><span class="sim-chip">${_esc(s.levelLabel)}</span><span class="sim-chip">${_esc(s.semestre)} · ${_esc(s.ue.join(', '))}</span><span class="sim-chip">${_esc(s.duration)}</span></div>
         </div></div>
@@ -970,7 +1013,7 @@ App.Sim = (() => {
 
   // ── Écran : préparation (couloir) ──
   function _dossierHtml(scn, c) {
-    const order = ['d_identite', 'd_motif', 'd_atcd', 'd_allergies', 'd_ttt', 'd_autonomie', 'd_habituel', 'd_const_hab'];
+    const order = scn.dossierOrder || ['d_identite', 'd_motif', 'd_atcd', 'd_allergies', 'd_ttt', 'd_autonomie', 'd_habituel', 'd_const_hab'];
     return `<div class="sim-dossier"><div class="sim-dossier-h">📁 Dossier de soins · ${_esc(scn.patient.civ)} ${_esc(scn.patient.nom.toUpperCase())} · chambre ${scn.patient.chambre}</div>` +
       order.filter(k => scn.facts[k]).map(k => `<div class="sim-dossier-row"><b>${_esc(scn.facts[k].label)}</b><span>${_esc(scn.facts[k].text)}</span></div>`).join('') + '</div>';
   }
@@ -988,7 +1031,7 @@ App.Sim = (() => {
         <p class="sim-quote">${_esc(scn.intro.equipe)}</p>
         <p><b>Ta mission :</b> ${_esc(scn.intro.consigne)}</p>
       </div>
-      <h3 class="sim-h">Devant la chambre 12</h3>
+      <h3 class="sim-h">Devant la chambre ${_esc(scn.patient.chambre)}</h3>
       <div class="sim-acts">
         ${btn('dossier', '📁', c.dossierOpen ? 'Refermer le dossier de soins' : 'Lire le dossier de soins', 'readDossier', !!d.g_dossier)}
         ${btn('sha', '🧴', 'Me frictionner les mains', 'sha', !!d.g_sha_in)}
@@ -1010,7 +1053,7 @@ App.Sim = (() => {
       <nav class="sim-tabbar" id="sim-tabbar" aria-label="Panneaux"></nav>
       <div class="sim-play" id="sim-play" data-tab="${_esc(c.tab || 'dialogue')}">
         <section class="sim-panel sim-p-dialogue" id="sim-p-dialogue" aria-label="Dialogue">
-          <div class="sim-pt"><span class="sim-avatar" aria-hidden="true">👵</span><div><b>${_esc(scn.patient.civ)} ${_esc(scn.patient.nom)}</b><div class="sim-muted sim-small">Résidente · chambre ${scn.patient.chambre}</div></div></div>
+          <div class="sim-pt"><span class="sim-avatar" aria-hidden="true">${scn.patient.avatar || '👵'}</span><div><b>${_esc(scn.patient.civ)} ${_esc(scn.patient.nom)}</b><div class="sim-muted sim-small">${_male(scn) ? 'Résident' : 'Résidente'} · chambre ${_esc(scn.patient.chambre)}</div></div></div>
           <div class="sim-log" id="sim-log" role="log" aria-live="polite"></div>
           <form class="sim-form" id="sim-form" onsubmit="return App.Sim.submit(event)">
             <input id="sim-input" type="text" autocomplete="off" enterkeyhint="send" maxlength="300" placeholder="Écris ce que tu dis à ${_esc(scn.patient.civ)} ${_esc(scn.patient.nom)}…" aria-label="Ta phrase">
@@ -1021,8 +1064,8 @@ App.Sim = (() => {
         </section>
         <section class="sim-panel sim-p-chambre" id="sim-p-chambre" aria-label="Chambre">
           <div class="sim-scene-bar"><h3 class="sim-h">🛏️ Dans la chambre</h3>
-            <button type="button" class="btn btn-ghost btn-sm" id="sim-zoom" onclick="App.Sim.toggleZoom()">🔍 Zoom sur la patiente</button></div>
-          <div class="sim-scene" id="sim-scene" data-tool="">${App.SimScene.svg({ patient: { eyes: 'closed', pale: true } })}</div>
+            <button type="button" class="btn btn-ghost btn-sm" id="sim-zoom" onclick="App.Sim.toggleZoom()">🔍 Zoom sur ${_male(scn) ? 'le patient' : 'la patiente'}</button></div>
+          <div class="sim-scene" id="sim-scene" data-tool="">${_sceneSvg(scn)}</div>
           <div class="sim-toolbar" id="sim-toolbar" role="group" aria-label="Instruments"></div>
           <div class="sim-gesture" id="sim-gesture" aria-live="polite"></div>
           <div class="sim-last" id="sim-last" hidden></div>
@@ -1046,6 +1089,10 @@ App.Sim = (() => {
     setTimeout(_scrollLog, 0);
   }
 
+  function _sceneSvg(scn) {
+    const o = scn.scene || {};
+    return App.SimScene.svg(Object.assign({}, o, { patient: Object.assign({ eyes: 'closed', pale: true }, o.patient || {}) }));
+  }
   function _scrollLog() { const l = _el('sim-log'); if (l) l.scrollTop = l.scrollHeight; }
   function _renderLog() {
     const l = _el('sim-log'), c = _cur(); if (!l || !c) return;
@@ -1057,12 +1104,13 @@ App.Sim = (() => {
     m.style.display = _menuOpen ? 'block' : 'none';
     if (b) b.setAttribute('aria-expanded', _menuOpen ? 'true' : 'false');
     if (!_menuOpen) return;
-    const I = window.App.SimIntents;
+    const I = window.App.SimIntents, scn = _curScn();
     m.innerHTML = I.THEMES.map(t => {
-      const items = I.LIST.filter(i => i.theme === t.id);
+      const items = I.LIST.filter(i => i.theme === t.id && (!i.extra || (scn && scn.answers && scn.answers[i.id])));
+      if (!items.length) return '';
       return `<details data-th="${_esc(t.id)}" ${_openThemes[t.id] ? 'open' : ''} ontoggle="App.Sim.thToggle('${_esc(t.id)}', this.open)">
-        <summary>${_esc(t.label)}</summary>
-        ${items.map(i => `<button type="button" class="sim-q ${c.asked[i.id] ? 'done' : ''}" onclick="App.Sim.askMenu('${_esc(i.id)}')">${c.asked[i.id] ? '✓ ' : ''}${_esc(i.menu)}</button>`).join('')}
+        <summary>${_esc(_gen(t.label, scn))}</summary>
+        ${items.map(i => `<button type="button" class="sim-q ${c.asked[i.id] ? 'done' : ''}" onclick="App.Sim.askMenu('${_esc(i.id)}')">${c.asked[i.id] ? '✓ ' : ''}${_esc(_gen(i.menu, scn))}</button>`).join('')}
       </details>`;
     }).join('') + '<div class="sim-muted sim-small sim-menu-tip">Tu peux aussi taper ta propre phrase dans la zone de texte.</div>';
   }
@@ -1099,6 +1147,15 @@ App.Sim = (() => {
   }
   // L'instrument en main, ou le geste en cours : tout ce que la patiente et l'écran affichent
   function _lcd(d) {
+    if (d.pulse != null) {                      // saturomètre de doigt : SpO₂ en grand, pouls (bpm) dessous, comme sur l'appareil
+      return `<div class="sim-lcd oxi" role="img" aria-label="Écran du saturomètre : SpO₂ ${_esc(d.big)} ${_esc(d.unit)}, pouls ${_esc(d.pulse)} battements par minute">
+        <span class="sim-oxi-pwr" aria-hidden="true"></span>
+        <span class="sim-oxi-scr">
+          <span class="sim-oxi-row"><small>SpO₂</small><b>${_esc(d.big)}</b><i>${_esc(d.unit)}</i></span>
+          <span class="sim-oxi-row pr"><small>PR</small><b>${_esc(d.pulse)}</b><i>bpm <em aria-hidden="true">♥</em></i></span>
+        </span>
+        ${d.sub ? `<span class="sim-lcd-sub">${_esc(d.sub)}</span>` : ''}</div>`;
+    }
     return `<div class="sim-lcd" role="img" aria-label="Écran de l'appareil : ${_esc(d.big)} ${_esc(d.unit)}">${d.sub ? `<span class="sim-lcd-sub">${_esc(d.sub)}</span>` : ''}<span class="sim-lcd-v">${_esc(d.big)}</span><span class="sim-lcd-u">${_esc(d.unit)}</span></div>`;
   }
   function _scale(t) {
@@ -1107,7 +1164,7 @@ App.Sim = (() => {
       const face = ['😀', '🙂', '🙂', '😐', '😐', '😕', '😕', '😟', '😣', '😖', '😭'][i];
       cells += `<div class="sim-sc ${i === t.scale ? 'on' : ''}" style="--h:${Math.round(125 - i * 12.5)}"><span class="sim-sc-f">${face}</span><b>${i}</b>${i === t.scale ? '<span class="sim-sc-hand" aria-hidden="true">👆</span>' : ''}</div>`;
     }
-    return `<div class="sim-scale" role="img" aria-label="Échelle de douleur de 0 à 10 : la résidente montre ${t.scale}">${cells}</div><div class="sim-quote">${_esc(t.patientSays)}</div>`;
+    return `<div class="sim-scale" role="img" aria-label="Échelle de douleur de 0 à 10 : ${_gen('la résidente', _curScn())} montre ${t.scale}">${cells}</div><div class="sim-quote">${_esc(t.patientSays)}</div>`;
   }
   function _arm(t, placed) {
     const band = { epaule: [14, 36], bon: [84, 108], coude: [112, 138] };
@@ -1123,7 +1180,7 @@ App.Sim = (() => {
   function _gesture() {                 // contenu du panneau « geste »
     const c = _cur(), scn = _curScn(); if (!c || !scn) return '';
     const key = _G ? _G.tool : _tool; const t = scn.tools[key];
-    const head = `<div class="sim-g-head"><span class="sim-g-ico">${t.icon}</span><div><b>${_G ? _esc(t.label) : 'Dans ta main : ' + _esc(t.label)}</b>${_G ? '' : '<div class="sim-muted sim-small">Touche sur la patiente l\'endroit où tu l\'utilises.</div>'}</div><button type="button" class="btn btn-ghost btn-sm" onclick="App.Sim.dropTool()">${_G && _G.phase === 'running' ? 'Annuler' : 'Reposer'}</button></div>`;
+    const head = `<div class="sim-g-head"><span class="sim-g-ico">${t.icon}</span><div><b>${_G ? _esc(t.label) : 'Dans ta main : ' + _esc(t.label)}</b>${_G ? '' : `<div class="sim-muted sim-small">${_esc(_gen("Touche sur la patiente l'endroit où tu l'utilises.", scn))}</div>`}</div><button type="button" class="btn btn-ghost btn-sm" onclick="App.Sim.dropTool()">${_G && _G.phase === 'running' ? 'Annuler' : 'Reposer'}</button></div>`;
     const warn = _hint ? `<div class="sim-g-warn" role="alert">${_esc(_hint)}</div>` : '';
     if (!_G) return head + warn;
     const g = _G;
@@ -1163,7 +1220,7 @@ App.Sim = (() => {
       ? '<input id="sim-in-1" type="text" inputmode="numeric" autocomplete="off" aria-label="Pression systolique" placeholder="0"><span class="sim-slash">/</span><input id="sim-in-2" type="text" inputmode="numeric" autocomplete="off" aria-label="Pression diastolique" placeholder="0">'
       : `<input id="sim-in-1" type="text" inputmode="decimal" autocomplete="off" aria-label="${_esc(inp.label)}" placeholder="0">`;
     const lbl = t.kind === 'count' ? `Calcule la fréquence par minute (${g.n} × ${t.factor})` : `${_esc(inp.label)} : note la valeur lue`;
-    return head + `<form class="sim-readform" onsubmit="return App.Sim.gSubmit(event)">${disp}${warn}
+    return head + `<form class="sim-readform" onsubmit="return App.Sim.gSubmit(event)">${disp}${t.display && t.display.note ? `<p class="sim-muted sim-small">${_esc(t.display.note)}</p>` : ''}${warn}
       <label class="sim-readlbl" for="sim-in-1">${lbl}</label>
       <div class="sim-readrow">${inputs}<span class="sim-unit">${_esc(inp.unit)}</span><button type="submit" class="btn btn-primary">✎ Noter dans le recueil</button></div></form>`;
   }
@@ -1183,7 +1240,7 @@ App.Sim = (() => {
       g.classList.toggle('seen', !!c.seenObj[id]);
       g.classList.toggle('held', !!tk && tk === _tool);
     });
-    const zb = _el('sim-zoom'); if (zb) zb.textContent = _zoom === 'patient' ? '🏠 Vue de la chambre' : '🔍 Zoom sur la patiente';
+    const zb = _el('sim-zoom'); if (zb) zb.textContent = _zoom === 'patient' ? '🏠 Vue de la chambre' : '🔍 Zoom sur ' + (_male(scn) ? 'le patient' : 'la patiente');
   }
   function _setZoom(mode, auto) {
     _zoom = mode; _autoZoom = !!auto && mode === 'patient';
@@ -1229,12 +1286,12 @@ App.Sim = (() => {
       if (!fs.length) return '';
       const body = got.length
         ? got.map(k => { const f = scn.facts[k];
-            return `<div class="sim-fact"><span class="sim-fact-k">${_esc(f.label)}</span><span class="sim-fact-v">${_esc(f.text)}</span><span class="sim-src">${_esc(KIND_LABEL[f.kind] || '')}</span></div>`; }).join('')
+            return `<div class="sim-fact"><span class="sim-fact-k">${_esc(f.label)}</span><span class="sim-fact-v">${_esc(f.text)}</span><span class="sim-src">${_esc(_gen(KIND_LABEL[f.kind] || '', scn))}</span></div>`; }).join('')
         : '<div class="sim-fact-none">Pas encore renseigné</div>';
       return `<div class="sim-sec"><div class="sim-sec-h">${_esc(sname)}</div>${body}</div>`;
     }).join('');
     return `<h3 class="sim-h">📋 Recueil de données <span class="sim-count">${_countFound()} notée${_countFound() > 1 ? 's' : ''}</span></h3>
-      <p class="sim-muted sim-small">Tout ce que tu apprends s'ajoute ici. « Dit par la résidente » = ce qu'elle ressent ; « Mesure » et « Observation » = ce que tu constates toi-même.</p>${rows}`;
+      <p class="sim-muted sim-small">${_esc(_gen("Tout ce que tu apprends s'ajoute ici. « Dit par la résidente » = ce qu'elle ressent ; « Mesure » et « Observation » = ce que tu constates toi-même.", scn))}</p>${rows}`;
   }
   function _renderTabs() {
     const tb = _el('sim-tabbar'), c = _cur(); if (!tb || !c) return;
@@ -1256,10 +1313,10 @@ App.Sim = (() => {
 
   // ── Écran : bilan ──
   function _tips(R) {
-    const t = [];
+    const scn = _curScn(), t = [];
     if (R.recueil.pts / R.recueil.max < 0.7) t.push("Recueil : reprends les informations clés que tu n'as pas trouvées (liste plus bas) et la façon de les obtenir.");
     if (R.gestes.pts / R.gestes.max < 0.7) t.push('Gestes : revois ceux marqués ✗ ou ◐ dans la grille (hygiène des mains, présentation, accord, identité).');
-    if (R.niveau.pts < 10 || R.actions.pts < 10) t.push("Décision : l'étudiant alerte vite, sécurise la résidente et ne donne aucun médicament sans l'infirmière.");
+    if (R.niveau.pts < 10 || R.actions.pts < 10) t.push(_gen("Décision : l'étudiant alerte vite, sécurise la résidente et ne donne aucun médicament sans l'infirmière.", scn));
     if (R.appel.pts < 12) t.push("Appel : entraîne-toi à dire le SAED à voix haute en moins d'une minute, avec les valeurs chiffrées et ce que tu demandes.");
     if (R.trans.pts < 12) t.push("Transmission : une cible courte, puis des données chiffrées comparées à l'habituel, des actions, un résultat et la suite.");
     return t;
@@ -1318,12 +1375,11 @@ App.Sim = (() => {
     const lv = _levelOf(R.level.xp), lvName = L => (LEVELS[L - 1] || LEVELS[0]).name;
     const word = R.total >= 90 ? 'Excellent' : R.total >= 75 ? 'Très bien' : R.total >= 60 ? 'Bien' : R.total >= 40 ? 'À consolider' : 'À reprendre';
     const dec = scn.decision, chosen = dec.levels.find(l => l.id === c.dec.level);
-    const unsafe = R.unsafe.length ? `<div class="sim-fb danger" role="alert"><b>⚠ Sécurité de la résidente${R.capped ? ' : score plafonné à 50/100' : ''}</b><ul class="sim-ul">${R.unsafe.map(u => `<li>${_esc(u)}</li>`).join('')}</ul>
-      <p>En situation réelle, ces choix mettent la résidente en danger. C'est la règle n° 1 : on ne prend jamais de risque pour elle, même dans un exercice.</p></div>` : '';
+    const unsafe = R.unsafe.length ? `<div class="sim-fb danger" role="alert"><b>⚠ Sécurité ${_male(scn) ? 'du résident' : 'de la résidente'}${R.capped ? ' : score plafonné à 50/100' : ''}</b><ul class="sim-ul">${R.unsafe.map(u => `<li>${_esc(u)}</li>`).join('')}</ul>
+      <p>En situation réelle, ces choix mettent ${_male(scn) ? 'le résident' : 'la résidente'} en danger. C'est la règle n° 1 : on ne prend jamais de risque pour elle, même dans un exercice.</p></div>` : '';
     const earned = R.earned.length ? `<h3 class="sim-h">🏅 Badges de cette partie</h3><div class="sim-card"><div class="sim-bdg-grid">${R.earned.map(id => { const bd = BADGES.find(x => x.id === id); return `<div class="sim-bdg on${R.newBadges.indexOf(id) >= 0 ? ' new' : ''}"><span class="sim-bdg-i">${bd.ico}</span><b>${_esc(bd.name)}</b>${R.newBadges.indexOf(id) >= 0 ? '<em class="sim-new">Nouveau</em>' : ''}<span class="sim-small sim-muted">${_esc(bd.desc)}</span></div>`; }).join('')}</div></div>` : '';
-    const allergyNote = c.found.q_allerg_pen
-      ? (R.allergySaid ? '✓ Tu as transmis l\'allergie possible à la pénicilline, absente du dossier : c\'est exactement le réflexe attendu.' : '⚠ Tu avais appris que Mme Martin ne supportait peut-être pas la pénicilline, mais tu ne l\'as pas transmis à Sophie. Une information discordante se transmet toujours : elle sera vérifiée par l\'équipe.')
-      : '⚠ Tu n\'as pas demandé à Mme Martin si elle était allergique à un médicament. Elle t\'aurait parlé de la pénicilline, absente du dossier : toujours vérifier les allergies.';
+    const dsc = scn.discordance;
+    const allergyNote = !dsc ? '' : (c.found[dsc.fact] ? (R.allergySaid ? dsc.said : dsc.heard) : dsc.missed);
     const tips = _tips(R);
     root.innerHTML = `<div class="sim-wrap">${head}
       <div class="sim-card sim-result">
@@ -1352,10 +1408,10 @@ App.Sim = (() => {
       <div class="sim-card sim-retain">${_esc(scn.alertSummary)}</div>
       <h3 class="sim-h">Ta décision</h3>
       <div class="sim-card">${chosen ? `<div class="sim-fb ${chosen.verdict}"><b>${_esc(chosen.label)}</b><p>${_esc(chosen.feedback)}</p></div>` : ''}
-        <details class="sim-why"><summary>Voir le détail de tes choix en attendant Sophie</summary><div class="sim-revs">${_actionsReview(c, scn)}</div></details></div>
-      <h3 class="sim-h">Ton appel à Sophie</h3>
+        <details class="sim-why"><summary>Voir le détail de tes choix en attendant ${_esc(scn.call.who)}</summary><div class="sim-revs">${_actionsReview(c, scn)}</div></details></div>
+      <h3 class="sim-h">Ton appel à ${_esc(scn.call.who)}</h3>
       <div class="sim-card">${_corrHtml(_grade(scn.call.sections, c.saed.txt))}
-        <p class="sim-small ${R.allergySaid ? '' : 'sim-warn'}">${allergyNote}</p>
+        ${allergyNote ? `<p class="sim-small ${R.allergySaid ? '' : 'sim-warn'}">${_esc(allergyNote)}</p>` : ''}
         <details class="sim-why"><summary>Voir un exemple de message SAED</summary><div class="sim-model">${['S', 'A', 'E', 'D'].map(k => `<p><b>${k}</b> · ${_esc(scn.call.model[k])}</p>`).join('')}</div></details>
         ${c.ai && c.ai.saed && c.ai.saed.state === 'ok' ? _aiBlock('saed', c) : ''}</div>
       <h3 class="sim-h">Ta transmission écrite</h3>

@@ -1946,6 +1946,20 @@ body.dark .sim-lcd { box-shadow: inset 0 0 16px rgba(0,0,0,.55), 0 0 0 4px #4755
 .sim-lcd-sub { width: 100%; text-align: center; font-size: .66rem; opacity: .8; letter-spacing: .06em; text-transform: uppercase; }
 .sim-lcd-v { font-size: 2.5rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(157,255,207,.5); }
 .sim-lcd-u { font-size: 1rem; opacity: .85; }
+/* Saturomètre de doigt (référence : OXY-ONE) : corps bleu, écran gris, SpO₂ en grand, pouls en bpm dessous */
+.sim-lcd.oxi { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 14px; max-width: 300px; padding: 16px 18px 12px; border-radius: 26px;
+  background: linear-gradient(160deg, #2e63a0, #1a3d6e); color: #101417; box-shadow: 0 6px 14px rgba(20,40,80,.28), inset 0 2px 0 rgba(255,255,255,.2); font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+body.dark .sim-lcd.oxi { box-shadow: 0 0 0 3px #475569, inset 0 2px 0 rgba(255,255,255,.18); }
+.sim-oxi-pwr { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(255,255,255,.4); position: relative; }
+.sim-oxi-pwr::after { content: ''; position: absolute; left: 50%; top: 3px; width: 3px; height: 10px; border-radius: 2px; background: rgba(255,255,255,.65); transform: translateX(-50%); }
+.sim-oxi-scr { display: block; background: #d3dad5; border: 5px solid #0c0f10; border-radius: 12px; padding: 6px 12px 8px; }
+.sim-oxi-row { display: flex; align-items: baseline; gap: 8px; }
+.sim-oxi-row small { font-size: .62rem; font-weight: 700; letter-spacing: .04em; min-width: 2.4em; }
+.sim-oxi-row b { font-size: 2.3rem; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.sim-oxi-row i { font-style: normal; font-size: .8rem; font-weight: 700; margin-left: auto; }
+.sim-oxi-row.pr b { font-size: 1.7rem; }
+.sim-oxi-row em { font-style: normal; color: #b4232a; }
+.sim-lcd.oxi .sim-lcd-sub { grid-column: 1 / -1; color: rgba(255,255,255,.85); }
 
 .sim-readform { display: block; }
 .sim-readlbl { display: block; font-size: .82rem; font-weight: 700; margin: 8px 0 4px; color: var(--gray-700); }
@@ -2179,4 +2193,109 @@ body.dark .sim-xp-n { color: #0f172a; }
   .sim-result { flex-direction: column; align-items: flex-start; gap: 8px; }
   .sim-result-t { width: 100%; }
   .sim-bdg-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ══ PHARMACO (entraînement) ═════════════════════════════════════
+   Tout est préfixé .ph- ; variables locales redéfinies en mode sombre. */
+#pharma-root {
+  --ph-card:#ffffff; --ph-soft:#f3f4f6; --ph-line:#e5e7eb;
+  --ph-ok:#15803d; --ph-okbg:#dcfce7; --ph-bad:#b91c1c; --ph-badbg:#fee2e2; --ph-warn:#b45309; --ph-warnbg:#fef3c7; --ph-sel:#dbeafe;
+}
+body.dark #pharma-root {
+  --ph-card:#1e293b; --ph-soft:#162032; --ph-line:#334155;
+  --ph-ok:#4ade80; --ph-okbg:#14532d; --ph-bad:#fca5a5; --ph-badbg:#7f1d1d; --ph-warn:#fbbf24; --ph-warnbg:#5a3a0b; --ph-sel:#1e3a5f;
+}
+#pharma-root .ph-wrap { max-width: 760px; margin: 0 auto; padding: 4px 4px 48px; color: var(--gray-900); }
+.ph-top { margin-bottom: 10px; }
+.ph-top.ph-row { display: flex; align-items: center; gap: 12px; }
+.ph-title { font-size: 1.4rem; font-weight: 800; margin: 4px 0 8px; }
+.ph-lead { color: var(--gray-600); font-size: .92rem; line-height: 1.55; margin: 0 0 14px; }
+.ph-h { font-size: .98rem; font-weight: 800; margin: 16px 0 6px; }
+.ph-p { font-size: .92rem; line-height: 1.6; margin: 4px 0 8px; }
+.ph-ul { margin: 4px 0 8px; padding-left: 20px; font-size: .9rem; line-height: 1.6; }
+.ph-ul li { margin: 5px 0; }
+.ph-muted { color: var(--gray-500); }
+.ph-small { font-size: .78rem; line-height: 1.45; }
+.ph-row { display: flex; align-items: center; }
+.ph-gap { gap: 10px; }
+.ph-wrapr { flex-wrap: wrap; }
+.ph-ok-t { color: var(--ph-ok); } .ph-bad-t { color: var(--ph-bad); } .ph-warn-t { color: var(--ph-warn); }
+.ph-big { padding: 12px 20px; font-size: .98rem; min-height: 46px; }
+#pharma-root .btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+.ph-card { background: var(--ph-card); border: 1px solid var(--ph-line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; }
+.ph-th-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
+.ph-ico { font-size: 1.9rem; line-height: 1; }
+.ph-th-name { font-weight: 800; font-size: 1.02rem; }
+.ph-card .ph-row { margin-top: 10px; }
+.ph-note { background: var(--ph-soft); border: 1px dashed var(--ph-line); border-radius: 10px; padding: 10px 12px; font-size: .8rem; line-height: 1.55; color: var(--gray-600); margin: 16px 0 0; }
+
+.ph-bar { height: 7px; background: var(--ph-line); border-radius: 99px; overflow: hidden; margin: 2px 0 6px; flex: 1; }
+.ph-bar i { display: block; height: 100%; background: var(--primary); border-radius: 99px; transition: width .25s; }
+.ph-bar-ok i { background: var(--ph-ok); }
+.ph-hist { display: grid; grid-template-columns: 90px 1fr auto; gap: 10px; font-size: .82rem; color: var(--gray-600); padding: 3px 0; }
+@media (max-width: 560px) { .ph-hist { grid-template-columns: 76px 1fr auto; } }
+
+/* Série */
+.ph-prog { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ph-score { font-weight: 800; color: var(--ph-ok); white-space: nowrap; }
+.ph-q { padding: 16px; }
+.ph-tag { font-size: .7rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 8px; }
+.ph-qtext { font-size: 1.08rem; font-weight: 700; line-height: 1.45; margin-bottom: 14px; }
+.ph-opts { display: flex; flex-direction: column; gap: 8px; }
+.ph-opt { display: flex; gap: 10px; align-items: flex-start; text-align: left; width: 100%; font: inherit; font-size: .95rem; line-height: 1.4;
+  color: var(--gray-900); background: var(--ph-card); border: 2px solid var(--ph-line); border-radius: 10px; padding: 11px 12px; min-height: 46px; cursor: pointer; transition: border-color .12s, background .12s; }
+.ph-opt:hover:not([disabled]) { border-color: var(--primary); background: var(--ph-soft); }
+.ph-opt[disabled] { cursor: default; }
+.ph-key { flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px; background: var(--ph-soft); border: 1px solid var(--ph-line); font-size: .72rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; color: var(--gray-600); }
+.ph-right { border-color: var(--ph-ok) !important; background: var(--ph-okbg) !important; }
+.ph-wrong { border-color: var(--ph-bad) !important; background: var(--ph-badbg) !important; }
+.ph-dim { opacity: .55; }
+.ph-in { width: 100%; font: inherit; font-size: 1rem; color: var(--gray-900); background: var(--ph-card); border: 2px solid var(--ph-line); border-radius: 10px; padding: 10px 12px; min-height: 44px; outline: none; }
+.ph-in:focus { border-color: var(--primary); }
+.ph-row .ph-in { flex: 1; }
+.ph-in-ok { border-color: var(--ph-ok); background: var(--ph-okbg); }
+.ph-in-bad { border-color: var(--ph-bad); background: var(--ph-badbg); }
+.ph-asc { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ph-col { display: flex; flex-direction: column; gap: 8px; }
+.ph-pair { font: inherit; font-size: .9rem; line-height: 1.35; text-align: left; color: var(--gray-900); background: var(--ph-card); border: 2px solid var(--ph-line); border-radius: 10px; padding: 10px 11px; min-height: 46px; cursor: pointer; overflow-wrap: anywhere; }
+.ph-pair:hover:not([disabled]) { border-color: var(--primary); }
+.ph-pair.ph-sel { border-color: var(--primary); background: var(--ph-sel); }
+.ph-pair[disabled] { cursor: default; }
+.ph-fb { border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; border: 1px solid; }
+.ph-fb-ok { background: var(--ph-okbg); border-color: var(--ph-ok); }
+.ph-fb-bad { background: var(--ph-badbg); border-color: var(--ph-bad); }
+.ph-fb-h { font-weight: 800; font-size: 1rem; margin-bottom: 4px; }
+.ph-fb-ok .ph-fb-h { color: var(--ph-ok); } .ph-fb-bad .ph-fb-h { color: var(--ph-bad); }
+.ph-fb-why { font-size: .9rem; line-height: 1.55; margin: 6px 0; }
+.ph-quit { background: var(--ph-warnbg); border: 1px solid var(--ph-warn); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: .86rem; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* Fiches, tableaux */
+.ph-tblw { overflow-x: auto; margin: 8px 0 10px; border: 1px solid var(--ph-line); border-radius: 10px; -webkit-overflow-scrolling: touch; }
+.ph-tbl { border-collapse: collapse; width: 100%; font-size: .84rem; line-height: 1.4; min-width: 480px; }
+.ph-tbl th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--gray-500); background: var(--ph-soft); padding: 8px 10px; white-space: nowrap; }
+.ph-tbl td { padding: 8px 10px; border-top: 1px solid var(--ph-line); vertical-align: top; }
+.ph-td-k { font-weight: 800; white-space: nowrap; }
+
+/* Bilan */
+.ph-center { text-align: center; }
+.ph-big-score { font-size: 2.6rem; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ph-pct { font-size: 1.2rem; font-weight: 800; margin: 2px 0 6px; }
+.ph-err { padding: 10px 0; border-top: 1px solid var(--ph-line); }
+.ph-err:first-child { border-top: none; padding-top: 0; }
+.ph-err-q { font-weight: 700; font-size: .92rem; margin-bottom: 4px; }
+@media (max-width: 520px) {
+  /* tableaux : chaque ligne devient une petite fiche (rien n'est caché hors écran) */
+  .ph-tblw { overflow-x: visible; border: none; }
+  .ph-tbl { min-width: 0; font-size: .86rem; display: block; }
+  .ph-tbl thead { display: none; }
+  .ph-tbl tbody { display: block; }
+  .ph-tbl tr { display: block; border: 1px solid var(--ph-line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; background: var(--ph-card); }
+  .ph-tbl td { display: block; border: none; padding: 3px 0; }
+  .ph-tbl td::before { content: attr(data-l); display: block; font-size: .64rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--gray-500); }
+  .ph-tbl td.ph-td-k::before { display: none; }
+  .ph-tbl td.ph-td-k { white-space: normal; font-size: .95rem; margin-bottom: 2px; }
+  .ph-asc { gap: 8px; }
+  .ph-qtext { font-size: 1rem; }
+  .ph-row.ph-wrapr .btn { flex: 1 1 100%; }
 }

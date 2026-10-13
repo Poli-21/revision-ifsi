@@ -225,6 +225,10 @@ App.Sync = (() => {
           english:  Math.max(mergedLog[date].english||0,  entry.english||0),
           englishSecs: Math.max(mergedLog[date].englishSecs||0, entry.englishSecs||0),
           simSecs:  Math.max(mergedLog[date].simSecs||0,  entry.simSecs||0),
+          trainSecs:  Math.max(mergedLog[date].trainSecs||0,  entry.trainSecs||0),
+          gameSecs:   Math.max(mergedLog[date].gameSecs||0,   entry.gameSecs||0),
+          orthoSecs:  Math.max(mergedLog[date].orthoSecs||0,  entry.orthoSecs||0),
+          pharmaSecs: Math.max(mergedLog[date].pharmaSecs||0, entry.pharmaSecs||0),
         };
       });
 

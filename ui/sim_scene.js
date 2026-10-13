@@ -32,6 +32,7 @@ App.SimScene = (() => {
   };
 
   let defs, uid, out;
+  let CLK = { h: 7, m: 40 };
   const grad = (c1, c2, horizontal) => {            // c1 en haut (ou à gauche), c2 en bas (ou à droite)
     const id = 'ss' + (uid++);
     defs.push(`<linearGradient id="${id}" x1="0" y1="0" x2="${horizontal ? 1 : 0}" y2="${horizontal ? 0 : 1}"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient>`);
@@ -116,10 +117,12 @@ App.SimScene = (() => {
     add(`<g transform="${mWallA(-0.02)}">${cur(3.85, 4.75)}${cur(6.7, 7.1 + 0.0)}
       <rect x="3.7" y="4.02" width="3.6" height="0.12" rx="0.06" fill="#d8b97c"/>
       <ellipse cx="4.3" cy="2.2" rx="0.2" ry="0.1" fill="#f4d99a" opacity=".0"/></g>`);
-    // Horloge : 7 h 40 (l'heure du scénario)
+    // Horloge : l'heure du scénario (7 h 40 par défaut)
     const c = P(2.7, 0, 3.2);
+    const hand = (deg, len) => { const a = deg * Math.PI / 180; return [r1(len * Math.sin(a)), r1(-len * Math.cos(a))]; };
+    const hh = hand(((CLK.h % 12) + CLK.m / 60) * 30, 8), mm = hand(CLK.m * 6, 12);
     add(`<g transform="translate(${r1(c[0])} ${r1(c[1])})">${ell(0, 2, 17, 17, 'rgba(60,40,30,.18)')}<circle r="17" fill="#fff9ec" stroke="#f0d9a8" stroke-width="4"/>
-      <line x1="0" y1="0" x2="-5" y2="-7" stroke="#3b4a5a" stroke-width="2.6" stroke-linecap="round"/><line x1="0" y1="0" x2="7" y2="6.5" stroke="#3b4a5a" stroke-width="2" stroke-linecap="round"/><circle r="1.8" fill="#3b4a5a"/></g>`);
+      <line x1="0" y1="0" x2="${hh[0]}" y2="${hh[1]}" stroke="#3b4a5a" stroke-width="2.8" stroke-linecap="round"/><line x1="0" y1="0" x2="${mm[0]}" y2="${mm[1]}" stroke="#3b4a5a" stroke-width="2" stroke-linecap="round"/><circle r="1.8" fill="#3b4a5a"/></g>`);
   }
   function door() {
     add(`<g transform="${mWallB(0)}">
@@ -232,14 +235,15 @@ App.SimScene = (() => {
 
   function patientBody(state) {
     // gilet menthe (buste) puis couverture ; la tête repose sur l'oreiller
-    rbox(3.78, 1.2, 0.8, 1.38, 0.95, 0.3, C.mint, { rim: 6 });
+    const gown = state.gown || C.mint;
+    rbox(3.78, 1.2, 0.8, 1.38, 0.95, 0.3, gown, { rim: 6 });
     // couverture crème avec revers
     rbox(3.4, 1.95, 0.8, 1.75, 2.15, 0.34, C.cream, { rim: 6 });
     rbox(3.4, 1.95, 0.8, 1.75, 0.4, 0.37, '#fff4d6', { rim: 6, top: '#fffaea' });
     // relief du corps sous la couverture
     rbox(3.88, 2.6, 1.1, 1.15, 1.35, 0.08, '#f0dcb4', { rim: 5, top: '#f6e6c4' });
     // bras (côté visible) : manche menthe, avant-bras, main, bracelet
-    rbox(4.98, 1.28, 0.98, 0.34, 0.8, 0.3, C.mint, { rim: 5 });
+    rbox(4.98, 1.28, 0.98, 0.34, 0.8, 0.3, gown, { rim: 5 });
     rbox(5.0, 2.05, 1.02, 0.3, 0.78, 0.24, state.pale ? C.skinPale : C.skin, { rim: 5 });
     const h = P(5.15, 2.98, 1.12), w = P(5.15, 2.72, 1.18);
     add(`${ell(h[0], h[1], 11, 9, rad(lt(C.skin, .3), C.skin), 'stroke="#f3c9aa" stroke-width="3"')}
@@ -247,21 +251,30 @@ App.SimScene = (() => {
     // tête
     const c = P(4.43, 0.96, 1.18);
     const rot = 60, eyes = state.eyes || 'closed';
+    const hairC = state.hair || ['#f4f6f9', '#cfd5de'];
+    const mouth = state.droop ? 'M-6.6 14.6 Q0 12.2 6.6 7.4' : (state.grimace ? 'M-5 13.4 Q0 9.4 5 13.4' : 'M-4.5 11 Q0 13.2 4.5 11');
+    const brows = state.grimace
+      ? '<path d="M-12 -2.6 Q-8 -8 -4 -6.6" fill="none" stroke="#9aa0ab" stroke-width="1.8" stroke-linecap="round"/><path d="M4 -6.6 Q8 -8 12 -2.6" fill="none" stroke="#9aa0ab" stroke-width="1.8" stroke-linecap="round"/>'
+      : '<path d="M-12 -4.5 Q-8 -7 -4 -5" fill="none" stroke="#c4c9d2" stroke-width="1.6" stroke-linecap="round"/><path d="M4 -5 Q8 -7 12 -4.5" fill="none" stroke="#c4c9d2" stroke-width="1.6" stroke-linecap="round"/>';
+    const sweat = state.sweat ? '<path d="M-15 -11 q2.4 4 0 6.4 q-2.4 -2.4 0 -6.4z" fill="#8fd0f5"/><path d="M13 -13 q2.4 4 0 6.4 q-2.4 -2.4 0 -6.4z" fill="#8fd0f5"/><path d="M-3 -17 q2 3.4 0 5.4 q-2 -2 0 -5.4z" fill="#8fd0f5"/>' : '';
     const eye = (x) => eyes === 'open'
       ? `<ellipse cx="${x}" cy="0" rx="2.6" ry="3" fill="#3b2f45"/><circle cx="${x + 0.9}" cy="-1" r="0.9" fill="#fff"/>`
       : `<path d="M${x - 4} -0.5 Q${x} 3.2 ${x + 4} -0.5" fill="none" stroke="#5a4150" stroke-width="2" stroke-linecap="round"/>`;
     add(`<g transform="translate(${r1(c[0])} ${r1(c[1])}) rotate(${rot}) scale(1.14)">
       ${ell(2, 13, 25, 10, 'rgba(70,52,40,.16)')}
-      ${ell(0, -9, 24, 19, rad('#f4f6f9', '#cfd5de'), 'stroke="#dfe3ea" stroke-width="2"')}
-      <circle cx="0" cy="-27" r="9" fill="${rad('#f4f6f9', '#c6ccd6')}" stroke="#dfe3ea" stroke-width="2"/>
+      ${ell(0, -9, 24, 19, rad(hairC[0], hairC[1]), 'stroke="#dfe3ea" stroke-width="2"')}
+      ${state.male ? '' : `<circle cx="0" cy="-27" r="9" fill="${rad('#f4f6f9', '#c6ccd6')}" stroke="#dfe3ea" stroke-width="2"/>`}
       ${ell(0, 0, 21, 21, rad(lt(state.pale ? C.skinPale : C.skin, .35), state.pale ? '#e6bfa6' : '#eeb894'), 'stroke="#f3c9aa" stroke-width="1.5"')}
-      <path d="M-20 -6 Q-12 -22 0 -21 Q12 -22 20 -6 Q9 -13 0 -12 Q-9 -13 -20 -6Z" fill="${rad('#f4f6f9', '#cfd5de')}"/>
+      <path d="M-20 -6 Q-12 -22 0 -21 Q12 -22 20 -6 Q9 -13 0 -12 Q-9 -13 -20 -6Z" fill="${rad(hairC[0], hairC[1])}"/>
       <ellipse cx="-21" cy="1" rx="3.6" ry="5" fill="${C.skin}"/><ellipse cx="21" cy="1" rx="3.6" ry="5" fill="${C.skin}"/>
-      <path d="M-12 -4.5 Q-8 -7 -4 -5" fill="none" stroke="#c4c9d2" stroke-width="1.6" stroke-linecap="round"/><path d="M4 -5 Q8 -7 12 -4.5" fill="none" stroke="#c4c9d2" stroke-width="1.6" stroke-linecap="round"/>
+      ${brows}
       ${eye(-8)}${eye(8)}
       ${ell(-13, 7, 4.6, 3.4, C.blush, 'opacity=".42"')}${ell(13, 7, 4.6, 3.4, C.blush, 'opacity=".42"')}
-      <path d="M-4.5 11 Q0 13.2 4.5 11" fill="none" stroke="#b9776f" stroke-width="2" stroke-linecap="round"/>
+      <path d="${mouth}" fill="none" stroke="#b9776f" stroke-width="2" stroke-linecap="round"/>
+      ${state.male ? '<path d="M-6 8.6 Q0 6.4 6 8.6" fill="none" stroke="#cfd5de" stroke-width="2.4" stroke-linecap="round"/>' : ''}
       <path d="M-1 3 Q0 5 1 3" fill="none" stroke="#e0a98b" stroke-width="1.6" stroke-linecap="round"/>
+      ${sweat}
+      ${state.droop ? '<path d="M-7 16 q2.3 4 0 5.8 q-2.3 -1.8 0 -5.8z" fill="#bfe4f6" stroke="#8fd0f5" stroke-width=".6"/>' : ''}
     </g>`);
   }
 
@@ -289,7 +302,7 @@ App.SimScene = (() => {
     add(`<g data-hot="chaussons">${one(2.3, 3.95, -10)}${one(2.85, 4.2, 6)}</g>`);
   }
 
-  function trolley() {
+  function trolley(opts) {
     shadow(6.0, 3.1, 7.3, 4.8, 0.2, 2);
     [[6.25, 3.3], [6.95, 3.3], [6.25, 4.45], [6.95, 4.45]].forEach(([x, y]) => rbox(x, y, 0.1, 0.06, 0.06, 1.0, '#b8c4cc', { rim: 3 }));
     rbox(6.2, 3.25, 0.38, 0.88, 1.3, 0.07, '#dfe8ee', { rim: 4 });
@@ -299,8 +312,13 @@ App.SimScene = (() => {
     rbox(6.27, 3.32, 1.31, 0.2, 0.16, 0.1, '#6cb7e6', { rim: 3, id: 'tool-thermometre' });
     rbox(6.62, 3.3, 1.15, 0.4, 0.4, 0.22, '#ffffff', { rim: 4, id: 'tool-tension' });
     add(`<g transform="${mFloor(1.37)}"><rect x="6.68" y="3.36" width="0.22" height="0.14" rx="0.02" fill="#4a5f78"/><rect x="6.72" y="3.4" width="0.14" height="0.07" rx="0.01" fill="#8ee0b0"/></g>`);
-    rbox(6.3, 3.95, 1.15, 0.3, 0.26, 0.1, '#9fd1f2', { rim: 4, id: 'tool-saturometre' });
+    rbox(6.3, 3.95, 1.15, 0.3, 0.26, 0.1, '#2f5f9e', { rim: 4, id: 'tool-saturometre' });
+    rbox(6.36, 3.99, 1.25, 0.18, 0.14, 0.02, '#d3dad5', { rim: 2, id: 'tool-saturometre' });
     rbox(6.7, 4.3, 1.15, 0.24, 0.24, 0.1, '#f7d98c', { rim: 4, id: 'tool-montre' });
+    if (opts && opts.glucometre) {                     // glycémie capillaire : lecteur + stylo piqueur
+      rbox(6.74, 3.82, 1.15, 0.26, 0.3, 0.1, '#e9f6ee', { rim: 4, id: 'tool-glucometre' });
+      rbox(6.82, 3.9, 1.25, 0.1, 0.12, 0.05, '#5fbf8a', { rim: 2, id: 'tool-glucometre' });
+    }
   }
 
   function plant() {
@@ -316,9 +334,10 @@ App.SimScene = (() => {
   function svg(opts) {
     opts = opts || {};
     const state = Object.assign({ eyes: 'closed', pale: true }, opts.patient || {});
+    CLK = Object.assign({ h: 7, m: 40 }, opts.clock || {});
     defs = []; uid = 0; out = [];
     floor(); walls(); windowAndCurtains(); door(); picture(); dispenser();
-    wardrobe(); mat(); overbedTable(); slippers(); bed(state); bedsideTable(); plant(); walker(); trolley();
+    wardrobe(); mat(); overbedTable(); slippers(); bed(state); bedsideTable(); plant(); walker(); trolley(opts);
     // Zones cliquables (au-dessus de tout)
     const hs = [
       hot('patiente', 'Observer la résidente', 4.4, 1.9, 1.6, 30),
@@ -333,7 +352,8 @@ App.SimScene = (() => {
       hot('tool-thermometre', 'Thermomètre', 6.37, 3.54, 1.35, 10, 2),
       hot('tool-tension', 'Tensiomètre', 6.82, 3.5, 1.45, 11, 2),
       hot('tool-saturometre', 'Saturomètre', 6.45, 4.08, 1.3, 10, 2),
-      hot('tool-montre', 'Montre', 6.82, 4.42, 1.3, 9, 2)
+      hot('tool-montre', 'Montre', 6.82, 4.42, 1.3, 9, 2),
+      opts.glucometre ? hot('tool-glucometre', 'Lecteur de glycémie', 6.87, 3.98, 1.34, 9, 2) : ''
     ].join('');
     const spots = [
       hot('zone-tete', 'Front et oreille', 4.45, 0.98, 1.6, 19, 1),
@@ -345,7 +365,7 @@ App.SimScene = (() => {
     const f = '<filter id="ssb1" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3"/></filter>' +
       '<filter id="ssb2" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>' +
       '<filter id="ssb3" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="8"/></filter>';
-    return `<svg class="sim-scene-svg" viewBox="${opts.viewBox || VB}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Chambre 12 : Mme Martin est dans son lit">
+    return `<svg class="sim-scene-svg" viewBox="${opts.viewBox || VB}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${(opts.label || 'Chambre 12 : Mme Martin est dans son lit').replace(/"/g, '&quot;')}">
       <defs>${f}${defs.join('')}</defs>
       ${out.join('')}
       <g class="sim-hots">${hs}${toolHs}</g><g class="sim-spots">${spots}</g>

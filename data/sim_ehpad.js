@@ -272,7 +272,7 @@ App.SimScenarios = [
     saturometre: { label: 'Saturomètre', icon: '🔴', zone: 'zone-doigt', kind: 'wait', seconds: 5, fact: 'm_spo2',
       where: 'Le saturomètre se pose au bout d\'un doigt.',
       start: 'Tu poses la pince du saturomètre sur le doigt de Mme Martin.',
-      display: { big: '94', unit: '%', sub: 'SpO₂, air ambiant' },
+      display: { big: '94', unit: '%', sub: 'SpO₂ et pouls, air ambiant', pulse: 104, note: "Note la saturation (SpO₂, en %), pas le pouls (PR). Le pouls affiché n'est qu'une indication : on prend quand même le pouls au poignet pour sentir son rythme." },
       input: { type: 'num', label: 'Saturation lue', unit: '%', value: 94, tol: 0 },
       noted: 'Saturation : 94 % en air ambiant' },
     douleur: { label: 'Échelle de douleur', icon: '😣', zone: '*', kind: 'scale', fact: 'm_douleur',
@@ -379,6 +379,15 @@ App.SimScenarios = [
       why: 'L\'hygiène des mains se fait aussi après le contact, pour ne pas transmettre de germes à la résidente suivante.',
       ref: 'UE B3 S1 : TD 1 et TD 2 (hygiène des mains, précautions standard)' }
   ],
+
+  // Discordance à repérer : l'allergie évoquée par la résidente ne figure pas au dossier.
+  // fact : information à trouver pendant le recueil · el : élément de l'appel SAED qui la transmet.
+  discordance: {
+    fact: 'q_allerg_pen', el: 'a_allerg',
+    said: "✓ Tu as transmis l'allergie possible à la pénicilline, absente du dossier : c'est exactement le réflexe attendu.",
+    heard: "⚠ Tu avais appris que Mme Martin ne supportait peut-être pas la pénicilline, mais tu ne l'as pas transmis à Sophie. Une information discordante se transmet toujours : elle sera vérifiée par l'équipe.",
+    missed: "⚠ Tu n'as pas demandé à Mme Martin si elle était allergique à un médicament. Elle t'aurait parlé de la pénicilline, absente du dossier : toujours vérifier les allergies."
+  },
 
   // Messages affichés au bilan pour les familles de faits
   alertSummary: "Pris seuls, les signes de cette situation ne sont pas « graves » : moins de boissons, moins de repas, fatigue, pouls et respiration plus rapides, pression artérielle plus basse que d'habitude, vertiges au lever. Mais ils vont tous dans le même sens et ils sont nouveaux par rapport à l'état habituel de Mme Martin. Ce n'est pas à toi de poser un diagnostic : ton rôle est de repérer que plusieurs signes se rejoignent, de vérifier ce qui est discordant (l'allergie) et d'alerter l'infirmière référente.",

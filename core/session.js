@@ -184,6 +184,9 @@ App.Session = (() => {
     });
   }
 
+  // Carte au palier « J+1 » (niveau 1 de l'algorithme : vue une fois, intervalle de 1 à 2 jours)
+  function _isJ1(c) { return !!(c && c.progress && App.SRS.getLevel(c) === 1); }
+
   function start(cat, type, limit, tryhard) {
     const { state } = App.Store;
     let cards = state.cards.filter(c => App.SRS.isDue(c));
@@ -222,7 +225,11 @@ App.Session = (() => {
       }
       return arr;
     }
-    // Cartes à risque exam → restent en tête, mélangées entre elles
+    // Priorité J+1 : les cartes du palier J+1 (apprises hier ou ratées) passent TOUJOURS en premier ;
+    // tout le reste suit dans l'ordre habituel (examen, fragiles par chapitre, maîtrisées).
+    const j1All = cards.filter(_isJ1);
+    cards = cards.filter(c => !_isJ1(c));
+    // Cartes à risque exam → restent en tête (après les J+1), mélangées entre elles
     const examRisk = cards.filter(c => _cardPriority(c) === 0);
     const rest     = cards.filter(c => _cardPriority(c) !== 0);
     // Fragiles = jamais vues ou intervalle < 30J → groupées par matière
@@ -237,13 +244,20 @@ App.Session = (() => {
     // Priorité ECTS : les UE à gros ECTS passent plus souvent et en premier (par blocs de 10 cartes
     // d'une même UE, pour ne pas changer de sujet à chaque carte). L'ordre interne à chaque UE
     // (fragiles groupées par chapitre) est conservé ; fragiles d'abord, puis maîtrisées.
-    if (limit > 0 && cards.length > limit) {
-      // Objectif du jour : on choisit d'abord QUELLES cartes (quota par UE ∝ ECTS), puis on les
-      // enchaîne par blocs de 10 d'une même UE, les plus gros ECTS en premier.
+    // J+1 : groupées par chapitre, mélangées dans chaque groupe (comme les fragiles)
+    const j1Groups = {};
+    j1All.forEach(c => { (j1Groups[c.cat] = j1Groups[c.cat] || []).push(c); });
+    const j1Ordered = _shuffle(Object.values(j1Groups).map(_shuffle)).flat();
+    const total = j1Ordered.length + cards.length;
+    if (limit > 0 && total > limit) {
+      // Objectif du jour : les J+1 d'abord (jusqu'à l'objectif), puis on choisit QUELLES autres cartes
+      // (quota par UE ∝ ECTS), enchaînées par blocs de 10 d'une même UE, les plus gros ECTS en premier.
+      const j1Pick = j1Ordered.length > limit ? _pickByEcts(j1Ordered, limit) : j1Ordered;
+      const left = limit - j1Pick.length;
       const ordered = [..._shuffle(examRisk), ...fragileOrdered, ...mastered];
-      cards = _ectsBlocks(_pickByEcts(ordered, limit));
+      cards = [..._ectsBlocks(j1Pick), ...(left > 0 ? _ectsBlocks(_pickByEcts(ordered, left)) : [])];
     } else {
-      cards = [..._ectsBlocks(_shuffle(examRisk)), ..._ectsBlocks(fragileOrdered), ..._ectsBlocks(mastered)];
+      cards = [..._ectsBlocks(j1Ordered), ..._ectsBlocks(_shuffle(examRisk)), ..._ectsBlocks(fragileOrdered), ..._ectsBlocks(mastered)];
     }
     current = { queue: [...cards], idx: 0, stats: { ok: 0, hard: 0, nope: 0, again: 0 }, startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: sessionLabel };
     if (tryhard) {
@@ -689,13 +703,19 @@ App.Session = (() => {
       }
       return arr;
     }
+    // Priorité J+1 : ces cartes passent en premier, puis le reste dans l'ordre habituel
+    const j1Cards  = cards.filter(_isJ1);
+    cards = cards.filter(c => !_isJ1(c));
     const fragile  = cards.filter(c => !c.progress || (c.progress.interval || 0) < MASTERED_DAYS);
     const mastered = cards.filter(c => c.progress && (c.progress.interval || 0) >= MASTERED_DAYS);
     const catGroups = {};
     fragile.forEach(c => { (catGroups[c.cat] = catGroups[c.cat] || []).push(c); });
     const fragileOrdered = _shuffle(Object.values(catGroups).map(_shuffle)).flat();
     _shuffle(mastered);
-    const queue = [...fragileOrdered, ...mastered];
+    const j1Groups = {};
+    j1Cards.forEach(c => { (j1Groups[c.cat] = j1Groups[c.cat] || []).push(c); });
+    const j1Ordered = _shuffle(Object.values(j1Groups).map(_shuffle)).flat();
+    const queue = [...j1Ordered, ...fragileOrdered, ...mastered];
     current = { queue, idx: 0, stats: { ok: 0, hard: 0, nope: 0, again: 0 }, startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: label || '' };
     App.UI.showView('session');
     _initAfkListeners();

@@ -20,7 +20,12 @@ App.SimIntents = {
     { id: 'nutrition', label: 'Alimentation, boissons, éliminations' },
     { id: 'autonomie', label: 'Autonomie et sommeil' },
     { id: 'dossier',   label: 'Antécédents, traitements, allergies' },
-    { id: 'psycho',    label: 'Moral, entourage, repères' }
+    { id: 'psycho',    label: 'Moral, entourage, repères' },
+    // Thèmes réservés à certains scénarios (affichés seulement si le scénario y répond)
+    { id: 'incident',  label: 'Cette nuit, un incident ?' },
+    { id: 'diabete',   label: 'Diabète, sueurs, tremblements' },
+    { id: 'urgence',   label: 'Parole, force, vue, tête' },
+    { id: 'equipe',    label: "Demander à l'équipe" }
   ],
 
   LIST: [
@@ -37,7 +42,7 @@ App.SimIntents = {
       menu: 'Vérifier son identité (nom, date de naissance)',
       ask: 'Pouvez-vous me dire votre nom et votre date de naissance, s\'il vous plaît ?',
       strong: [/\b(votre|ton) nom\b/, /\bcomment (vous )?(vous )?(appelez|nommez)\b/, /\bdate de naissance\b/,
-               /\bnee? le\b/, /\bnom et prenom\b/, /\bvotre identite\b/, /\bbracelet\b/, /\bvous etes bien (madame|mme)\b/],
+               /\bnee? le\b/, /\bnom et prenom\b/, /\bvotre identite\b/, /\bbracelet\b/, /\bvous etes bien (madame|mme|monsieur)\b/],
       weak: [/\bprenom\b/, /\bnom\b/] },
     { id: 'c_explication', theme: 'contact', contact: true,
       menu: 'Expliquer ce que je vais faire',
@@ -156,6 +161,60 @@ App.SimIntents = {
       strong: [/\bfamille\b/, /\benfants?\b/, /\bfille\b/, /\bfils\b/, /\bvisites?\b/, /\bproches?\b/, /\bpetits enfants\b/] },
     { id: 'q_orientation', theme: 'psycho',
       menu: 'Quel jour sommes-nous ? Où êtes-vous ?', ask: 'Savez-vous quel jour nous sommes, et où nous sommes ?',
-      strong: [/\bquel jour\b/, /\bquelle date\b/, /\bou etes vous\b/, /\bsavez vous (ou|quel)\b/, /\bdate d aujourd/, /\bou vous (trouvez|etes)\b/, /\bquelle annee\b/, /\bquel mois\b/] }
+      strong: [/\bquel jour\b/, /\bquelle date\b/, /\bou etes vous\b/, /\bsavez vous (ou|quel)\b/, /\bdate d aujourd/, /\bou vous (trouvez|etes)\b/, /\bquelle annee\b/, /\bquel mois\b/] },
+
+    // ══ Questions propres à certains scénarios (extra : true) ══════════════════════════
+    // Elles ne sont reconnues, ni proposées dans le menu, que si le scénario fournit une réponse (answers.<id>).
+    // over : intentions « avalées » quand celle-ci est reconnue (évite deux réponses pour la même question).
+
+    // Un incident dans la nuit (chute cachée)
+    { id: 'q_nuit', theme: 'incident', extra: true,
+      menu: "Que s'est-il passé cette nuit ?", ask: "Que s'est-il passé cette nuit ? Vous êtes-vous levée ?",
+      strong: [/\bque s est il passe\b/, /\bqu est ce qui s est passe\b/, /\bce qui s est passe\b/, /\bquelque chose s est passe\b/, /\bs est passe\b.*\b(quelque chose|nuit|cette nuit)\b/, /\bnuit\b.*\bs est passe\b/,
+               /\b(vous etes|etes vous|vous vous etes) (vous )?(leve|levee|reveille|reveillee)\b/,
+               /\bcette nuit\b.*\b(arrive|incident|probleme|souci|passe)\b/, /\bpendant la nuit\b.*\b(leve|levee|tombe|tombee|arrive|passe|incident)\b/,
+               /\bnuit derniere\b.*\b(leve|levee|arrive|passe)\b/] },
+    { id: 'q_sonnette', theme: 'incident', extra: true,
+      menu: "Avez-vous sonné pour appeler quelqu'un ?", ask: "Avez-vous sonné pour appeler quelqu'un ?",
+      strong: [/\bsonn(e|er|ez|ette)\b/, /\bpoire d appel\b/, /\bappele (quelqu un|une soignante?|l equipe|de l aide|les soignants|le personnel)\b/,
+               /\bn avez vous pas (sonne|appele)\b/, /\bappeler (de l aide|quelqu un)\b/] },
+    { id: 'q_choc', theme: 'incident', extra: true,
+      menu: 'Vous êtes-vous cogné la tête ?', ask: 'Vous êtes-vous cogné la tête ?',
+      strong: [/\bcogn/, /\bchoc\b/, /\bheurt/, /\bcoup a la tete\b/, /\btraumatisme\b/] },
+    { id: 'q_rassure', theme: 'contact', extra: true, contact: true,
+      menu: 'Le rassurer : « personne ne va vous gronder »', ask: 'Vous pouvez tout me dire, personne ne va vous gronder. Je suis là pour vous aider.',
+      strong: [/\bgronder\b/, /\breproche/, /\bpunir\b/, /\bpas de (reproche|probleme)\b/, /\bvous pouvez (tout )?me (le )?dire\b/, /\bne vous inquietez pas\b/,
+               /\bje suis la pour (vous )?aider\b/, /\bce n est pas (grave|de votre faute)\b/, /\bn ayez pas peur\b/] },
+
+    // Diabète, hypoglycémie
+    { id: 'q_diabete', theme: 'diabete', extra: true,
+      menu: "Diabète : piqûre d'insuline, glycémie, sucre", ask: "Vous êtes diabétique : avez-vous eu votre piqûre d'insuline hier soir ? Avez-vous mesuré votre sucre ?",
+      strong: [/\bdiabet/, /\binsuline\b/, /\bglycemie\b/, /\bpiqure\b/, /\bsucre\b/, /\bstylo\b/, /\bhypoglyc/, /\bhypo\b/] },
+    { id: 'q_trembler', theme: 'diabete', extra: true,
+      menu: 'Tremblez-vous ? Le cœur bat-il vite ?', ask: 'Est-ce que vous tremblez ? Votre cœur bat vite ?',
+      strong: [/\btrembl/, /\bpalpit/, /\bcoeur (qui )?bat\b/, /\bmains qui\b/] },
+
+    // Suspicion d'AVC : parole, force, vue, tête
+    { id: 'q_parole', theme: 'urgence', extra: true,
+      menu: 'Pouvez-vous parler ? Me comprenez-vous ?', ask: 'Pouvez-vous me parler ? Est-ce que vous me comprenez ?',
+      strong: [/\bparl/, /\bparole\b/, /\bmots?\b/, /\bme comprenez\b/, /\bcomprenez vous\b/, /\bse faire comprendre\b/, /\bbafouill/, /\bprononc/] },
+    { id: 'q_membres', theme: 'urgence', extra: true,
+      menu: 'Sentez-vous vos bras, vos jambes, vos mains ?', ask: 'Est-ce que vous sentez vos bras et vos jambes ? Avez-vous de la force dans les mains ?',
+      strong: [/\b(bras|jambes?|mains?|pieds?)\b/, /\bforce\b/, /\bengourdi/, /\bfourmill/, /\bparalys/, /\blourd/, /\bsensib/] },
+    { id: 'q_vue', theme: 'urgence', extra: true,
+      menu: 'Voyez-vous bien ? Voyez-vous double ?', ask: 'Voyez-vous bien ? Voyez-vous double ou flou ?',
+      strong: [/\bvoyez vous\b/, /\bvue\b/, /\bvision\b/, /\bvoir double\b/, /\bflou\b/, /\byeux\b/] },
+    { id: 'q_tete', theme: 'urgence', extra: true,
+      menu: 'Avez-vous mal à la tête ?', ask: 'Avez-vous mal à la tête ?',
+      strong: [/\bmal (a la|de la|de) tete\b/, /\bcephal/, /\bmigraine\b/, /\btete (vous )?fait mal\b/] },
+    { id: 'q_test_vite', theme: 'urgence', extra: true, over: ['q_membres', 'q_parole'],
+      menu: 'Lui demander de sourire, de lever les deux bras, de répéter une phrase', ask: 'Pouvez-vous me sourire, lever les deux bras devant vous et répéter cette phrase : « Il fait beau ce matin » ?',
+      strong: [/\bsourire\b/, /\bsouriez\b/, /\blever? (les )?(deux )?bras\b/, /\blevez (les )?(deux )?bras\b/, /\brepet\w* (cette |une |la )?phrase\b/,
+               /\bmontrez (moi )?(les|vos) dents\b/, /\btendez (les )?(deux )?bras\b/, /\bserrez (ma|mes) main/] },
+
+    // Équipe
+    { id: 'q_equipe', theme: 'equipe', extra: true, over: ['q_vue'],
+      menu: "Demander à Karim (aide-soignant) ce qu'il a remarqué", ask: "Karim, est-ce que tu as remarqué quelque chose ce matin ou cette nuit ?",
+      strong: [/\bkarim\b/, /\baide soignant/, /\bcollegue/, /\bl equipe\b/, /\bveilleu/] }
   ]
 };

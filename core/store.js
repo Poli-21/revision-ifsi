@@ -183,6 +183,23 @@ App.Store = (() => {
     saveLog();
   }
 
+  // Temps passé en ENTRAÎNEMENT (jeux, orthographe, pharmaco) : s'ajoute à « Temps » (seconds) et est
+  // détaillé dans trainSecs (total) + gameSecs / orthoSecs / pharmaSecs. Aucune carte comptée, aucun
+  // effet sur l'objectif de 100 ni sur la série.
+  const TRAIN_KINDS = { game: 'gameSecs', ortho: 'orthoSecs', pharma: 'pharmaSecs' };
+  function logTraining({ kind = 'game', seconds = 0 } = {}) {
+    if (!(seconds > 0)) return;
+    const field = TRAIN_KINDS[kind];
+    if (!field) return;
+    const today = App.SRS.todayStr();
+    if (!state.studyLog[today]) state.studyLog[today] = { reviewed: 0, ok: 0, hard: 0, nope: 0 };
+    const e = state.studyLog[today];
+    e.seconds   = (e.seconds   || 0) + seconds;
+    e.trainSecs = (e.trainSecs || 0) + seconds;
+    e[field]    = (e[field]    || 0) + seconds;
+    saveLog();
+  }
+
   // ── Objectif quotidien (nombre de cartes à réviser par jour) ──
   const KEY_GOAL = 'ifsi_daily_goal_v1';
   function getDailyGoal() {
@@ -229,5 +246,5 @@ App.Store = (() => {
     });
   }
 
-  return { state, load, save, saveLog, saveOrder, normCat, logReview, logSessionDuration, logEnglish, logSim, getStreak, getDailyGoal, setDailyGoal, reviewedToday, getBackup, setBackup, deleteBackup, listBackupKeys };
+  return { state, load, save, saveLog, saveOrder, normCat, logReview, logSessionDuration, logEnglish, logSim, logTraining, getStreak, getDailyGoal, setDailyGoal, reviewedToday, getBackup, setBackup, deleteBackup, listBackupKeys };
 })();
