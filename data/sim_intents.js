@@ -25,6 +25,7 @@ App.SimIntents = {
     { id: 'incident',  label: 'Cette nuit, un incident ?' },
     { id: 'diabete',   label: 'Diabète, sueurs, tremblements' },
     { id: 'urgence',   label: 'Parole, force, vue, tête' },
+    { id: 'respi',     label: 'Souffle, spray, somnolence' },
     { id: 'equipe',    label: "Demander à l'équipe" }
   ],
 
@@ -211,6 +212,15 @@ App.SimIntents = {
       menu: 'Lui demander de sourire, de lever les deux bras, de répéter une phrase', ask: 'Pouvez-vous me sourire, lever les deux bras devant vous et répéter cette phrase : « Il fait beau ce matin » ?',
       strong: [/\bsourire\b/, /\bsouriez\b/, /\blever? (les )?(deux )?bras\b/, /\blevez (les )?(deux )?bras\b/, /\brepet\w* (cette |une |la )?phrase\b/,
                /\bmontrez (moi )?(les|vos) dents\b/, /\btendez (les )?(deux )?bras\b/, /\bserrez (ma|mes) main/] },
+
+    // Détresse respiratoire chez un insuffisant respiratoire chronique (somnolence, spray)
+    { id: 'q_somnolence', theme: 'respi', extra: true, over: ['q_sommeil'],
+      menu: 'Avez-vous la tête lourde, envie de dormir ?', ask: 'Avez-vous la tête lourde ? Est-ce que vous avez envie de dormir ?',
+      strong: [/\btete lourde\b/, /\blourdeur\b/, /\benvie de dormir\b/, /\benvie de vous endormir\b/, /\bsomnol/, /\bs endorm/, /\bvous endorm/, /\bassoupi/, /\bendormi\b/,
+               /\bcoup de barre\b/, /\bpaupieres\b/, /\bgarder les yeux ouverts\b/] },
+    { id: 'q_inhal', theme: 'respi', extra: true,
+      menu: 'Avez-vous utilisé votre spray (Ventoline) ? Cela vous a-t-il soulagé ?', ask: 'Avez-vous utilisé votre spray, la Ventoline ? Est-ce que cela vous a soulagé ?',
+      strong: [/\bventoline\b/, /\bsalbutamol\b/, /\bspray\b/, /\binhalateur\b/, /\bbouffees?\b/, /\bpompe\b/, /\baerosol\b/, /\bbronchodilat/, /\bsoulage/, /\bspiriva\b/, /\btiotropium\b/] },
 
     // Équipe
     { id: 'q_equipe', theme: 'equipe', extra: true, over: ['q_vue'],

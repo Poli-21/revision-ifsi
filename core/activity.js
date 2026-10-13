@@ -1,5 +1,5 @@
 // core/activity.js — Chrono d'activité partagé pour les ENTRAÎNEMENTS
-// (Jeux de l'onglet Entraînement, Orthographe, Pharmaco). Le temps réellement passé à s'entraîner
+// (Jeux de l'onglet Entraînement, Orthographe, Pharmaco, Gaz du sang). Le temps réellement passé à s'entraîner
 // s'ajoute à « Temps » du jour et de la semaine. Aucune carte comptée, aucun effet sur l'objectif
 // de 100 cartes ni sur la série de jours : seul le temps est compté.
 // Règles (identiques à l'onglet Anglais et à la Simulation) :
@@ -62,7 +62,7 @@ App.Activity = (() => {
     }
   }
 
-  // ── Les trois types d'entraînement de l'app ──────────────────
+  // ── Les types d'entraînement de l'app ──────────────────
   // Jeux (Vrai/Faux, trous, association, tryhard) : seulement pendant une partie.
   register('game',   () => _shown('games-view') && _shown('games-practice'));
   // Orthographe : seulement pendant l'exercice d'un mot.
@@ -70,6 +70,11 @@ App.Activity = (() => {
   // Pharmaco : pendant une série (questions, correction). Ni le menu ni l'écran de bilan.
   register('pharma', () => _shown('games-view') && _shown('pharma-root')
                           && !!(App.Pharma && App.Pharma.isTraining && App.Pharma.isTraining()));
+
+  // Gaz du sang : pendant une série (questions, cas guidés, correction). Ni le menu ni le bilan.
+  // (L'atelier lancé depuis la simulation est compté par la simulation, pas ici.)
+  register('gazo',   () => _shown('games-view') && _shown('gazo-root')
+                          && !!(App.Gazo && App.Gazo.isTraining && App.Gazo.isTraining()));
 
   return { register, markActivity: _mark, _t: { tick: _tick, kinds: () => Object.keys(kinds) } };
 })();

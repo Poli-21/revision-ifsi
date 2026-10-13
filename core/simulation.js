@@ -72,7 +72,7 @@ App.Sim = (() => {
     c.pending = c.pending || {}; c.entered = c.entered || {}; c.errors = c.errors || 0; c.misplaced = c.misplaced || 0;
     c.dec = c.dec || { step: 'level', order: null, level: null, levelDone: false, picks: {}, actionsDone: false };
     c.saed = c.saed || { txt: { S: '', A: '', E: '', D: '' }, tries: 0, p1: null, p2: null, t1: null, log: [], sent: false, done: false, canRetry: false, warn: '' };
-    c.rx = c.rx || { ecg: null, skipped: false };
+    c.rx = c.rx || { ecg: null, skipped: false, gazo: null, gazoSkipped: false };
     c.wr = c.wr || { txt: { C: '', D: '', A: '', R: '' }, graded: false, pts: 0, warn: '' };
     c.ai = c.ai || {};
   }
@@ -429,12 +429,13 @@ App.Sim = (() => {
     { id: 'oeil', ico: '👁️', name: 'Œil de lynx', desc: 'Trouver toutes les informations clés du recueil.', test: R => R.recueil.found === R.recueil.total },
     { id: 'mains', ico: '🧴', name: 'Mains propres', desc: 'Te frictionner les mains avant ET après le contact.', test: (R, c) => !!(c.done.g_sha_in && c.done.g_sha_out) },
     { id: 'mesures', ico: '🎯', name: 'Mesures justes', desc: 'Noter toutes les mesures sans aucune erreur de saisie.', test: (R, c, scn) => (c.errors || 0) === 0 && Object.keys(c.entered).length >= scn.toolOrder.length },
-    { id: 'alerte', ico: '🚨', name: 'Bon réflexe', desc: "Juger qu'il faut alerter l'infirmière maintenant, sans geste dangereux.", test: R => R.niveau.id === 'maintenant' && !R.unsafe.length },
+    { id: 'alerte', ico: '🚨', name: 'Bon réflexe', desc: "Juger qu'il faut alerter l'infirmière maintenant, sans geste dangereux.", test: R => (R.niveau.good || R.niveau.id === 'maintenant') && !R.unsafe.length },
     { id: 'securite', ico: '🛡️', name: "Sécurité d'abord", desc: "Choisir au moins 5 des bons gestes d'attente, sans geste dangereux.", test: R => R.actions.good >= 5 && !R.unsafe.length },
     { id: 'saed', ico: '📞', name: 'Message clair', desc: "Obtenir au moins 12/15 à l'appel SAED.", test: R => R.appel.pts >= 12 },
     { id: 'discordance', ico: '🔎', name: 'Discordance repérée', desc: "Repérer une information qui ne colle pas avec le dossier (allergie, chute non signalée, repas non pris…) et la transmettre à l'infirmière.", test: R => !!R.allergySaid },
     { id: 'transmetteur', ico: '📝', name: 'Transmetteur', desc: 'Obtenir au moins 12/15 à la transmission écrite.', test: R => R.trans.pts >= 12 },
     { id: 'ecg', ico: '🫀', name: 'ECG réussi', desc: "Réaliser l'ECG de la prescription avec au moins 70/100.", test: R => !!R.ecg && R.ecg.score >= 70 },
+    { id: 'gazo', ico: '🩸', name: 'Gaz du sang lu', desc: "Lire le gaz du sang d'un scénario avec au plus une erreur (sans poser de diagnostic).", test: R => !!R.gazo && R.gazo.score >= 80 },
     { id: 'excellence', ico: '⭐', name: 'Excellence', desc: 'Atteindre 90/100 ou plus, sans geste dangereux.', test: R => R.total >= 90 && !R.unsafe.length },
     { id: 'progres', ico: '📈', name: 'Progression', desc: 'Rejouer et gagner au moins 10 points par rapport à ton meilleur score.', test: R => R.prevBest != null && R.total >= R.prevBest + 10 }
   ];
@@ -645,6 +646,11 @@ App.Sim = (() => {
         else if (R.skipped) extra = `<div class="sim-rx-ecg">${_esc(who)} réalise l'ECG à ta place. <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxEcg()">Finalement, je le fais</button></div>`;
         else extra = `<div class="sim-rx-ecg"><button class="btn btn-primary btn-sm" onclick="App.Sim.rxEcg()">🫀 Réaliser l'ECG (atelier)</button><button class="btn btn-ghost btn-sm" onclick="App.Sim.rxSkip()">Laisser ${_esc(who)} le faire</button><div class="sim-muted sim-small">Facultatif. ${_esc(who)} reste à côté de toi : en 1re année, un geste technique se fait sous la supervision d'un soignant. L'ECG simulé est celui de ${_esc(ecgWho)} (pouls à ${_esc(ecgCtx.rate)}/min).</div></div>`;
       }
+      if (l.gazo && rx.gazo) {
+        if (R.gazo) extra = `<div class="sim-rx-ecg ok">✓ Gaz du sang lu · ${R.gazo.score}/100 <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxGazo()">Refaire</button></div>`;
+        else if (R.gazoSkipped) extra = `<div class="sim-rx-ecg">${_esc(who)} lit le résultat à ta place. <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxGazo()">Finalement, je le lis</button></div>`;
+        else extra = `<div class="sim-rx-ecg"><button class="btn btn-primary btn-sm" onclick="App.Sim.rxGazo()">🩸 Lire le gaz du sang (atelier)</button><button class="btn btn-ghost btn-sm" onclick="App.Sim.rxGazoSkip()">Laisser ${_esc(who)} le lire</button><div class="sim-muted sim-small">Facultatif et hors score (bonus d'XP). C'est un exercice de raisonnement : tu fais une lecture sommaire, c'est le médecin qui interprète et décide. Les valeurs sont fictives.</div></div>`;
+      }
       return `<li><span class="sim-rx-i">${l.icon}</span><div>${_esc(l.t)}${extra}</div></li>`;
     }).join('');
     const ident = rx.patientLine || (pt.civ + ' ' + (pt.prenom ? pt.prenom + ' ' : '') + String(pt.nom).toUpperCase() + ' · ' + pt.age + ' ans · chambre ' + pt.chambre);
@@ -745,6 +751,23 @@ App.Sim = (() => {
     window.App.SimECG.open(ctx);
   }
   function rxSkip() { const c = _cur(); if (!_stage('decision') || c.dec.step !== 'rx') return; c.rx.skipped = true; _save(); render(); }
+  // Atelier facultatif « lire le gaz du sang » (scénarios dont la consigne comporte rx.gazo) : bonus d'XP, hors score
+  function rxGazo() {
+    const c = _cur(), scn = _curScn();
+    if (!_stage('decision') || c.dec.step !== 'rx' || !window.App.Gazo || !scn.rx || !scn.rx.gazo) return;
+    _save();
+    const g = scn.rx.gazo;
+    window.App.Gazo.workshop({
+      q: g.q, title: g.title, intro: g.intro, backLabel: g.backLabel, doneLabel: g.doneLabel,
+      onDone: r => {
+        const steps = Math.max(1, r.steps || 1);
+        c.rx.gazo = { score: Math.max(0, Math.round(100 * (steps - (r.errs || 0)) / steps)), errs: r.errs || 0 };
+        c.rx.gazoSkipped = false; _save(); screen = 'jeu'; render(); _top();
+      },
+      onBack: () => { screen = 'jeu'; render(); _top(); }
+    });
+  }
+  function rxGazoSkip() { const c = _cur(); if (!_stage('decision') || c.dec.step !== 'rx') return; c.rx.gazoSkipped = true; _save(); render(); }
   function rxNext() {
     const c = _cur(); if (!_stage('decision') || c.dec.step !== 'rx') return;
     c.stage = 'transmissions'; _save(); render(); _top();
@@ -813,7 +836,7 @@ App.Sim = (() => {
     const gW = b.grid.reduce((a, x) => a + (x.state === 'ok' || x.state === 'retry' ? 1 : (x.state === 'late' ? 0.5 : 0)), 0);
     const gestes = { max: 15, value: gW, total: b.gTotal, pts: 15 * gW / (b.gTotal || 1) };
     const lv = dec.levels.find(l => l.id === c.dec.level) || null;
-    const niveau = { max: 10, id: lv ? lv.id : null, pts: lv ? lv.pts : 0 };
+    const niveau = { max: 10, id: lv ? lv.id : null, pts: lv ? lv.pts : 0, good: !!lv && lv.verdict === 'good' };
     const picked = dec.actions.filter(a => c.dec.picks[a.id]);
     const goodTotal = dec.actions.filter(a => a.v === 'good').length;
     const good = picked.filter(a => a.v === 'good').length, avoid = picked.filter(a => a.v === 'avoid').length;
@@ -830,7 +853,7 @@ App.Sim = (() => {
     const capped = unsafe.length > 0 && raw > 50;
     const total = Math.round(unsafe.length ? Math.min(raw, 50) : raw);
     return { recueil, gestes, niveau, actions, appel, trans, unsafe, raw: Math.round(raw * 10) / 10, capped, total,
-             allergySaid: _callAllergy(c, scn), ecg: c.rx.ecg ? { score: c.rx.ecg.score } : null, partial: !!partial };
+             allergySaid: _callAllergy(c, scn), ecg: c.rx.ecg ? { score: c.rx.ecg.score } : null, gazo: c.rx.gazo ? { score: c.rx.gazo.score } : null, partial: !!partial };
   }
   function _complete() {
     const c = _cur(), scn = _curScn(); if (!c || !scn || c.res) return;
@@ -838,8 +861,10 @@ App.Sim = (() => {
     const R = _results();
     R.prevBest = P.best[scn.id] != null ? P.best[scn.id] : null;
     const base = R.prevBest == null ? R.total + 10 : Math.max(5, R.total - R.prevBest);
-    const bonus = R.ecg ? Math.min(20, Math.round(R.ecg.score / 5)) : 0;
-    R.xp = { base, bonus, total: base + bonus, first: R.prevBest == null };
+    const bonusEcg = R.ecg ? Math.min(20, Math.round(R.ecg.score / 5)) : 0;
+    const bonusGazo = R.gazo ? Math.min(10, Math.round(R.gazo.score / 10)) : 0;
+    const bonus = bonusEcg + bonusGazo;
+    R.xp = { base, bonus, bonusEcg, bonusGazo, total: base + bonus, first: R.prevBest == null };
     const before = _levelOf(P.xp).L.n;
     R.earned = BADGES.filter(bd => { try { return bd.test(R, c, scn); } catch (e) { return false; } }).map(bd => bd.id);
     R.newBadges = R.earned.filter(id => !P.badges[id]);
@@ -1385,7 +1410,7 @@ App.Sim = (() => {
       <div class="sim-card sim-result">
         <div class="sim-result-score"><b>${R.total}</b><span>/100</span></div>
         <div class="sim-result-t"><div class="sim-result-w">${word}</div>
-          <div class="sim-muted sim-small">+${R.xp.total} XP${R.xp.first ? ' (dont 10 pour une première partie)' : ' (tu gagnes des XP quand tu progresses)'}${R.xp.bonus ? ' · ECG +' + R.xp.bonus : ''} · temps actif ${_hms(c.secs)}</div>
+          <div class="sim-muted sim-small">+${R.xp.total} XP${R.xp.first ? ' (dont 10 pour une première partie)' : ' (tu gagnes des XP quand tu progresses)'}${(R.xp.bonusEcg != null ? R.xp.bonusEcg : (R.ecg ? R.xp.bonus : 0)) ? ' · ECG +' + (R.xp.bonusEcg != null ? R.xp.bonusEcg : R.xp.bonus) : ''}${R.xp.bonusGazo ? ' · gaz du sang +' + R.xp.bonusGazo : ''} · temps actif ${_hms(c.secs)}</div>
           <div class="sim-result-lv">Niveau ${lv.L.n} · ${_esc(lv.L.name)}${R.level.after > R.level.before ? ' <em class="sim-new">Niveau gagné</em>' : ''}</div>
           <div class="sim-xpbar"><i style="width:${lv.pct}%"></i></div></div>
       </div>
@@ -1398,6 +1423,7 @@ App.Sim = (() => {
         ${_brk('Appel à l\'infirmière (SAED)', R.appel.pts, 15, R.appel.tries > 1 ? '2 essais, le meilleur est retenu' : '1 essai')}
         ${_brk('Transmission écrite', R.trans.pts, 15, 'cible, données, actions, résultats')}
         ${R.ecg ? `<p class="sim-muted sim-small">🫀 ECG de la prescription réalisé : ${R.ecg.score}/100 (bonus d'XP, hors score).</p>` : ''}
+        ${R.gazo ? `<p class="sim-muted sim-small">🩸 Gaz du sang lu : ${R.gazo.score}/100 (bonus d'XP, hors score ; lecture sommaire, pas un diagnostic).</p>` : ''}
         ${R.capped ? `<p class="sim-warn sim-small">Total avant plafond : ${fmt(R.raw)}/100.</p>` : ''}
       </div>
       ${earned}${stats}
@@ -1470,7 +1496,7 @@ App.Sim = (() => {
   return {
     open, close, start, resume, toList, discard, setTab, say, submit, askMenu, toggleMenu, thToggle,
     pickTool, dropTool, hot, gStartCount, gTap, gRecount, gPlace, gInflate, gSubmit, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
-    decLevel, decLevelOk, decPick, decActionsOk, decNext, txt, sendSaed, saedRetry, saedDone, rxEcg, rxSkip, rxNext, wrSubmit, wrDone, aiReview,
+    decLevel, decLevelOk, decPick, decActionsOk, decNext, txt, sendSaed, saedRetry, saedDone, rxEcg, rxSkip, rxGazo, rxGazoSkip, rxNext, wrSubmit, wrDone, aiReview,
     parse, _t: { norm: _norm, state: () => st, tick: _tick, grade: (kind, texts) => { const scn = _curScn() || _scenarios()[0]; return _grade(kind === 'saed' ? scn.call.sections : scn.written.fields, texts); }, results: () => _results(), levelOf: _levelOf }
   };
 })();

@@ -343,6 +343,15 @@
           <span class="sim-entry-go">S'entraîner →</span>
         </button>
 
+        <button class="sim-entry-card" id="gm-gazo" onclick="App.Gazo.open()">
+          <span class="sim-entry-ico">🧪</span>
+          <span class="sim-entry-txt">
+            <span class="sim-entry-name">Gaz du sang <em class="sim-new">Nouveau</em></span>
+            <span class="sim-entry-desc">Valeurs normales et sens de chaque paramètre (pH, PaCO₂, HCO₃⁻, PaO₂) · méthode d'interprétation avec compensation. Fiches, séries de questions et cas guidés pas à pas, tes erreurs à revoir. Construit à partir de tes notes. Fonctionne hors ligne.</span>
+          </span>
+          <span class="sim-entry-go">S'entraîner →</span>
+        </button>
+
         <div class="games-mode-grid">
           <button class="game-mode-card selected" id="gm-tf" onclick="App.Games.selectMode('tf')">
             <span class="gm-icon">⚡</span>
@@ -418,6 +427,9 @@
 
       <!-- Pharmaco (rendu par core/pharma.js) -->
       <div id="pharma-root" style="display:none"></div>
+
+      <!-- Gaz du sang (rendu par core/gazo.js) -->
+      <div id="gazo-root" style="display:none"></div>
 
     </div>
 
@@ -885,9 +897,12 @@
 <script src="data/sim_roux.js"></script>
 <script src="data/sim_blanc.js"></script>
 <script src="data/sim_girard.js"></script>
+<script src="data/sim_moreau.js"></script>
 <script src="ui/sim_scene.js"></script>
 <script src="ui/sim_ecg_art.js"></script>
 <script src="core/sim_ecg.js"></script>
+<script src="data/gazo.js"></script>
+<script src="core/gazo.js"></script>
 <script src="core/simulation.js"></script>
 <script src="data/pharma.js"></script>
 <script src="core/pharma.js"></script>

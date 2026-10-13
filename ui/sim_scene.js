@@ -253,6 +253,12 @@ App.SimScene = (() => {
     const rot = 60, eyes = state.eyes || 'closed';
     const hairC = state.hair || ['#f4f6f9', '#cfd5de'];
     const mouth = state.droop ? 'M-6.6 14.6 Q0 12.2 6.6 7.4' : (state.grimace ? 'M-5 13.4 Q0 9.4 5 13.4' : 'M-4.5 11 Q0 13.2 4.5 11');
+    // gasp : bouche entrouverte (gêne respiratoire) · cyan : lèvres bleutées (cyanose)
+    const lipC = state.cyan ? '#6e7fc2' : '#b9776f';
+    const mouthEl = state.gasp
+      ? `<ellipse cx="0" cy="12.4" rx="4.2" ry="4.8" fill="#8a4a4f" stroke="${lipC}" stroke-width="2"/><path d="M-2.6 10.2 Q0 9 2.6 10.2" fill="none" stroke="#f4f0ec" stroke-width="1.4" stroke-linecap="round"/>`
+      : `<path d="${mouth}" fill="none" stroke="${lipC}" stroke-width="2" stroke-linecap="round"/>`;
+    const cyanHalo = state.cyan ? ell(0, 12, 9, 6, '#7f93d6', 'opacity=".22"') : '';
     const brows = state.grimace
       ? '<path d="M-12 -2.6 Q-8 -8 -4 -6.6" fill="none" stroke="#9aa0ab" stroke-width="1.8" stroke-linecap="round"/><path d="M4 -6.6 Q8 -8 12 -2.6" fill="none" stroke="#9aa0ab" stroke-width="1.8" stroke-linecap="round"/>'
       : '<path d="M-12 -4.5 Q-8 -7 -4 -5" fill="none" stroke="#c4c9d2" stroke-width="1.6" stroke-linecap="round"/><path d="M4 -5 Q8 -7 12 -4.5" fill="none" stroke="#c4c9d2" stroke-width="1.6" stroke-linecap="round"/>';
@@ -270,7 +276,7 @@ App.SimScene = (() => {
       ${brows}
       ${eye(-8)}${eye(8)}
       ${ell(-13, 7, 4.6, 3.4, C.blush, 'opacity=".42"')}${ell(13, 7, 4.6, 3.4, C.blush, 'opacity=".42"')}
-      <path d="${mouth}" fill="none" stroke="#b9776f" stroke-width="2" stroke-linecap="round"/>
+      ${cyanHalo}${mouthEl}
       ${state.male ? '<path d="M-6 8.6 Q0 6.4 6 8.6" fill="none" stroke="#cfd5de" stroke-width="2.4" stroke-linecap="round"/>' : ''}
       <path d="M-1 3 Q0 5 1 3" fill="none" stroke="#e0a98b" stroke-width="1.6" stroke-linecap="round"/>
       ${sweat}
