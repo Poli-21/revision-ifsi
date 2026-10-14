@@ -56,7 +56,7 @@ App.Sec = (() => {
   function open() {
     _load(); _bindKeys();
     const root = _el('secours-root'); if (!root) return;
-    ['games-setup', 'games-practice', 'games-done', 'sim-root', 'pharma-root', 'gazo-root'].forEach(id => { const e = _el(id); if (e) e.style.display = 'none'; });
+    ['games-setup', 'games-practice', 'games-done', 'sim-root', 'pharma-root', 'gazo-root', 'tp-root', 'dose-root'].forEach(id => { const e = _el(id); if (e) e.style.display = 'none'; });
     root.style.display = 'block';
     screen = 'menu'; run = null;
     render(); _top();

@@ -9,7 +9,7 @@ App.SimScene = (() => {
   const S = 52, K = 0.866, OX = 304, OY = 246;      // échelle, cos 30°, origine écran
   let W = 7.2, D = 6.4;                              // salle : largeur (x), profondeur (y) ; chambre d'hôpital plus grande (voir svg())
   const H = 4.4;                                     // hauteur (z)
-  const VB = '0 0 640 640', VB_H = '-46 -30 736 736';
+  const VB = '-100 -40 880 800', VB_H = '-100 -40 880 800';
   const P = (x, y, z = 0) => [OX + (x - y) * K * S, OY + (x + y) * 0.5 * S - z * S];
   const r1 = n => Math.round(n * 10) / 10;
   const pts = a => a.map(p => P(p[0], p[1], p[2] || 0).map(r1).join(',')).join(' ');
@@ -49,6 +49,10 @@ App.SimScene = (() => {
     return `url(#${id})`;
   };
   const add = s => { out.push(s); };
+  function place(g, fn) {
+    const n = out.length; fn(); const o = SH[g]; if (!o || n === out.length) return;
+    const d = _off(o), seg = out.splice(n); out.push(`<g transform="translate(${d[0]} ${d[1]})">${seg.join('')}</g>`);
+  }
 
   // ── Primitives ──────────────────────────────────────────────────────────
   // Boîte aux arêtes arrondies : trois faces dégradées, contour « boudiné », arête éclairée
@@ -67,7 +71,13 @@ App.SimScene = (() => {
     add(`<polygon points="${pts([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])}" fill="rgba(70,52,40,${a == null ? 0.2 : a})" filter="url(#ssb${b || 1})"/>`);
   }
   const ell = (cx, cy, rx, ry, fill, extra) => `<ellipse cx="${r1(cx)}" cy="${r1(cy)}" rx="${rx}" ry="${ry}" fill="${fill}" ${extra || ''}/>`;
-  const hot = (id, label, x, y, z, r, pad) => { const p = P(x, y, z); return `<g class="sim-hot" data-hot="${id}" tabindex="0" role="button" aria-label="${label}"><circle class="sim-hot-ring" cx="${r1(p[0])}" cy="${r1(p[1])}" r="${r}"/><circle class="sim-hot-hit" cx="${r1(p[0])}" cy="${r1(p[1])}" r="${r + (pad == null ? 6 : pad)}"/></g>`; };
+  // Disposition : chaque groupe d'objets est décalé (ex, ey) dans la pièce agrandie, pour occuper la place au lieu de tout coller dans le coin
+  const BEDSH = [1.7, 0];
+  let SH = {};
+  const HG = { patiente: 'bed', lit: 'bed', table: 'bed', o2wall: 'bed', sonnette: 'bed', chaussons: 'bed', 'tool-scope': 'bed', 'zone-tete': 'bed', 'zone-thorax': 'bed', 'zone-bras': 'bed', 'zone-doigt': 'bed',
+    plateau: 'over', deambulateur: 'walk', dasri: 'bins', daom: 'bins', opct: 'trolley', 'tool-thermometre': 'trolley', 'tool-tension': 'trolley', 'tool-saturometre': 'trolley', 'tool-montre': 'trolley', 'tool-glucometre': 'trolley' };
+  const _off = o => [r1((o[0] - o[1]) * K * S), r1((o[0] + o[1]) * 0.5 * S)];
+  const hot = (id, label, x, y, z, r, pad) => { const p = P(x, y, z); const o = SH[HG[id]]; if (o) { const d = _off(o); p[0] += d[0]; p[1] += d[1]; } return `<g class="sim-hot" data-hot="${id}" tabindex="0" role="button" aria-label="${label}"><circle class="sim-hot-ring" cx="${r1(p[0])}" cy="${r1(p[1])}" r="${r}"/><circle class="sim-hot-hit" cx="${r1(p[0])}" cy="${r1(p[1])}" r="${r + (pad == null ? 6 : pad)}"/></g>`; };
 
   // ── Pièces du décor ─────────────────────────────────────────────────────
   function floor() {
@@ -467,15 +477,15 @@ App.SimScene = (() => {
 
   function walker() {
     const g = (x, y, z) => P(x, y, z).map(r1);
-    const f = [[0.55, 4.6], [0.55, 5.45], [1.15, 4.6], [1.15, 5.45]];
+    const f = [[0.8, 4.6], [0.8, 5.45], [1.4, 4.6], [1.4, 5.45]];
     const top = 1.4;
     const line = (a, b, w, c) => `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
-    let s = ell(g(0.85, 5.0, 0)[0], g(0.85, 5.0, 0)[1] + 3, 40, 14, 'rgba(70,52,40,.16)');
+    let s = ell(g(1.1, 5.0, 0)[0], g(1.1, 5.0, 0)[1] + 3, 40, 14, 'rgba(70,52,40,.16)');
     f.forEach(([x, y]) => { s += line(g(x, y, 0), g(x, y, top), 6, '#8d9aa4') + line(g(x, y, 0), g(x, y, top), 3, '#d3dde4'); });
-    s += line(g(0.55, 4.6, top), g(0.55, 5.45, top), 6, '#8d9aa4') + line(g(1.15, 4.6, top), g(1.15, 5.45, top), 6, '#8d9aa4');
-    s += line(g(0.55, 5.45, top), g(1.15, 5.45, top), 6, '#8d9aa4') + line(g(0.55, 4.6, top), g(1.15, 4.6, top), 6, '#8d9aa4');
-    s += line(g(0.55, 4.6, top), g(0.55, 5.45, top), 3, '#d3dde4') + line(g(0.55, 4.6, 0.7), g(0.55, 5.45, 0.7), 4, '#aab6bf');
-    s += line(g(0.55, 4.6, top + 0.02), g(0.55, 4.95, top + 0.02), 8, '#6bb7e0') + line(g(0.55, 5.1, top + 0.02), g(0.55, 5.45, top + 0.02), 8, '#6bb7e0');
+    s += line(g(0.8, 4.6, top), g(0.8, 5.45, top), 6, '#8d9aa4') + line(g(1.4, 4.6, top), g(1.4, 5.45, top), 6, '#8d9aa4');
+    s += line(g(0.8, 5.45, top), g(1.4, 5.45, top), 6, '#8d9aa4') + line(g(0.8, 4.6, top), g(1.4, 4.6, top), 6, '#8d9aa4');
+    s += line(g(0.8, 4.6, top), g(0.8, 5.45, top), 3, '#d3dde4') + line(g(0.8, 4.6, 0.7), g(0.8, 5.45, 0.7), 4, '#aab6bf');
+    s += line(g(0.8, 4.6, top + 0.02), g(0.8, 4.95, top + 0.02), 8, '#6bb7e0') + line(g(0.8, 5.1, top + 0.02), g(0.8, 5.45, top + 0.02), 8, '#6bb7e0');
     f.forEach(([x, y]) => { const p = g(x, y, 0); s += `<circle cx="${p[0]}" cy="${p[1]}" r="3.6" fill="#4b5560"/>`; });
     add(`<g data-hot="deambulateur">${s}</g>`);
   }
@@ -490,21 +500,22 @@ App.SimScene = (() => {
   }
 
   function trolley(opts) {
-    shadow(6.0, 3.1, 7.3, 4.8, 0.2, 2);
-    [[6.25, 3.3], [6.95, 3.3], [6.25, 4.45], [6.95, 4.45]].forEach(([x, y]) => rbox(x, y, 0.1, 0.06, 0.06, 1.0, '#b8c4cc', { rim: 3 }));
-    rbox(6.2, 3.25, 0.38, 0.88, 1.3, 0.07, '#dfe8ee', { rim: 4 });
-    rbox(6.17, 3.22, 1.06, 0.94, 1.36, 0.09, '#eef3f6', { rim: 5 });
-    // instruments posés dessus : thermomètre, tensiomètre (avec écran), saturomètre, montre
-    rbox(6.27, 3.32, 1.15, 0.2, 0.44, 0.16, '#ffffff', { rim: 4, id: 'tool-thermometre' });
-    rbox(6.27, 3.32, 1.31, 0.2, 0.16, 0.1, '#6cb7e6', { rim: 3, id: 'tool-thermometre' });
-    rbox(6.62, 3.3, 1.15, 0.4, 0.4, 0.22, '#ffffff', { rim: 4, id: 'tool-tension' });
-    add(`<g transform="${mFloor(1.37)}"><rect x="6.68" y="3.36" width="0.22" height="0.14" rx="0.02" fill="#4a5f78"/><rect x="6.72" y="3.4" width="0.14" height="0.07" rx="0.01" fill="#8ee0b0"/></g>`);
-    rbox(6.3, 3.95, 1.15, 0.3, 0.26, 0.1, '#2f5f9e', { rim: 4, id: 'tool-saturometre' });
-    rbox(6.36, 3.99, 1.25, 0.18, 0.14, 0.02, '#d3dad5', { rim: 2, id: 'tool-saturometre' });
-    rbox(6.7, 4.3, 1.15, 0.24, 0.24, 0.1, '#f7d98c', { rim: 4, id: 'tool-montre' });
+    // Grande table de soins : plateau large, instruments bien espacés (le plateau fait 1,15 × 1,8)
+    shadow(5.95, 3.0, 7.3, 4.95, 0.2, 2);
+    [[6.05, 3.15], [7.05, 3.15], [6.05, 4.7], [7.05, 4.7]].forEach(([x, y]) => rbox(x, y, 0.1, 0.07, 0.07, 1.0, '#b8c4cc', { rim: 3 }));
+    rbox(6.0, 3.08, 0.38, 1.12, 1.75, 0.07, '#dfe8ee', { rim: 4 });
+    rbox(5.97, 3.05, 1.06, 1.18, 1.81, 0.09, '#eef3f6', { rim: 5 });
+    // instruments posés dessus : thermomètre, tensiomètre (avec écran), saturomètre, montre, lecteur de glycémie
+    rbox(6.08, 3.2, 1.15, 0.24, 0.52, 0.16, '#ffffff', { rim: 4, id: 'tool-thermometre' });
+    rbox(6.08, 3.2, 1.31, 0.24, 0.2, 0.1, '#6cb7e6', { rim: 3, id: 'tool-thermometre' });
+    rbox(6.48, 3.18, 1.15, 0.52, 0.5, 0.24, '#ffffff', { rim: 4, id: 'tool-tension' });
+    add(`<g transform="${mFloor(1.39)}"><rect x="6.55" y="3.25" width="0.3" height="0.18" rx="0.02" fill="#4a5f78"/><rect x="6.6" y="3.3" width="0.2" height="0.09" rx="0.01" fill="#8ee0b0"/></g>`);
+    rbox(6.1, 3.98, 1.15, 0.36, 0.3, 0.1, '#2f5f9e', { rim: 4, id: 'tool-saturometre' });
+    rbox(6.17, 4.03, 1.25, 0.22, 0.17, 0.02, '#d3dad5', { rim: 2, id: 'tool-saturometre' });
+    rbox(6.1, 4.5, 1.15, 0.28, 0.28, 0.1, '#f7d98c', { rim: 4, id: 'tool-montre' });
     if (opts && opts.glucometre) {                     // glycémie capillaire : lecteur + stylo piqueur
-      rbox(6.74, 3.82, 1.15, 0.26, 0.3, 0.1, '#e9f6ee', { rim: 4, id: 'tool-glucometre' });
-      rbox(6.82, 3.9, 1.25, 0.1, 0.12, 0.05, '#5fbf8a', { rim: 2, id: 'tool-glucometre' });
+      rbox(6.58, 3.98, 1.15, 0.3, 0.36, 0.1, '#e9f6ee', { rim: 4, id: 'tool-glucometre' });
+      rbox(6.66, 4.06, 1.25, 0.12, 0.15, 0.05, '#5fbf8a', { rim: 2, id: 'tool-glucometre' });
     }
   }
 
@@ -533,10 +544,25 @@ App.SimScene = (() => {
     rbox(6.3, 1.72, 0.1, 0.65, 0.14, 0.78, '#c99079', { rim: 4 }); rbox(6.3, 2.42, 0.1, 0.65, 0.14, 0.78, '#c99079', { rim: 4 });   // accoudoirs
     rbox(6.38, 1.9, 0.52, 0.5, 0.52, 0.06, '#f4b8a0', { rim: 3, top: '#f9cdb9' });                  // plaid
   }
+  // Déchets de soins : DASRI (poubelle jaune, symbole « risque biologique »), poubelle ordinaire (DAOM, grise), collecteur OPCT (sur l'étagère basse du chariot)
   function wasteBin() {
-    shadow(6.1, 4.7, 6.8, 5.3, 0.18, 1);
-    rbox(6.25, 4.82, 0, 0.42, 0.42, 0.62, '#f3d04f', { rim: 4 });
-    rbox(6.22, 4.79, 0.62, 0.48, 0.48, 0.07, '#e3b92f', { rim: 3 });
+    // Contre le mur de la porte, à côté du distributeur : poubelle DASRI (jaune) et poubelle ordinaire (grise)
+    shadow(0.0, 4.9, 0.7, 6.05, 0.18, 1);
+    rbox(0.08, 4.95, 0, 0.42, 0.42, 0.62, '#f3d04f', { rim: 4 });
+    rbox(0.05, 4.92, 0.62, 0.48, 0.48, 0.07, '#e3b92f', { rim: 3 });
+    const b = P(0.51, 5.16, 0.32), l = P(0.29, 5.16, 0.74);
+    add(`<g transform="translate(${r1(b[0])} ${r1(b[1])})"><circle r="8.5" fill="#fff8d6" stroke="#b8860b" stroke-width="1"/><text y="5.2" text-anchor="middle" font-size="13" font-weight="700" fill="#222">☣</text></g>
+      <text x="${r1(l[0])}" y="${r1(l[1] + 14)}" text-anchor="middle" font-size="7.5" font-weight="800" fill="#7a5c00">DASRI</text>`);
+    rbox(0.08, 5.55, 0, 0.4, 0.4, 0.55, '#9aa5b1', { rim: 4 });
+    rbox(0.05, 5.52, 0.55, 0.46, 0.46, 0.07, '#7f8a96', { rim: 3 });
+    const d = P(0.29, 5.75, 0.8);
+    add(`<text x="${r1(d[0])}" y="${r1(d[1] + 14)}" text-anchor="middle" font-size="7" font-weight="800" fill="#50606f">ORDURES</text>`);
+  }
+  function opctBox() {
+    rbox(6.3, 3.62, 0.45, 0.34, 0.34, 0.28, '#f3d04f', { rim: 4, id: 'opct' });
+    rbox(6.28, 3.6, 0.73, 0.38, 0.38, 0.05, '#2f3a45', { rim: 3, id: 'opct' });
+    const t = P(6.47, 3.79, 0.64);
+    add(`<text x="${r1(t[0])}" y="${r1(t[1] + 3)}" text-anchor="middle" font-size="6.5" font-weight="800" fill="#6b4f00">OPCT</text>`);
   }
 
 
@@ -609,18 +635,23 @@ App.SimScene = (() => {
     CLK = Object.assign({ h: 7, m: 40 }, opts.clock || {});
     defs = []; uid = 0; out = [];
     HOSP = opts.style === 'hopital'; PAL = HOSP ? PAL_H : PAL_E;
-    W = HOSP ? 8.2 : 7.2; D = HOSP ? 7.2 : 6.4;
+    W = 10; D = HOSP ? 8.6 : 8.4;                       // pièce agrandie (largeur 10)
     const G = geom(state);
-    floor(); walls(); windowAndCurtains(); door(); nameplate(opts.room);
-    if (HOSP) { whiteboard(); dispenser(); wardrobe(); rampe(state.o2); overbedTable(); }
-    else { picture(); dispenser(); wardrobe(); mat(); o2Unit(state.o2); overbedTable(); slippers(); }
-    if (opts.nurse) nurse();
-    bed(state, G);
-    monitorSensors(state, G);
-    o2Tube(state.o2, G); satClip(state.sat, G);
-    bedsideTable();
-    if (HOSP) scopeStand(opts.scope); else { framePhoto(); plant(); armchair(); walker(); }
-    trolley(opts); wasteBin();
+    SH = { bed: BEDSH, over: [0.9, 0.7], plant: [2.5, 0], chair: [-2.4, 3.2], trolley: [2.3, 1.6], walk: [1.4, 0.6], bins: [0, 1.6], pic: [0, 1.0] };
+    floor(); walls(); place('bed', windowAndCurtains); door(); nameplate(opts.room);
+    if (HOSP) { place('pic', whiteboard); dispenser(); wardrobe(); place('bed', rampe.bind(null, state.o2)); place('over', overbedTable); }
+    else { place('pic', picture); dispenser(); wardrobe(); place('bed', mat); place('bed', o2Unit.bind(null, state.o2)); place('over', overbedTable); place('bed', slippers); }
+    place('bed', () => {
+      if (opts.nurse) nurse();
+      bed(state, G);
+      monitorSensors(state, G);
+      o2Tube(state.o2, G); satClip(state.sat, G);
+      bedsideTable();
+      if (HOSP) scopeStand(opts.scope); else framePhoto();
+    });
+    if (!HOSP) { place('plant', plant); place('chair', armchair); place('walk', walker); }
+    place('trolley', () => { trolley(opts); opctBox(); });
+    place('bins', wasteBin);
     // Zones cliquables (au-dessus de tout)
     const hs = (HOSP ? [
       hot('patiente', opts.male === false ? 'Observer la patiente' : 'Observer le patient', G.thorax[0], G.thorax[1] + 0.1, G.thorax[2], 30),
@@ -628,23 +659,29 @@ App.SimScene = (() => {
       hot('o2wall', "Prise d'oxygène murale et débitmètre", 3.8, 0, 2.55, 24),
       hot('lit', 'Le lit : dossier et position', 5.15, 3.35, 0.95, 28),
       hot('sonnette', 'Sonnette', 5.42, 2.3, 0.7, 11),
-      hot('dispenser', 'Distributeur de solution hydro-alcoolique', 0, 4.17, 2.2, 22)
+      hot('dispenser', 'Distributeur de solution hydro-alcoolique', 0, 4.17, 2.2, 22),
+      hot('opct', 'Collecteur à objets piquants (OPCT)', 6.47, 3.79, 0.8, 11, 3),
+      hot('dasri', 'Poubelle DASRI (déchets de soins à risques infectieux)', 0.29, 5.16, 0.8, 15, 3),
+      hot('daom', 'Poubelle ordinaire (DAOM)', 0.29, 5.75, 0.7, 14, 3)
     ] : [
       hot('patiente', 'Observer la résidente', G.thorax[0], G.thorax[1] + 0.1, G.thorax[2], 30),
       hot('table', 'Table de chevet', 5.95, 0.9, 1.5, 24),
       hot('plateau', 'Plateau du petit déjeuner', 1.85, 2.6, 1.45, 26),
-      hot('deambulateur', 'Déambulateur', 0.85, 5.0, 0.9, 26),
+      hot('deambulateur', 'Déambulateur', 1.1, 5.0, 0.9, 26),
       hot('chaussons', 'Chaussons', 2.58, 4.08, 0.1, 24),
       hot('sonnette', 'Sonnette', 5.42, 1.55, 0.7, 14),
-      hot('dispenser', 'Distributeur de solution hydro-alcoolique', 0, 4.17, 2.2, 22)
+      hot('dispenser', 'Distributeur de solution hydro-alcoolique', 0, 4.17, 2.2, 22),
+      hot('opct', 'Collecteur à objets piquants (OPCT)', 6.47, 3.79, 0.8, 11, 3),
+      hot('dasri', 'Poubelle DASRI (déchets de soins à risques infectieux)', 0.29, 5.16, 0.8, 15, 3),
+      hot('daom', 'Poubelle ordinaire (DAOM)', 0.29, 5.75, 0.7, 14, 3)
     ]).join('');
     const toolHs = [
-      hot('tool-thermometre', 'Thermomètre', 6.37, 3.54, 1.35, 10, 2),
-      hot('tool-tension', 'Tensiomètre', 6.82, 3.5, 1.45, 11, 2),
-      hot('tool-saturometre', 'Saturomètre', 6.45, 4.08, 1.3, 10, 2),
-      hot('tool-montre', 'Montre', 6.82, 4.42, 1.3, 9, 2),
+      hot('tool-thermometre', 'Thermomètre', 6.2, 3.46, 1.4, 11, 2),
+      hot('tool-tension', 'Tensiomètre', 6.74, 3.43, 1.55, 12, 2),
+      hot('tool-saturometre', 'Saturomètre', 6.28, 4.13, 1.3, 11, 2),
+      hot('tool-montre', 'Montre', 6.24, 4.64, 1.3, 10, 2),
       HOSP && opts.scope ? hot('tool-scope', 'Scope', 6.4, 2.12, 1.55, 18, 2) : '',
-      opts.glucometre ? hot('tool-glucometre', 'Lecteur de glycémie', 6.87, 3.98, 1.34, 9, 2) : ''
+      opts.glucometre ? hot('tool-glucometre', 'Lecteur de glycémie', 6.73, 4.16, 1.34, 10, 2) : ''
     ].join('');
     const spots = [
       hot('zone-tete', 'Front et oreille', G.head[0] + 0.02, G.head[1] + 0.02, G.head[2] + 0.42, 19, 1),
@@ -662,5 +699,5 @@ App.SimScene = (() => {
     </svg>`;
   }
 
-  return { svg, P, VIEW: { get room() { return HOSP ? VB_H : VB; }, patient: '318 232 256 232' } };
+  return { svg, P, VIEW: { get room() { return HOSP ? VB_H : VB; }, get patient() { const d = _off(BEDSH); return (318 + d[0]) + ' ' + (232 + d[1]) + ' 256 232'; } } };
 })();

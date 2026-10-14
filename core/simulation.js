@@ -9,6 +9,8 @@ window.App = window.App || {};
 
 App.Sim = (() => {
   const KEY = 'ifsi_sim_v1';
+  const NB_KEY = 'ifsi_sim_nb';          // préférence « mode bloc-notes » (l'étudiant note lui-même)
+  function _nbPref() { try { return localStorage.getItem(NB_KEY) === '1'; } catch (e) { return false; } }
   const MAX_HISTORY = 30;
   const MAX_LOG = 400;
 
@@ -77,7 +79,8 @@ App.Sim = (() => {
     c.saed = c.saed || { txt: { S: '', A: '', E: '', D: '' }, tries: 0, p1: null, p2: null, t1: null, log: [], sent: false, done: false, canRetry: false, warn: '' };
     c.rx = c.rx || { ecg: null, skipped: false, gazo: null, gazoSkipped: false };
     c.wr = c.wr || { txt: { C: '', D: '', A: '', R: '' }, graded: false, pts: 0, warn: '' };
-    c.ai = c.ai || {};
+    c.ai = c.ai || {}; c.prep = c.prep || {}; c.waste = c.waste || null;
+    c.nb = !!c.nb; c.notes = typeof c.notes === 'string' ? c.notes : ''; c.nbExp = c.nbExp || {}; c.nbWarn = c.nbWarn || {};
     const k = c.care = (c.care && typeof c.care === 'object') ? c.care : {};
     k.pos = k.pos || null; k.o2 = k.o2 || null; k.alert = k.alert || null; k.stay = !!k.stay; k.stayShown = !!k.stayShown; k.bad = k.bad || 0;
     k.ev = Array.isArray(k.ev) ? k.ev : [];
@@ -603,6 +606,7 @@ App.Sim = (() => {
     const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre' || !scn.tools[key]) return;
     if (_tool === key) return dropTool();
     _gClear(); _tool = key;
+    { const t = scn.tools[key]; if (t.waste && c.waste && !c.waste.done && c.found[t.fact]) _startWaste(key); }
     if (_zoom === 'room') _setZoom('patient', true);
     _renderToolbar(); _renderGesture(); _syncScene();
   }
@@ -661,6 +665,14 @@ App.Sim = (() => {
     if (c.firstCare === null) c.firstCare = c.actions;
     c.actions++;
     _hint = '';
+    if (t.prep && !(c.prep[_tool] && c.prep[_tool].passed) && !(c.prep[_tool] && c.prep[_tool].revealed && c.prep[_tool].go)) {
+      const pr = c.prep[_tool] = c.prep[_tool] || { tries: 0, passed: false, sel: [], order: _shuffleIds(t.prep.items.map(i => i.id)) };
+      pr.sel = []; pr.revealed = false;
+      _log('narr', 'Tu prépares ton matériel avant de piquer.'); c.last = { text: 'Prépare ta sécurité avant de piquer.', facts: [] };
+      _G = { tool: _tool, kind: t.kind, phase: 'prep', errs: 0, placeErrs: 0, n: 0 };
+      _save(); _renderLog(); _renderChambre(); _renderGesture(false);
+      return;
+    }
     _log('narr', t.start); c.last = { text: t.start, facts: [] };
     _G = { tool: _tool, kind: t.kind, phase: 'start', errs: 0, placeErrs: 0, n: 0 };
     if (t.kind === 'instant' || t.kind === 'wait') _gMeasure(t.seconds);
@@ -668,6 +680,44 @@ App.Sim = (() => {
     else if (t.kind === 'count') _G.phase = 'ready';
     else if (t.kind === 'scale') { _G.phase = 'read'; c.pending[_tool] = true; }
     _save(); _renderLog(); _renderChambre(); _renderRecueil(); _renderGesture(t.kind === 'scale');
+  }
+  // ── Préparation de sécurité (glycémie capillaire) : on coche ce qu'on fait avant de piquer ──
+  function _shuffleIds(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const x = a[i]; a[i] = a[j]; a[j] = x; } return a; }
+  function gPrepToggle(id) {
+    const c = _cur(); if (!c || !_G || _G.phase !== 'prep') return;
+    const pr = c.prep[_G.tool]; if (!pr || pr.revealed) return;
+    const k = pr.sel.indexOf(id); if (k >= 0) pr.sel.splice(k, 1); else pr.sel.push(id);
+    _hint = ''; _save(); _renderGesture(false);
+  }
+  function _prepGo(key) {                 // la préparation est faite : on pique
+    const c = _cur(), scn = _curScn(), t = scn.tools[key], pr = c.prep[key]; if (!c || !_G) return;
+    pr.go = true;
+    _log('narr', t.start); c.last = { text: t.start, facts: [] };
+    _G.phase = 'start';
+    _hint = '';
+    _gMeasure(t.seconds);
+    _save(); _renderLog(); _renderChambre(); _renderRecueil(); _renderGesture(false);
+  }
+  function gPrepSubmit() {
+    const c = _cur(), scn = _curScn(); if (!c || !scn || !_G || _G.phase !== 'prep') return;
+    const key = _G.tool, t = scn.tools[key], pr = c.prep[key];
+    if (pr.revealed) return _prepGo(key);
+    const items = t.prep.items;
+    const missing = items.filter(i => i.ok && pr.sel.indexOf(i.id) < 0), wrong = items.filter(i => !i.ok && pr.sel.indexOf(i.id) >= 0);
+    if (!missing.length && !wrong.length) {
+      pr.passed = true;
+      _markDone('g_glyc_secu', pr.tries > 0 ? { retry: true } : null);
+      _log('narr', 'Tu es prêt : mains frictionnées, gants, autopiqueur de sécurité et collecteur à portée.');
+      return _prepGo(key);
+    }
+    pr.tries++;
+    if (pr.tries >= 2) {
+      pr.revealed = true;
+      _hint = 'Voici ce qu\'il fallait faire : ' + items.filter(i => i.ok).map(i => i.label).join(' ; ') + '. À éviter : ' + items.filter(i => !i.ok).map(i => i.label).join(' ; ') + '.';
+    } else {
+      _hint = (wrong.length ? 'À revoir : ' + wrong.map(i => '« ' + i.label + ' » : ' + i.why).join(' ') + ' ' : '') + (missing.length ? 'Il te manque ' + missing.length + ' geste' + (missing.length > 1 ? 's' : '') + ' de sécurité.' : '') + ' Corrige ta sélection puis revalide.';
+    }
+    _save(); _renderGesture(false);
   }
   function _gMeasure(sec) {              // attente chronométrée (thermomètre, saturomètre, gonflage du brassard)
     const g = _G; g.phase = 'measuring'; g.t0 = Date.now(); g.dur = sec * 1000;
@@ -731,24 +781,98 @@ App.Sim = (() => {
     if (t.sensors.every(x => _G.placed[x.id])) { _log('narr', t.ready); _G.sub = 'scope'; _gMeasure(t.seconds); }
     _save(); _renderLog(); _renderChambre(); _renderGesture();
   }
-  function gScopeCuff(id) {
-    if (!_G || _G.kind !== 'scope' || _G.sub !== 'cuff') return;
-    const t = _curScn().tools[_G.tool], p = t.cuff.find(x => x.id === id), sn = t.sensors.find(x => x.id === 'bras'); if (!p || !sn) return;
-    if (!p.ok) { _G.placeErrs++; _hint = p.hint; _renderGesture(); return; }
-    _hint = ''; _markDone('g_brassard', { retry: _G.placeErrs > 0 });
-    _scopePlace(sn);
+  // ── Pose du brassard : l'étudiant règle lui-même la hauteur et le sens du repère « Artery » ──
+  // Hauteur : bord inférieur du brassard au-dessus du pli du coude. Sens : la flèche « Artery » doit être face à l'artère brachiale (face interne du bras).
+  const CUFF_Y0 = 120, CUFF_S = 5, CUFF_H = 56;          // pli du coude dans le dessin, pixels par cm, hauteur du brassard
+  function _cuffState() {
+    if (!_G) return null;
+    if (!_G.cuff) {
+      const cms = [9, 11, 13, -2], angs = [-150, 150, 180, -120, 120, 90, -90];
+      _G.cuff = { cm: cms[Math.floor(Math.random() * cms.length)], ang: angs[Math.floor(Math.random() * angs.length)], palp: false, drag: false };
+    }
+    return _G.cuff;
   }
-  // pose du brassard
-  function gPlace(id) {
-    const c = _cur(); if (!_G || _G.phase !== 'place') return;
-    const t = _curScn().tools[_G.tool], p = t.cuff.find(x => x.id === id); if (!p) return;
-    if (!p.ok) { _G.placeErrs++; _hint = p.hint; _renderGesture(); return; }
+  function gCuffMove(d) { const k = _cuffState(); if (!k) return; k.cm = Math.max(-4, Math.min(16, Math.round((k.cm + d) * 2) / 2)); _hint = ''; _renderGesture(false); }
+  function gCuffRot(d) { const k = _cuffState(); if (!k) return; k.ang = ((k.ang + d + 540) % 360) - 180; _hint = ''; _renderGesture(false); }
+  function gCuffPalp() {
+    const k = _cuffState(); if (!k || k.palp) return;
+    k.palp = true; _log('narr', 'Tu palpes le pli du coude : tu sens le pouls de l\'artère brachiale, sur la face interne du bras (côté du corps).');
+    _save(); _renderLog(); _renderGesture(false);
+  }
+  function cuffDown(ev) {
+    const k = _cuffState(); if (!k || !ev || !ev.currentTarget) return;
+    const svg = ev.currentTarget; k.drag = true;
+    try { svg.setPointerCapture(ev.pointerId); } catch (e) {}
+    cuffMove(ev);
+  }
+  function cuffMove(ev) {
+    const k = _cuffState(); if (!k || !k.drag) return;
+    const svg = ev.currentTarget, r = svg.getBoundingClientRect(); if (!r.height) return;
+    const vy = (ev.clientY - r.top) / r.height * 230, lower = vy + CUFF_H / 2;
+    k.cm = Math.max(-4, Math.min(16, Math.round((CUFF_Y0 - lower) / CUFF_S * 2) / 2));
+    const g = svg.querySelector('#sim-cuffband'); if (g) g.setAttribute('transform', 'translate(0 ' + (-k.cm * CUFF_S) + ')');
+  }
+  function cuffUp(ev) { const k = _cuffState(); if (k) { k.drag = false; _renderGesture(false); } }
+  function gCuffOk() {
+    const c = _cur(); if (!c || !_G) return; const k = _cuffState(); if (!k) return;
+    const scope = _G.kind === 'scope';
+    if (!scope && _G.phase !== 'place') return;
+    if (scope && _G.sub !== 'cuff') return;
+    const lowOk = k.cm >= 1.5 && k.cm <= 4, angOk = Math.abs(k.ang) <= 35;
+    if (!lowOk || !angOk) {
+      _G.placeErrs++;
+      const m = [];
+      if (k.cm > 4) m.push('Le brassard est trop haut : il se place juste au-dessus du pli du coude.');
+      else if (k.cm < 1.5) m.push('Le brassard est trop bas : il gêne le pli du coude et fausse la mesure.');
+      if (!angOk) m.push('Le repère « Artery » n\'est pas face à l\'artère : l\'artère brachiale passe sur la face interne du bras. Tourne le brassard.');
+      _hint = m.join(' '); _save(); _renderGesture(false); return;
+    }
     _hint = ''; _markDone('g_brassard', { retry: _G.placeErrs > 0 });
+    if (scope) { const t = _curScn().tools[_G.tool], sn = t.sensors.find(x => x.id === 'bras'); if (sn) _scopePlace(sn); return; }
     _G.phase = 'cuffed'; _save(); _renderGesture();
   }
   function gInflate() {
     if (!_G || _G.phase !== 'cuffed') return;
     _G.sub = 'inflate'; _gMeasure(_curScn().tools[_G.tool].seconds); _renderGesture();
+  }
+  // ── Mode bloc-notes : l'étudiant relève et écrit lui-même les valeurs, rien n'est pré-rempli ──
+  function setNb(on) {
+    try { localStorage.setItem(NB_KEY, on ? '1' : '0'); } catch (e) {}
+    const el = _el('sim-nb-state'); if (el) el.textContent = on ? 'activé pour la prochaine partie' : 'désactivé';
+  }
+  function _nbNums(text) { return (String(text || '').match(/\d+(?:[.,]\d+)?/g) || []).map(x => parseFloat(x.replace(',', '.'))); }
+  function _nbExpect(scn, key, n) {
+    const t = scn.tools[key], out = [], add = (label, vals, tol) => out.push({ label, vals, tol: tol || 0 });
+    if (t.multi) t.multi.forEach(m => m.type === 'bp' ? add(m.label || 'Pression artérielle', [m.sys, m.dia], m.tol) : add(m.label, [m.value], m.tol));
+    else if (t.kind === 'count') add(t.label, [n * t.factor], 0);
+    else if (t.input && t.input.type === 'bp') add(t.input.label, [t.input.sys, t.input.dia], t.input.tol);
+    else { add(t.input.label, [t.input.value], t.input.tol); if (t.also) add(t.also.input.label, [t.also.input.value], t.also.input.tol); }
+    return out;
+  }
+  function _nbMissing(exp, notes) {          // libellés dont la valeur n'apparaît pas dans le bloc-notes
+    const nums = _nbNums(notes);
+    return (exp || []).filter(e => !e.vals.every(v => nums.some(x => Math.abs(x - v) <= (e.tol || 0) + 0.001))).map(e => e.label);
+  }
+  function nbTxt(v) {
+    const c = _cur(); if (!c) return;
+    const was = !!c.notes.trim();
+    c.notes = String(v || '').slice(0, 3000);
+    ['sim-nb-main', 'sim-nb-g'].forEach(id => { const el = _el(id); if (el && el.value !== c.notes) el.value = c.notes; });
+    _saveSoon();
+    if (was !== !!c.notes.trim()) _renderTabs();
+  }
+  function gNbDone() {
+    const c = _cur(), scn = _curScn(); if (!c || !scn || !c.nb || !_G || _G.phase !== 'read') return false;
+    const key = _G.tool, n = (c.pending[key] && c.pending[key].n != null) ? c.pending[key].n : _G.n;
+    const exp = _nbExpect(scn, key, n), miss = _nbMissing(exp, c.notes);
+    if (miss.length && !c.nbWarn[key]) {
+      c.nbWarn[key] = true;
+      _hint = 'Je ne retrouve pas dans ton bloc-notes : ' + miss.join(', ') + '. Relis l\'écran et écris la valeur avec son unité : tu en auras besoin pour appeler l\'infirmière. Si tu es sûr de toi, appuie de nouveau sur « J\'ai noté ».';
+      _save(); _renderGesture(false); return false;
+    }
+    c.nbExp[key] = exp;
+    _record(key);
+    return false;
   }
   // saisie de la valeur lue
   function _num(v) { const x = parseFloat(String(v == null ? '' : v).replace(',', '.').replace(/[^\d.\-]/g, '')); return isNaN(x) ? null : x; }
@@ -800,12 +924,55 @@ App.Sim = (() => {
     list.forEach(m => { c.entered[m.fact] = true; _find(m.fact); facts.push(m.fact); notes.push(m.noted); });
     const noted = notes.join(' · ');
     if (t.kind === 'scope') c.mon = { live: true };                 // le scope reste branché sur le patient
-    _log('narr', 'Tu notes dans le recueil : ' + noted + '.');
-    c.last = { text: '✓ Noté dans le recueil : ' + noted, facts };
-    _gClear(); _tool = null;
-    if (_autoZoom) _setZoom('room', false);
+    if (c.nb) {
+      _log('narr', 'Tu relèves la mesure (' + (t.label || 'instrument') + '). Elle est dans ton bloc-notes si tu l\'as écrite.');
+      c.last = { text: '✓ Mesure relevée : vérifie que tu l\'as bien écrite dans ton bloc-notes.', facts };
+    } else {
+      _log('narr', 'Tu notes dans le recueil : ' + noted + '.');
+      c.last = { text: '✓ Noté dans le recueil : ' + noted, facts };
+    }
+    if (t.waste && !(c.waste && c.waste.done)) {                 // il reste à trier les déchets (OPCT / DASRI / ordinaire)
+      _gClear(); _tool = key;
+      _startWaste(key);
+    } else {
+      _gClear(); _tool = null;
+      if (_autoZoom) _setZoom('room', false);
+    }
     _renderToolbar(); _renderGesture(); _syncScene();
     _afterAction();
+  }
+  function _startWaste(key) {
+    const c = _cur(), scn = _curScn(), t = scn.tools[key];
+    if (!c.waste) c.waste = { tries: 0, passed: false, done: false, assign: {}, revealed: false, order: _shuffleIds(t.waste.items.map(i => i.id)) };
+    _G = { tool: key, kind: t.kind, phase: 'waste', errs: 0, placeErrs: 0, n: 0 };
+  }
+  function gWasteSet(id, bin) {
+    const c = _cur(); if (!c || !_G || _G.phase !== 'waste' || !c.waste || c.waste.revealed) return;
+    c.waste.assign[id] = bin; _hint = ''; _save(); _renderGesture(false);
+  }
+  function gWasteSubmit() {
+    const c = _cur(), scn = _curScn(); if (!c || !scn || !_G || _G.phase !== 'waste') return;
+    const key = _G.tool, t = scn.tools[key], w = c.waste, items = t.waste.items;
+    const done = () => { _gClear(); _tool = null; if (_autoZoom) _setZoom('room', false); _renderToolbar(); _renderGesture(); _syncScene(); _afterAction(); };
+    if (w.revealed) { w.done = true; _save(); return done(); }
+    if (items.some(i => !w.assign[i.id])) { _hint = 'Choisis une poubelle pour chaque élément avant de valider.'; _save(); _renderGesture(false); return; }
+    const wrong = items.filter(i => w.assign[i.id] !== i.bin);
+    if (!wrong.length) {
+      w.passed = true; w.done = true;
+      _markDone('g_glyc_dechets', w.tries > 0 ? { retry: true } : null);
+      _log('narr', 'Tu tries tes déchets : autopiqueur dans l\'OPCT, déchets souillés dans les DASRI, emballage propre dans les ordures ménagères.');
+      c.last = { text: '✓ Déchets bien triés : OPCT, DASRI, ordures ménagères.', facts: [] };
+      return done();
+    }
+    w.tries++;
+    const nm = id => (t.waste.bins.find(b => b.id === id) || {}).label;
+    if (w.tries >= 2) {
+      w.revealed = true;
+      _hint = 'Voici le bon tri : ' + items.map(i => i.label + ' → ' + nm(i.bin)).join(' ; ') + '.';
+    } else {
+      _hint = 'À revoir : ' + wrong.map(i => '« ' + i.label + ' » : ' + i.why).join(' ') + ' Corrige puis revalide.';
+    }
+    _save(); _renderGesture(false);
   }
   function reopen(key) {                 // revenir sur une valeur lue mais pas encore notée
     const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre' || !c.pending[key]) return;
@@ -1057,7 +1224,7 @@ App.Sim = (() => {
 
   // Appel à l'infirmière référente (SAED)
   function _recueilRecap(c, scn) {
-    return `<details class="sim-recap"><summary>📋 Mon recueil de données (à relire avant d'appeler)</summary><div class="sim-recap-body">${_recueilHtml(true)}</div></details>`;
+    return `<details class="sim-recap"><summary>${c.nb ? '📝 Mon bloc-notes' : '📋 Mon recueil de données'} (à relire avant d'appeler)</summary><div class="sim-recap-body">${_recueilHtml(true)}</div></details>`;
   }
   function _aiBlock(kind, c) {
     const out = c.ai && c.ai[kind];
@@ -1252,7 +1419,7 @@ App.Sim = (() => {
     if (!W.graded) {
       body = `<div class="sim-card"><h2 class="sim-title">📝 Transmissions écrites</h2><p class="sim-lead">${_esc(wr.intro)}</p>
         <div class="sim-note">${_esc(wr.rules)}</div>
-        <details class="sim-recap"><summary>📋 Mon recueil de données (à relire)</summary><div class="sim-recap-body">${_recueilHtml(true)}</div></details>
+        <details class="sim-recap"><summary>${c.nb ? '📝 Mon bloc-notes' : '📋 Mon recueil de données'} (à relire)</summary><div class="sim-recap-body">${_recueilHtml(true)}</div></details>
         ${W.warn ? `<div class="sim-g-warn" role="alert">${_esc(W.warn)}</div>` : ''}${fields}
         <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.wrSubmit()">Valider ma transmission</button></div></div>`;
     } else {
@@ -1402,7 +1569,7 @@ App.Sim = (() => {
     const scn = _scn(id); if (!scn) return;
     st.current = { scenarioId: id, startedAt: Date.now(), stage: 'couloir', tab: 'dialogue', log: [], found: {}, done: {},
                    asked: {}, seenObj: {}, pending: {}, entered: {}, errors: 0, misplaced: 0,
-                   actions: 0, firstCare: null, secs: 0, dossierOpen: false, misses: 0, last: null, saved: false };
+                   actions: 0, firstCare: null, secs: 0, dossierOpen: false, misses: 0, last: null, saved: false, nb: _nbPref(), notes: '' };
     _fix(st.current);
     _gReset();
     _confirmFinish = false; _menuOpen = false; _menuAct = false;
@@ -1487,6 +1654,7 @@ App.Sim = (() => {
       🤖 <b>IA facultative</b> : si tu as ajouté une clé Gemini dans les réglages, un bouton permet de demander un avis plus fin sur ton appel et ta transmission (internet nécessaire, hors score). <br>
       🏅 <b>Ta progression</b> (niveau, XP, badges) reste sur cet appareil.</div>
       ${_progHtml()}
+      <label class="sim-nbtog"><input type="checkbox" id="sim-nb-tog" ${_nbPref() ? 'checked' : ''} onchange="App.Sim.setNb(this.checked)"><span><b>📝 Mode bloc-notes</b> · <span id="sim-nb-state">${_nbPref() ? 'activé pour la prochaine partie' : 'désactivé'}</span><br><small>Plus difficile : le recueil n'est plus rempli pour toi. Tu relèves tension, température… et tu les écris toi-même dans un bloc-notes libre, puis tu t'en sers pour transmettre à l'infirmière.</small></span></label>
       ${resumeHtml}
       <h3 class="sim-h">Scénarios</h3>
       ${cards}
@@ -1694,7 +1862,7 @@ App.Sim = (() => {
     el.innerHTML = scn.toolOrder.map(k => {
       const t = scn.tools[k], done = _toolFacts(t).every(f => !!c.found[f]), pend = !!c.pending[k] && !done, held = _tool === k;
       return `<button type="button" class="sim-tool ${held ? 'held' : ''} ${done ? 'done' : ''}" aria-pressed="${held}" onclick="App.Sim.pickTool('${k}')">
-        <span class="sim-tool-ico">${t.icon}</span><span class="sim-tool-lbl">${_esc(t.label)}</span>${done ? '<span class="sim-act-ok">✓</span>' : (pend ? '<span class="sim-pend-dot" title="Valeur à noter">✎</span>' : '')}</button>`;
+        <span class="sim-tool-ico">${t.icon}</span><span class="sim-tool-lbl">${_esc(t.label)}</span>${done ? (t.waste && c.waste && !c.waste.done ? '<span class="sim-pend-dot" title="Déchets à trier">♻️</span>' : '<span class="sim-act-ok">✓</span>') : (pend ? '<span class="sim-pend-dot" title="Valeur à noter">✎</span>' : '')}</button>`;
     }).join('');
   }
   // L'instrument en main, ou le geste en cours : tout ce que la patiente et l'écran affichent
@@ -1709,6 +1877,24 @@ App.Sim = (() => {
         ${d.sub ? `<span class="sim-lcd-sub">${_esc(d.sub)}</span>` : ''}</div>`;
     }
     return `<div class="sim-lcd" role="img" aria-label="Écran de l'appareil : ${_esc(d.big)} ${_esc(d.unit)}">${d.sub ? `<span class="sim-lcd-sub">${_esc(d.sub)}</span>` : ''}<span class="sim-lcd-v">${_esc(d.big)}</span><span class="sim-lcd-u">${_esc(d.unit)}</span></div>`;
+  }
+  // Appareils de mesure dessinés avec leur boîtier : tensiomètre (START / MEM + tuyau), thermomètre (sonde), glucomètre (bandelette + goutte)
+  const _DEVS = { tension: 'tension', thermometre: 'thermo', glucometre: 'gluco' };
+  function _dev(key, d, busy) {
+    const kind = _DEVS[key]; if (!kind || !d || d.pulse != null) return _lcd(d);
+    const dash = kind === 'tension' ? '--- / --' : (kind === 'thermo' ? '--.-' : '---');
+    const scr = busy
+      ? `<span class="sim-dev-v blink" aria-hidden="true">${dash}</span><span class="sim-lcd-u">${_esc(d.unit)}</span>`
+      : `${d.sub ? `<span class="sim-lcd-sub">${_esc(d.sub)}</span>` : ''}<span class="sim-lcd-v">${_esc(d.big)}</span><span class="sim-lcd-u">${_esc(d.unit)}</span>`;
+    const lbl = busy ? 'Appareil en train de mesurer' : `Écran de l'appareil : ${d.big} ${d.unit}`;
+    const screen = `<div class="sim-lcd sim-lcd-in" role="img" aria-label="${_esc(lbl)}">${scr}</div>`;
+    if (kind === 'tension') return `<div class="sim-dev sim-dev-tension"><div class="sim-dev-body"><div class="sim-dev-brand">TENSIOMÈTRE</div>${screen}
+      <div class="sim-dev-btns"><span class="sim-dev-btn start">START</span><span class="sim-dev-btn">MEM</span></div><span class="sim-dev-port" aria-hidden="true"></span></div>
+      <svg class="sim-dev-tube" viewBox="0 0 90 40" aria-hidden="true"><path d="M0 4 C34 4 40 36 70 30" fill="none" stroke="#8a97a6" stroke-width="5" stroke-linecap="round"/><path d="M0 4 C34 4 40 36 70 30" fill="none" stroke="#d3dae2" stroke-width="2" stroke-linecap="round"/><rect x="66" y="22" width="22" height="16" rx="5" fill="#3b5bb0" stroke="#1d2f66"/></svg></div>`;
+    if (kind === 'thermo') return `<div class="sim-dev sim-dev-thermo"><div class="sim-dev-body"><div class="sim-dev-brand">THERMOMÈTRE</div>${screen}<span class="sim-dev-btn start">ON</span></div><span class="sim-dev-probe" aria-hidden="true"></span></div>`;
+    return `<div class="sim-dev sim-dev-gluco"><div class="sim-dev-body"><div class="sim-dev-brand">GLUCOMÈTRE</div>${screen}<span class="sim-dev-btn start">OK</span>
+      <span class="sim-dev-strip" aria-hidden="true"><i class="${busy ? 'drop' : ''}"></i></span></div>
+      <svg class="sim-dev-pen" viewBox="0 0 80 22" aria-hidden="true"><rect x="2" y="5" width="56" height="12" rx="6" fill="#e8ecf2" stroke="#8d99a8"/><rect x="58" y="8" width="16" height="6" rx="3" fill="#9aa6b5"/><circle cx="14" cy="11" r="3" fill="#2f6fd6"/></svg></div>`;
   }
   // Écran du scope : tracé du rythme, FC, SpO₂, pression non invasive, FR ; une alarme sonne si une valeur sort des seuils
   function _ecgPath(irregular) {
@@ -1728,7 +1914,7 @@ App.Sim = (() => {
   function _scopeSensors(t) {
     const g = _G || { placed: {} };
     const list = `<ul class="sim-sens">${t.sensors.map(x => `<li class="${g.placed[x.id] ? 'done' : ''}"><span class="sim-sens-i" aria-hidden="true">${g.placed[x.id] ? '✓' : '○'}</span><span>${_esc(x.label)}<small>${_esc(x.hint)}</small></span></li>`).join('')}</ul>`;
-    const cuff = g.sub === 'cuff' ? `<div class="sim-g-note">Où places-tu le brassard du scope ?</div><div class="sim-cuff">${_arm(t, null, 'gScopeCuff')}<div class="sim-cuff-list">${t.cuff.map(p => `<button type="button" class="sim-q" onclick="App.Sim.gScopeCuff('${p.id}')">${_esc(p.label)}</button>`).join('')}</div></div>` : '';
+    const cuff = g.sub === 'cuff' ? `<div class="sim-g-note">Pose le brassard du scope toi-même : hauteur (glisse-le ou ▲ ▼) et sens du repère « Artery » (↺ ↻).</div>${_hint ? `<div class="sim-g-warn" role="alert">${_esc(_hint)}</div>` : ''}${_cuffPanel(t, false)}` : '';
     return `<div class="sim-g-note">${_esc(t.intro)}</div>${list}${cuff}`;
   }
   function _scale(t) {
@@ -1739,17 +1925,46 @@ App.Sim = (() => {
     }
     return `<div class="sim-scale" role="img" aria-label="Échelle de douleur de 0 à 10 : ${_gen('la résidente', _curScn())} montre ${t.scale}">${cells}</div><div class="sim-quote">${_esc(t.patientSays)}</div>`;
   }
-  function _arm(t, placed, fn) {
-    fn = fn || 'gPlace';
-    const band = { epaule: [14, 36], bon: [84, 108], coude: [112, 138] };
-    const bands = t.cuff.map(p => {
-      const [y0, y1] = band[p.id];
-      return `<g class="sim-band ${placed === p.id ? 'on' : ''}" onclick="App.Sim.${fn}('${p.id}')"><rect x="36" y="${y0}" width="78" height="${y1 - y0}" rx="8"/></g>`;
-    }).join('');
-    return `<svg class="sim-arm" viewBox="0 0 150 215" role="img" aria-label="Schéma du bras">
-      <path d="M48 8 Q75 -2 102 8 L106 112 Q75 132 44 112Z" fill="#f4cba9"/><path d="M46 112 Q75 134 104 112 L98 205 Q75 214 52 205Z" fill="#efc09b"/>
-      <path d="M46 120 Q75 140 104 120" fill="none" stroke="#d9a07a" stroke-width="2.5" stroke-linecap="round"/>
-      <text x="75" y="166" text-anchor="middle" font-size="9" fill="#a4714e">pli du coude ↑</text>${bands}</svg>`;
+  // Dessin du bras (face interne, paume vers le haut) avec le brassard à la hauteur réglée ; le repère imprimé « Artery » se déplace quand on tourne le brassard
+  function _armSvg(k, locked) {
+    const y = -k.cm * CUFF_S, rad = k.ang * Math.PI / 180, cx = 75, mx = cx + Math.sin(rad) * 30, face = Math.cos(rad) > 0.05;
+    const cuff = `<g id="sim-cuffband" transform="translate(0 ${y})">
+      <rect x="40" y="${CUFF_Y0 - CUFF_H}" width="70" height="${CUFF_H}" rx="9" fill="url(#cfg)" stroke="#1d2f66" stroke-width="2"/>
+      <rect x="40" y="${CUFF_Y0 - 14}" width="70" height="14" rx="6" fill="#4a6cc2" opacity=".55"/>
+      <path d="M44 ${CUFF_Y0 - CUFF_H + 9} H106" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
+      ${face ? `<g transform="translate(${mx.toFixed(1)} ${CUFF_Y0 - CUFF_H / 2 - 2})" opacity="${(0.4 + 0.6 * Math.cos(rad)).toFixed(2)}"><path d="M0 -14 V6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M-5 1 L0 8 L5 1Z" fill="#fff"/><text y="19" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fff" letter-spacing=".3">Artery</text></g>
+        <g transform="translate(${(mx - 26 * Math.cos(rad)).toFixed(1)} ${CUFF_Y0 - CUFF_H + 3})" opacity=".9"><text font-size="6" fill="#dbe6ff">INDEX</text><path d="M0 5 H26" stroke="#dbe6ff" stroke-width="1"/><path d="M6 3 V8 M13 3 V8 M20 3 V8" stroke="#dbe6ff" stroke-width=".8"/></g>` : ''}
+      <path d="M108 ${CUFF_Y0 - 6} C130 ${CUFF_Y0 + 2} 136 ${CUFF_Y0 + 24} 132 ${CUFF_Y0 + 46}" fill="none" stroke="#8a97a6" stroke-width="5" stroke-linecap="round"/>
+      <path d="M108 ${CUFF_Y0 - 6} C130 ${CUFF_Y0 + 2} 136 ${CUFF_Y0 + 24} 132 ${CUFF_Y0 + 46}" fill="none" stroke="#c9d2dc" stroke-width="2" stroke-linecap="round"/></g>`;
+    return `<svg class="sim-arm" id="sim-arm" viewBox="0 0 150 230" role="img" aria-label="Schéma du bras avec le brassard" ${locked ? '' : 'onpointerdown="App.Sim.cuffDown(event)" onpointermove="App.Sim.cuffMove(event)" onpointerup="App.Sim.cuffUp(event)" onpointercancel="App.Sim.cuffUp(event)"'}>
+      <defs><linearGradient id="cfg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#27428c"/><stop offset=".5" stop-color="#3b5bb0"/><stop offset="1" stop-color="#27428c"/></linearGradient>
+        <linearGradient id="arg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e7b48c"/><stop offset=".45" stop-color="#f6d2b3"/><stop offset="1" stop-color="#e2ad84"/></linearGradient></defs>
+      <path d="M46 6 Q75 -4 104 6 L106 112 Q75 130 44 112Z" fill="url(#arg)" stroke="#c98f66" stroke-width="1.4"/>
+      <path d="M44 112 Q75 130 106 112 L100 222 Q75 230 50 222Z" fill="url(#arg)" stroke="#c98f66" stroke-width="1.4"/>
+      <path d="M58 40 Q75 58 92 40" fill="none" stroke="#d29a72" stroke-width="1.6" opacity=".7"/>
+      <path d="M45 122 Q75 142 105 122" fill="none" stroke="#c4875c" stroke-width="2.6" stroke-linecap="round"/>
+      <text x="75" y="160" text-anchor="middle" font-size="8.5" fill="#9a6a48">pli du coude</text>
+      ${cuff}</svg>`;
+  }
+  function _crossSvg(k) {              // coupe du bras vue du dessus : le thorax est à gauche, l'extérieur à droite
+    const R = 33, a = (180 + k.ang) * Math.PI / 180, mx = 60 + Math.cos(a) * (R + 1), my = 60 + Math.sin(a) * (R + 1), deg = 180 + k.ang;
+    return `<svg class="sim-cross" viewBox="0 0 120 120" role="img" aria-label="Coupe du bras vue du dessus : le thorax est à gauche">
+      <path d="M0 6 Q9 60 0 114" fill="#d9e0ea" stroke="#b3bfce" stroke-width="2"/><text x="4" y="62" font-size="7" fill="#6b7a8c" transform="rotate(-90 9 60)" text-anchor="middle">thorax</text>
+      <circle cx="60" cy="60" r="27" fill="#f4cba9" stroke="#c98f66" stroke-width="1.4"/><circle cx="62" cy="62" r="6" fill="#efe7dc" stroke="#cdbfae"/>
+      <ellipse cx="55" cy="52" rx="13" ry="9" fill="#e7a98a" opacity=".55"/>
+      ${k.palp ? '<circle cx="36" cy="60" r="3.6" fill="#d11f2a"><animate attributeName="r" values="3;5;3" dur=".9s" repeatCount="indefinite"/></circle><text x="36" y="73" font-size="6.5" fill="#b3131d" text-anchor="middle">pouls</text>' : ''}
+      <circle cx="60" cy="60" r="${R}" fill="none" stroke="#2f4f9e" stroke-width="7"/>
+      <g transform="translate(${mx.toFixed(1)} ${my.toFixed(1)}) rotate(${deg - 90})"><path d="M0 -7 L5 4 L-5 4Z" fill="#fff" stroke="#16295f" stroke-width="1"/></g>
+      <text x="60" y="112" text-anchor="middle" font-size="6.5" fill="#6b7a8c">extérieur du bras →</text></svg>`;
+  }
+  function _cuffPanel(t, locked) {
+    const k = _cuffState();
+    if (locked) return `<div class="sim-cuff">${_armSvg(k, true)}<div class="sim-cuff-side">${_crossSvg(k)}</div></div>`;
+    return `<div class="sim-cuff">${_armSvg(k, false)}<div class="sim-cuff-side">${_crossSvg(k)}
+        <div class="sim-cuff-ctl"><div class="sim-cuff-row"><span>Hauteur</span><button type="button" class="btn btn-ghost btn-sm" aria-label="Monter le brassard" onclick="App.Sim.gCuffMove(0.5)">▲</button><button type="button" class="btn btn-ghost btn-sm" aria-label="Descendre le brassard" onclick="App.Sim.gCuffMove(-0.5)">▼</button></div>
+        <div class="sim-cuff-row"><span>Sens</span><button type="button" class="btn btn-ghost btn-sm" aria-label="Tourner le brassard vers la gauche" onclick="App.Sim.gCuffRot(-30)">↺</button><button type="button" class="btn btn-ghost btn-sm" aria-label="Tourner le brassard vers la droite" onclick="App.Sim.gCuffRot(30)">↻</button></div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="App.Sim.gCuffPalp()" ${k.palp ? 'disabled' : ''}>🫳 Palper le pli du coude</button></div></div></div>
+      <div class="sim-row"><button type="button" class="btn btn-primary" onclick="App.Sim.gCuffOk()">✔ Valider la pose du brassard</button></div>`;
   }
   function _gesture() {                 // contenu du panneau « geste »
     const c = _cur(), scn = _curScn(); if (!c || !scn) return '';
@@ -1759,16 +1974,33 @@ App.Sim = (() => {
     if (t.kind === 'scope' && (!_G || _G.phase === 'sensors')) return head + warn + _scopeSensors(t);
     if (!_G) return head + warn;
     const g = _G;
+    if (g.phase === 'waste') {
+      const w = c.waste, tw = t.waste, binBy = {}; tw.bins.forEach(b => { binBy[b.id] = b; });
+      const rows = (w.order || tw.items.map(i => i.id)).map(id => { const i = tw.items.find(x => x.id === id), cur = w.assign[id];
+        const state = w.revealed ? (cur === i.bin ? 'good' : 'wrong') : '';
+        return `<div class="sim-waste-row ${state}"><div class="sim-waste-l">${_esc(i.label)}${w.revealed ? `<div class="sim-muted sim-small">${cur === i.bin ? '✓' : '✗ → ' + _esc(binBy[i.bin].label)} · ${_esc(i.why)}</div>` : ''}</div>
+          <div class="sim-waste-b" role="group" aria-label="${_esc(i.label)}">${tw.bins.map(b => `<button type="button" class="sim-waste-btn ${b.id} ${cur === b.id ? 'on' : ''}" aria-pressed="${cur === b.id}" ${w.revealed ? 'disabled' : ''} onclick="App.Sim.gWasteSet('${i.id}','${b.id}')"><span aria-hidden="true">${b.ico}</span> ${_esc(b.label)}</button>`).join('')}</div></div>`; }).join('');
+      return head + `<div class="sim-prep"><div class="sim-readlbl">♻️ ${_esc(tw.title)}</div><p class="sim-muted sim-small">${_esc(tw.intro)}</p>${warn}<div class="sim-waste">${rows}</div>
+        <div class="sim-readrow"><button type="button" class="btn btn-primary" onclick="App.Sim.gWasteSubmit()">${w.revealed ? 'Compris : terminer' : 'Valider mon tri'}</button></div></div>`;
+    }
+    if (g.phase === 'prep') {
+      const pr = c.prep[key], pp = t.prep, byId = {}; pp.items.forEach(i => { byId[i.id] = i; });
+      const list = (pr.order || pp.items.map(i => i.id)).map(id => { const i = byId[id], on = pr.sel.indexOf(id) >= 0;
+        const cls = pr.revealed ? (i.ok ? 'good' : (on ? 'wrong' : '')) : (on ? 'on' : '');
+        return `<button type="button" class="sim-prep-it ${cls}" aria-pressed="${on}" ${pr.revealed ? 'disabled' : ''} onclick="App.Sim.gPrepToggle('${i.id}')"><span class="sim-prep-box">${pr.revealed ? (i.ok ? '✓' : (on ? '✗' : '')) : (on ? '☑' : '☐')}</span><span>${_esc(i.label)}</span></button>`; }).join('');
+      return head + `<div class="sim-prep"><div class="sim-readlbl">🛡️ ${_esc(pp.title)}</div><p class="sim-muted sim-small">${_esc(pp.intro)}</p>${warn}<div class="sim-prep-list">${list}</div>
+        <div class="sim-readrow"><button type="button" class="btn btn-primary" onclick="App.Sim.gPrepSubmit()">${pr.revealed ? 'Compris : continuer vers le geste' : 'Valider ma préparation (' + pr.sel.length + ')'}</button></div></div>`;
+    }
     if (g.phase === 'measuring') {
       const txt = g.sub === 'inflate' ? 'Le brassard se gonfle… Reste immobile et ne parle pas.' : (g.sub === 'scope' ? 'Le scope démarre : le brassard se gonfle tout seul et les courbes apparaissent… patiente quelques secondes.' : 'Mesure en cours… patiente quelques secondes.');
-      return head + `<div class="sim-g-note">${txt}</div><div class="sim-prog"><i id="sim-g-bar" style="width:0%"></i></div>`;
+      const dv = (t.display && !t.multi && g.sub !== 'scope' && _DEVS[g.tool]) ? _dev(g.tool, t.display, true) : '';
+      return head + `${dv}<div class="sim-g-note">${txt}</div><div class="sim-prog"><i id="sim-g-bar" style="width:0%"></i></div>`;
     }
     if (g.phase === 'place') {
-      return head + `<div class="sim-g-note">Où places-tu le brassard ? Touche le bon endroit sur le bras.</div>${warn}
-        <div class="sim-cuff">${_arm(t, null)}<div class="sim-cuff-list">${t.cuff.map(p => `<button type="button" class="sim-q" onclick="App.Sim.gPlace('${p.id}')">${_esc(p.label)}</button>`).join('')}</div></div>`;
+      return head + `<div class="sim-g-note">Pose le brassard toi-même : fais glisser le brassard le long du bras (ou utilise ▲ ▼) et tourne-le (↺ ↻) pour que le repère imprimé soit bien orienté. Puis valide.</div>${warn}${_cuffPanel(t, false)}`;
     }
     if (g.phase === 'cuffed') {
-      return head + `<div class="sim-g-note">Le brassard est bien en place. Quand tu es prêt, lance la mesure.</div><div class="sim-row"><button type="button" class="btn btn-primary" onclick="App.Sim.gInflate()">▶ Lancer la mesure</button></div>`;
+      return head + `${_cuffPanel(t, true)}<div class="sim-g-note">Le brassard est bien en place : repère « Artery » face à l'artère, juste au-dessus du pli du coude. Quand tu es prêt, lance la mesure.</div><div class="sim-row"><button type="button" class="btn btn-primary" onclick="App.Sim.gInflate()">▶ Lancer la mesure</button></div>`;
     }
     if (g.phase === 'ready') {
       return head + `<div class="sim-g-note">${_esc(t.intro)}</div>${warn}<div class="sim-row"><button type="button" class="btn btn-primary" onclick="App.Sim.gStartCount()">▶ Démarrer le comptage (${t.seconds} s)</button></div>`;
@@ -1786,6 +2018,17 @@ App.Sim = (() => {
         <div class="sim-row"><button type="button" class="btn btn-primary" onclick="App.Sim.gRecount()">↺ Recompter</button></div>`;
     }
     // phase « read » : lire l'écran puis noter
+    if (c.nb) {
+      let disp;
+      if (t.multi) disp = _scopeLcd(t);
+      else if (t.kind === 'count') disp = `<div class="sim-g-note">Tu as compté <b>${g.n}</b> ${t.tap === 'Battement' ? 'battements' : 'respirations'} en ${t.seconds} secondes. À toi de calculer la fréquence par minute.</div>`;
+      else if (t.kind === 'scale') disp = _scale(t);
+      else disp = _dev(g.tool, t.display);
+      return head + `<div class="sim-readform sim-nbform">${disp}${t.display && t.display.note ? `<p class="sim-muted sim-small">${_esc(t.display.note)}</p>` : ''}${warn}
+        <label class="sim-readlbl" for="sim-nb-g">Lis l'écran puis écris dans ton bloc-notes ce que tu relèves (valeur et unité).</label>
+        <textarea id="sim-nb-g" class="sim-nb-ta" rows="4" maxlength="3000" placeholder="Ex. : …" oninput="App.Sim.nbTxt(this.value)">${_esc(c.notes)}</textarea>
+        <div class="sim-readrow"><button type="button" class="btn btn-primary" onclick="App.Sim.gNbDone()">✔ J'ai noté, ranger l'appareil</button></div></div>`;
+    }
     if (t.multi) {
       let k = 0;
       const f = (m, id, ph, lab) => `<label class="sim-mf"><span>${_esc(lab)}</span><input id="sim-in-${id}" type="text" inputmode="numeric" autocomplete="off" aria-label="${_esc(lab)}" placeholder="${ph}" value="${_esc((g.vals && g.vals[id - 1]) || '')}"></label>`;
@@ -1800,7 +2043,7 @@ App.Sim = (() => {
     let disp;
     if (t.kind === 'count') disp = `<div class="sim-g-note">Tu as compté <b>${g.n}</b> ${t.tap === 'Battement' ? 'battements' : 'respirations'} en ${t.seconds} secondes.</div>`;
     else if (t.kind === 'scale') disp = _scale(t);
-    else disp = _lcd(t.display);
+    else disp = _dev(g.tool, t.display);
     const inputs = inp.type === 'bp'
       ? '<input id="sim-in-1" type="text" inputmode="numeric" autocomplete="off" aria-label="Pression systolique" placeholder="0"><span class="sim-slash">/</span><input id="sim-in-2" type="text" inputmode="numeric" autocomplete="off" aria-label="Pression diastolique" placeholder="0">'
       : (t.also
@@ -1816,7 +2059,7 @@ App.Sim = (() => {
     const on = !!(_tool || _G);
     box.classList.toggle('on', on);
     box.innerHTML = on ? _gesture() : '';
-    if (focus) { const i = _el('sim-in-1'); if (i) { try { i.focus({ preventScroll: false }); } catch (e) { i.focus(); } } }
+    if (focus) { const i = _el('sim-in-1') || _el('sim-nb-g'); if (i) { try { i.focus({ preventScroll: false }); } catch (e) { i.focus(); } } }
   }
   // Dessin : marques « déjà regardé », instrument en main, zones de la patiente
   function _syncScene() {
@@ -1852,10 +2095,18 @@ App.Sim = (() => {
   }
   function _renderRecueil() {
     const p = _el('sim-p-recueil'); if (!p || !_cur() || !_curScn()) return;
+    if (_cur().nb && _el('sim-nb-main')) return;                    // on ne redessine pas la zone pendant que l'étudiant écrit
     p.innerHTML = _recueilHtml(false);
   }
   function _recueilHtml(ro) {            // ro : lecture seule (après le recueil, pas de bouton « à noter »)
     const c = _cur(), scn = _curScn(); if (!c || !scn) return '';
+    if (c.nb) {
+      if (ro) return `<h3 class="sim-h">📝 Mon bloc-notes</h3>${c.notes.trim() ? `<div class="sim-nb-ro">${_esc(c.notes)}</div>` : '<div class="sim-fact-none">Ton bloc-notes est vide.</div>'}`;
+      return `<h3 class="sim-h">📝 Mon bloc-notes</h3>
+        <p class="sim-muted sim-small">Note ici ce que tu apprends : ce que dit ${_male(scn) ? 'le résident' : 'la résidente'}, les mesures que tu relèves, ce que tu observes. Rien n'est rempli à ta place. Tu t'en serviras pour appeler l'infirmière et écrire tes transmissions.</p>
+        <textarea id="sim-nb-main" class="sim-nb-ta" rows="14" maxlength="3000" aria-label="Mon bloc-notes" placeholder="Écris ici…" oninput="App.Sim.nbTxt(this.value)">${_esc(c.notes)}</textarea>
+        <details class="sim-recap"><summary>💡 Un pense-bête ? (titres seulement)</summary><div class="sim-recap-body"><p class="sim-muted sim-small">${SECTIONS.map(x => _esc(x[1])).join(' · ')}</p></div></details>`;
+    }
     const tableFacts = new Set(scn.constTable.map(r => r.fact)); tableFacts.add('d_const_hab');
     const keys = Object.keys(scn.facts);
     const usualKnown = !!c.found.d_const_hab;
@@ -1884,8 +2135,8 @@ App.Sim = (() => {
   function _renderTabs() {
     const tb = _el('sim-tabbar'), c = _cur(); if (!tb || !c) return;
     const t = c.tab || 'dialogue';
-    tb.innerHTML = [['dialogue', '💬', 'Dialogue'], ['chambre', '🛏️', 'Chambre'], ['recueil', '📋', 'Recueil']].map(([id, ico, lbl]) =>
-      `<button type="button" class="${t === id ? 'on' : ''}" onclick="App.Sim.setTab('${id}')" aria-current="${t === id}"><span>${ico}</span>${lbl}${id === 'recueil' ? ` <span class="sim-badge">${_countFound()}</span>` : ''}</button>`).join('');
+    tb.innerHTML = [['dialogue', '💬', 'Dialogue'], ['chambre', '🛏️', 'Chambre'], ['recueil', c.nb ? '📝' : '📋', c.nb ? 'Notes' : 'Recueil']].map(([id, ico, lbl]) =>
+      `<button type="button" class="${t === id ? 'on' : ''}" onclick="App.Sim.setTab('${id}')" aria-current="${t === id}"><span>${ico}</span>${lbl}${id === 'recueil' ? (c.nb ? (c.notes.trim() ? ' <span class="sim-badge">✎</span>' : '') : ` <span class="sim-badge">${_countFound()}</span>`) : ''}</button>`).join('');
     const p = _el('sim-play'); if (p) p.setAttribute('data-tab', t);
   }
   function submit(e) {
@@ -1913,6 +2164,27 @@ App.Sim = (() => {
     const pc = max ? Math.round(100 * pts / max) : 0;
     return `<div class="sim-brk"><div class="sim-brk-l"><b>${_esc(label)}</b><div class="sim-muted sim-small">${_esc(note)}</div></div>
       <div class="sim-brk-p">${fmt(pts)}<small>/${max}</small></div><div class="sim-brk-bar"><i style="width:${pc}%"></i></div></div>`;
+  }
+  function _glycBilanHtml(c, scn) {        // sécurité avant la glycémie capillaire (information, hors score si le cas ne note pas ce geste)
+    const pr = c.prep && c.prep.glucometre; if (!pr) return '';
+    const inGrid = scn.grid.some(g => g.id === 'g_glyc_secu');
+    const ok = pr.passed && pr.tries === 0, mid = pr.passed;
+    const w = c.waste, wOk = w && w.passed && w.tries === 0, wMid = w && w.passed;
+    const wRow = w ? `<div class="sim-row-res ${wOk ? 'ok' : (wMid ? 'late' : 'miss')}"><span class="sim-mark">${wOk ? '✓' : (wMid ? '◐' : '✗')}</span><div><b>${wOk ? 'Déchets bien triés du premier coup.' : (wMid ? 'Déchets triés après une correction.' : 'Tri des déchets à revoir.')}</b>
+      <div class="sim-muted sim-small">Autopiqueur → collecteur OPCT · bandelette, gants et compresse souillés → DASRI (poubelle jaune) · emballage propre → ordures ménagères.</div></div></div>` : '';
+    return `<h3 class="sim-h">🩸 Glycémie capillaire : ta sécurité</h3><div class="sim-card"><div class="sim-row-res ${ok ? 'ok' : (mid ? 'late' : 'miss')}"><span class="sim-mark">${ok ? '✓' : (mid ? '◐' : '✗')}</span><div>
+      <b>${ok ? 'Préparation de sécurité réussie du premier coup.' : (mid ? 'Préparation réussie après une correction.' : 'Préparation à revoir.')}</b>
+      <div class="sim-muted sim-small">Mains frictionnées, gants, lecteur et bandelette vérifiés, autopiqueur de sécurité à usage unique, collecteur à portée, doigt préparé ; on ne rebouche jamais une lancette et on pique sur le côté de la pulpe.${inGrid ? '' : ' (Information : ce geste n\'est pas noté dans le score de ce cas.)'}</div></div></div>${wRow}</div>`;
+  }
+  function _nbBilanHtml(c, scn) {
+    if (!c.nb) return '';
+    const keys = Object.keys(c.nbExp || {});
+    const rows = keys.map(k => { const miss = _nbMissing(c.nbExp[k], c.notes), t = scn.tools[k];
+      return `<div class="sim-row-res ${miss.length ? 'miss' : 'ok'}"><span class="sim-mark">${miss.length ? '✗' : '✓'}</span><div><b>${_esc(t.label)}</b>${miss.length ? `<div class="sim-muted sim-small">Valeur absente de ton bloc-notes : ${_esc(miss.join(', '))}</div>` : '<div class="sim-muted sim-small">Valeur retrouvée dans tes notes.</div>'}</div></div>`; }).join('');
+    return `<h3 class="sim-h">📝 Ton bloc-notes</h3><div class="sim-card">
+      ${c.notes.trim() ? `<div class="sim-nb-ro">${_esc(c.notes)}</div>` : '<div class="sim-fact-none">Ton bloc-notes est vide.</div>'}
+      ${rows ? `<div style="margin-top:8px">${rows}</div>` : ''}
+      <div class="sim-muted sim-small" style="margin-top:6px">Compare tes notes à la liste des informations clés ci-dessous : qu'as-tu oublié d'écrire ? Le contrôle automatique ne regarde que les valeurs chiffrées des mesures (hors score).</div></div>`;
   }
   function _renderBilan(root) {
     const c = _cur(), scn = _curScn(), R = c.res || null;
@@ -1990,8 +2262,10 @@ App.Sim = (() => {
         ${R.capped ? `<p class="sim-warn sim-small">Total avant plafond : ${fmt(R.raw)}/100.</p>` : ''}
       </div>
       ${_soinsBilanHtml(c, scn, R)}
+      ${_glycBilanHtml(c, scn)}
       ${earned}${stats}
       ${tips.length ? `<h3 class="sim-h">Pour progresser</h3><div class="sim-card"><ul class="sim-ul">${tips.map(t => `<li>${_esc(t)}</li>`).join('')}</ul></div>` : ''}
+      ${_nbBilanHtml(c, scn)}
       <h3 class="sim-h">Informations clés</h3>
       <div class="sim-card">${keyRows}</div>
       <h3 class="sim-h">🔎 Ce qu'il fallait retenir</h3>
@@ -2059,8 +2333,8 @@ App.Sim = (() => {
 
   return {
     open, close, start, resume, toList, discard, setTab, say, submit, askMenu, toggleMenu, toggleAct, act, thToggle,
-    pickTool, dropTool, hot, sheetDo, sheetClose, gScopeCuff, gStartCount, gTap, gRecount, gPlace, gInflate, gSubmit, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
+    pickTool, dropTool, hot, sheetDo, sheetClose, gCuffMove, gCuffRot, gCuffPalp, gCuffOk, cuffDown, cuffMove, cuffUp, gStartCount, gTap, gRecount, gInflate, gSubmit, gPrepToggle, gPrepSubmit, gWasteSet, gWasteSubmit, gNbDone, nbTxt, setNb, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
     decLevel, decLevelOk, decPick, decActionsOk, decNext, txt, sendSaed, saedRetry, saedDone, rxEcg, rxSkip, rxGazo, rxGazoSkip, rxNext, unkCopy, unkClear, wrSubmit, wrDone, aiReview,
-    parse, parseAct, _t: { norm: _norm, prep: _prep, suggest: _suggest, unk: _unkRead, state: () => st, tick: _tick, grade: (kind, texts) => { const scn = _curScn() || _scenarios()[0]; return _grade(kind === 'saed' ? scn.call.sections : scn.written.fields, texts); }, results: () => _results(), levelOf: _levelOf }
+    parse, parseAct, _t: { norm: _norm, prep: _prep, suggest: _suggest, unk: _unkRead, state: () => st, tick: _tick, grade: (kind, texts) => { const scn = _curScn() || _scenarios()[0]; return _grade(kind === 'saed' ? scn.call.sections : scn.written.fields, texts); }, results: () => _results(), levelOf: _levelOf, cuff: () => (_G && _G.cuff) || null }
   };
 })();

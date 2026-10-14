@@ -231,6 +231,8 @@ App.Sync = (() => {
           pharmaSecs: Math.max(mergedLog[date].pharmaSecs||0, entry.pharmaSecs||0),
           gazoSecs:   Math.max(mergedLog[date].gazoSecs||0,   entry.gazoSecs||0),
           secoursSecs: Math.max(mergedLog[date].secoursSecs||0, entry.secoursSecs||0),
+          tpSecs: Math.max(mergedLog[date].tpSecs||0, entry.tpSecs||0),
+          doseSecs: Math.max(mergedLog[date].doseSecs||0, entry.doseSecs||0),
         };
       });
 

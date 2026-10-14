@@ -80,5 +80,13 @@ App.Activity = (() => {
   register('secours', () => _shown('games-view') && _shown('secours-root')
                           && !!(App.Sec && App.Sec.isTraining && App.Sec.isTraining()));
 
+  // Entraînement TP : pendant un exercice, la pratique guidée ou l'auto-évaluation (pas le menu).
+  register('tp', () => _shown('games-view') && _shown('tp-root')
+                     && !!(App.Tp && App.Tp.isTraining && App.Tp.isTraining()));
+
+  // Calcul de doses : pendant une série (pas le menu ni le résultat).
+  register('dose', () => _shown('games-view') && _shown('dose-root')
+                      && !!(App.Dose && App.Dose.isTraining && App.Dose.isTraining()));
+
   return { register, markActivity: _mark, _t: { tick: _tick, kinds: () => Object.keys(kinds) } };
 })();

@@ -361,6 +361,24 @@
           <span class="sim-entry-go">S'entraîner →</span>
         </button>
 
+        <button class="sim-entry-card" id="gm-tp" onclick="App.Tp.open()">
+          <span class="sim-entry-ico">🧪</span>
+          <span class="sim-entry-txt">
+            <span class="sim-entry-name">Entraînement TP <em class="sim-new">Nouveau</em></span>
+            <span class="sim-entry-desc">Révise tes travaux pratiques, d'abord l'hygiène des mains (friction hydro-alcoolique, lavage) calquée sur ta grille officielle : prérequis, gestes dessinés, pratique guidée avec minuteur, situations de soins et auto-évaluation Oui/Non. Fonctionne hors ligne.</span>
+          </span>
+          <span class="sim-entry-go">S'entraîner →</span>
+        </button>
+
+        <button class="sim-entry-card" id="gm-dose" onclick="App.Dose.open()">
+          <span class="sim-entry-ico">🧮</span>
+          <span class="sim-entry-txt">
+            <span class="sim-entry-name">Calcul de doses <em class="sim-new">Nouveau</em></span>
+            <span class="sim-entry-desc">Comprimés, volumes à prélever, dose selon le poids, gouttes par minute, mL/h, pourcentages, insuline. Chiffres différents à chaque série, 3 niveaux, correction détaillée et erreur typique repérée. Fonctionne hors ligne.</span>
+          </span>
+          <span class="sim-entry-go">S'entraîner →</span>
+        </button>
+
         <div class="games-mode-grid">
           <button class="game-mode-card selected" id="gm-tf" onclick="App.Games.selectMode('tf')">
             <span class="gm-icon">⚡</span>
@@ -442,6 +460,10 @@
 
       <!-- Secourisme PSE1 (rendu par core/secours.js) -->
       <div id="secours-root" style="display:none"></div>
+      <!-- Entraînement TP (rendu par core/tp.js) -->
+      <div id="tp-root" style="display:none"></div>
+      <!-- Calcul de doses (rendu par core/dose.js) -->
+      <div id="dose-root" style="display:none"></div>
 
     </div>
 
@@ -912,6 +934,7 @@
 <script src="data/sim_moreau.js"></script>
 <script src="data/sim_hopital.js"></script>
 <script src="data/sim_soins.js"></script>
+<script src="data/sim_glyc.js"></script>
 <script src="ui/sim_scene.js"></script>
 <script src="ui/sim_ecg_art.js"></script>
 <script src="core/sim_ecg.js"></script>
@@ -923,6 +946,10 @@
 <script src="data/secours_b.js"></script>
 <script src="data/secours_c.js"></script>
 <script src="core/secours.js"></script>
+<script src="ui/tp_art.js"></script>
+<script src="data/tp_fha.js"></script>
+<script src="core/tp.js"></script>
+<script src="core/dose.js"></script>
 <script src="core/simulation.js"></script>
 <script src="data/pharma.js"></script>
 <script src="core/pharma.js"></script>
