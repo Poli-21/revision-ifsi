@@ -93,7 +93,7 @@ App.Partiels = (() => {
       const hist = _historyForUE(u.code);
       const lastScore = hist.length ? hist[0].score : null;
       const factor = _priorityFactor(lastScore);
-      return { ue: u, lastScore, attempts: hist.length, score: App.UE.ectsWeight(u, _sem) * factor };
+      return { ue: u, lastScore, attempts: hist.length, score: App.UE.studyWeight(u, _sem) * factor };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
@@ -308,7 +308,9 @@ App.Partiels = (() => {
 
   // ── Quiz chronométré ─────────────────────────────────────────────
   function startQuiz() {
-    const pool = _cardsForUE(_curUE).sort(() => Math.random() - .5).slice(0, QUIZ_SIZE);
+    const pool = _cardsForUE(_curUE).sort(() => Math.random() - .5);
+    pool.sort((a, b) => (App.UE.hasSchema(b) ? 1 : 0) - (App.UE.hasSchema(a) ? 1 : 0));   // schémas d'abord (tri stable : l'ordre reste aléatoire dans chaque groupe)
+    pool.length = Math.min(pool.length, QUIZ_SIZE);
     if (pool.length < 4) return;
     const total = pool.length * QUIZ_SECS;
     _quiz = { queue: pool, idx: 0, correctCount: 0, log: [], totalSecs: total, secsLeft: total, timer: null };

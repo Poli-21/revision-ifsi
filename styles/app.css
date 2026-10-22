@@ -1710,12 +1710,12 @@ body.dark .th-x{background:#334155;color:#e2e8f0;}
 /* ══ SIMULATION CLINIQUE ═════════════════════════════════════════
    Tout est préfixé .sim- ; les couleurs passent par des variables locales
    (redéfinies pour le mode sombre) afin de ne rien toucher ailleurs. */
-#sim-root {
+#sim-root, #sim-rl-ov {
   --sim-card:#ffffff; --sim-soft:#f3f4f6; --sim-line:#e5e7eb;
   --sim-me:#dbeafe; --sim-me-t:#1e3a8a; --sim-pat:#fef3c7; --sim-pat-t:#78350f; --sim-narr:#eef2f7;
   --sim-ok:#15803d; --sim-okbg:#dcfce7; --sim-bad:#b91c1c; --sim-badbg:#fee2e2; --sim-warn:#b45309; --sim-warnbg:#fef3c7;
 }
-body.dark #sim-root {
+body.dark #sim-root, body.dark #sim-rl-ov {
   --sim-card:#1e293b; --sim-soft:#162032; --sim-line:#334155;
   --sim-me:#1e3a5f; --sim-me-t:#dbeafe; --sim-pat:#4a3b10; --sim-pat-t:#fde68a; --sim-narr:#1b2638;
   --sim-ok:#4ade80; --sim-okbg:#14532d; --sim-bad:#fca5a5; --sim-badbg:#7f1d1d; --sim-warn:#fbbf24; --sim-warnbg:#5a3a0b;
@@ -2647,7 +2647,7 @@ body.dark #dose-root { --dz-card:#1e293b; --dz-soft:#162032; --dz-line:#334155; 
 .dz-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
 .dz-start { width: 100%; min-height: 48px; }
 .dz-prog { height: 8px; background: var(--dz-soft); border-radius: 99px; overflow: hidden; margin: 6px 0; } .dz-prog i { display: block; height: 100%; background: var(--primary); border-radius: 99px; transition: width .2s; }
-.dz-q-cat { font-size: .78rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .04em; }
+.dz-q-cat { font-size: .78rem; font-weight: 700; color: var(--gray-500); letter-spacing: .04em; }
 .dz-q-t { font-size: 1.02rem; line-height: 1.55; margin: 6px 0 10px; }
 .dz-lbl { display: block; font-size: .85rem; margin: 6px 0; }
 .dz-ansrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -2711,3 +2711,23 @@ body.dark .sim-dev-body { background: linear-gradient(#cdd5e1, #a9b4c4); }
 .sim-dev-strip i.drop { animation: simDrop 1.2s ease-in infinite; }
 @keyframes simDrop { 0% { opacity: 0; transform: translateY(-6px); } 40% { opacity: 1; } 100% { opacity: 1; transform: translateY(8px); } }
 .sim-dev-pen { width: 70px; flex: 0 0 70px; margin-bottom: 4px; }
+
+/* Correction du temps de travail */
+.ypt-fix { background: transparent; border: 1px solid rgba(255,255,255,.18); color: inherit; border-radius: 8px; cursor: pointer; font-size: .78rem; padding: 2px 6px; min-height: 28px; min-width: 28px; }
+.ypt-fix:hover { background: rgba(255,255,255,.1); }
+.ypt-fix-big { font-weight: 600; padding: 4px 10px; }
+#timefix-overlay .modal { max-height: 92vh; overflow-y: auto; }
+
+/* ── Simulation : mode réaliste (horloge, imprévus) ── */
+.sim-rl-clk { font-variant-numeric: tabular-nums; font-weight: 700; font-size: .8rem; color: var(--sim-warn); background: var(--sim-warnbg); border-radius: 99px; padding: 3px 10px; white-space: nowrap; }
+.sim-rl-ov { z-index: 260; padding: 12px; }
+.sim-rl-modal { text-align: left; color: var(--gray-900); }
+body.dark .sim-rl-modal { background: var(--sim-card); }
+.sim-rl-ico { font-size: 2rem; line-height: 1; margin-bottom: 6px; }
+.sim-rl-modal h3 { font-size: 1.05rem; font-weight: 800; margin: 0 0 6px; }
+.sim-rl-modal p { font-size: .9rem; line-height: 1.5; margin: 0 0 10px; }
+.sim-rl-choices { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.sim-rl-ch { text-align: left; width: 100%; white-space: normal; min-height: 44px; }
+@media (max-width: 480px) { .sim-rl-modal { padding: 18px; } .sim-bar { flex-wrap: wrap; } }
+.sim-rl-modal .sim-fb { margin: 10px 0 14px; }
+.sim-rl-modal .sim-row { margin-top: 8px; }

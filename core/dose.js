@@ -134,22 +134,166 @@ App.Dose = (() => {
         if (l === 2) { const a = pick([20, 40, 50, 100, 200, 500, 1000]), V = pick([2, 4, 5, 10, 20, 50, 100]), c = a / V; if (!nice(c, 2)) continue;
           return { text: `Un flacon contient **${a} mg dans ${V} mL**. Quelle est la **concentration** en mg/mL ?`, ans: c, unit: 'mg/mL', tol: 0.005,
             steps: [`Concentration = quantité ÷ volume.`, `${a} ÷ ${V} = ${fr(c)} mg/mL.`], tip: 'Concentration (mg/mL) = quantité (mg) ÷ volume (mL).' }; }
-        const p = pick([0.5, 1, 2, 5, 10]), c = p * 10; return { text: `Une solution à **${fr(p)} %** : quelle est sa concentration en **mg/mL** ?`, ans: c, unit: 'mg/mL', tol: 0.005,
+        const p = pick([0.1, 0.2, 0.25, 0.5, 1, 2, 3, 4, 5, 10, 15, 20]), c = p * 10; return { text: `Une solution à **${fr(p)} %** : quelle est sa concentration en **mg/mL** ?`, ans: c, unit: 'mg/mL', tol: 0.005,
           steps: [`${fr(p)} % = ${fr(p)} g pour 100 mL = ${fr(p * 1000)} mg pour 100 mL.`, `Pour 1 mL : ${fr(p * 1000)} ÷ 100 = ${fr(c)} mg/mL.`], tip: 'Astuce : % × 10 = mg/mL (1 % = 10 mg/mL).' };
       }
     },
     insuline(l) {
       for (let k = 0; k < 300; k++) {
-        if (l === 1) { const ui = pick([4, 6, 8, 10, 12, 14, 16, 20, 24, 30]), v = ui / 100;
+        if (l === 1) { const ui = pick([4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, 20, 22, 24, 28, 30, 35, 40]), v = ui / 100;
           return { text: `Insuline **U100** (100 UI par mL). Prescription : **${ui} UI**. Quel volume en **mL** (seringue à insuline) ?`, ans: v, unit: 'mL', tol: 0.0005,
             steps: [`100 UI sont dans 1 mL.`, `${ui} UI = ${ui} ÷ 100 = ${fr(v)} mL.`], tip: 'En pratique on lit des unités sur la seringue ou le stylo, pas des mL. L\'insuline est à haut risque : double contrôle, jamais de dose « à l\'œil ».' }; }
-        if (l === 2) { const ml = pick([0.05, 0.08, 0.1, 0.12, 0.15, 0.2, 0.25, 0.3]), ui = ml * 100;
+        if (l === 2) { const ml = pick([0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.14, 0.15, 0.18, 0.2, 0.22, 0.25, 0.28, 0.3, 0.35, 0.4]), ui = ml * 100;
           return { text: `Seringue à insuline **U100** : tu as prélevé **${fr(ml)} mL**. Combien d'**unités (UI)** est-ce ?`, ans: ui, unit: 'UI', tol: 0.05,
             steps: [`1 mL = 100 UI.`, `${fr(ml)} × 100 = ${fr(ui)} UI.`], tip: 'U100 : × 100 pour passer des mL aux UI, ÷ 100 pour l\'inverse.' }; }
         const n = pick([2, 3, 4]), tot = pick([12, 18, 24, 30, 36, 40, 60]), per = tot / n; if (!nice(per, 1)) continue;
         return { text: `Prescription d'insuline : **${tot} UI par jour en ${n} injections égales**. Combien d'**UI par injection** ?`, ans: per, unit: 'UI', tol: 0.05,
           steps: [`${tot} UI ÷ ${n} injections = ${fr(per)} UI par injection.`], tip: 'Division simple, mais en vrai on vérifie TOUJOURS la prescription et le schéma écrit : insuline = médicament à haut risque.' };
       }
+    }
+  };
+  // ══ Niveaux 4 et 5 : calculs « de réa / de service » (plusieurs étapes, unités mélangées, données inutiles à écarter) ══
+  const _ctx = (l, kg) => l < 5 ? '' : pick([` (${ri(58, 84)} ans, ${(1.5 + Math.random() * 0.35).toFixed(2).replace('.', ',')} m${kg ? ', **' + kg + ' kg**' : ''})`, ` (allergique à la pénicilline, créatinine normale${kg ? ', **' + kg + ' kg**' : ''})`, ` (admis hier soir${kg ? ', **' + kg + ' kg**' : ''})`]);
+  const _ctxKid = l => l < 5 ? '' : pick([` (${ri(2, 11)} ans, vaccins à jour)`, ' (admis aux urgences pédiatriques, pas d\'allergie connue)', ` (${ri(2, 11)} ans, hospitalisé pour une pneumopathie)`]);
+  const _ceil = x => Math.ceil(x - 1e-9);
+  const EXP = {
+    conv(l) {
+      for (let k = 0; k < 400; k++) {
+        const t = ri(1, l === 4 ? 3 : 4);
+        if (t === 1) { const v = pick([25, 50, 75, 100, 150, 250, 500, 20, 40]), ans = v * 60 / 1000; if (!nice(ans, 4)) continue;
+          return { text: `Convertis **${v} µg/min** en **mg/h**.`, ans, unit: 'mg/h', tol: 1e-6, steps: [`Par heure : ${v} µg/min × 60 = ${v * 60} µg/h.`, `En mg : ${v * 60} ÷ 1000 = ${fr(ans)} mg/h.`], tip: 'Deux changements d\'unité à la fois : minutes → heures (× 60) et µg → mg (÷ 1000). Fais-les l\'un après l\'autre.', alt: [{ v: v / 1000, msg: 'Tu as oublié de passer des minutes aux heures (× 60).' }, { v: v * 60, msg: 'Tu as oublié de passer des µg aux mg (÷ 1000).' }] }; }
+        if (t === 2) { const v = pick([0.6, 1.2, 3, 6, 9, 12, 1.8, 2.4]), ans = v * 1000 / 60; if (!nice(ans, 3)) continue;
+          return { text: `Convertis **${fr(v)} mg/h** en **µg/min**.`, ans, unit: 'µg/min', tol: 0.01, steps: [`En µg : ${fr(v)} mg × 1000 = ${fr(v * 1000)} µg/h.`, `Par minute : ${fr(v * 1000)} ÷ 60 = ${fr(ans)} µg/min.`], tip: 'Dans l\'autre sens : mg → µg (× 1000) et heures → minutes (÷ 60).' }; }
+        if (t === 3) { const d = pick([0.05, 0.1, 0.2, 0.5, 1, 2]), kg = pick([50, 60, 70, 80, 90, 100]), ans = d * kg; if (!nice(ans, 3)) continue;
+          return { text: `Dose de **${fr(d)} µg/kg/min** pour un patient de **${kg} kg**. Quelle dose en **µg/min** ?${_ctx(l, 0)}`, ans, unit: 'µg/min', tol: 0.005, steps: [`Dose = dose par kg × poids : ${fr(d)} × ${kg} = ${fr(ans)} µg/min.`], tip: 'µg/kg/min : on multiplie par le poids pour avoir la dose totale par minute.' }; }
+        const d = pick([0.05, 0.1, 0.2, 0.3, 0.5]), kg = pick([50, 60, 70, 80, 90]), ans = d * kg * 60 / 1000; if (!nice(ans, 3)) continue;
+        return { text: `Patient de **${kg} kg** sous **${fr(d)} µg/kg/min**. Quelle dose en **mg/h** ?${_ctx(l, 0)}`, ans, unit: 'mg/h', tol: 0.002, steps: [`Par minute : ${fr(d)} × ${kg} = ${fr(d * kg)} µg/min.`, `Par heure : × 60 = ${fr(d * kg * 60)} µg/h.`, `En mg : ÷ 1000 = ${fr(ans)} mg/h.`], tip: 'Chaîne à suivre : poids → minutes en heures → µg en mg.' };
+      }
+    },
+    cp(l) {
+      for (let k = 0; k < 400; k++) {
+        const who = pick(NAMES);
+        if (l === 4) { const [dn, , ds] = pick(DRUGS_CP), D = pick(ds), per = pick([1, 2, 0.5, 1.5]), n = pick([1, 2, 3, 4]), days = pick([7, 10, 14, 15, 21, 28]), box = pick([14, 20, 28, 30, 50, 100]);
+          const tot = per * n * days; if (!nice(tot, 2)) continue; const boxes = _ceil(tot / box);
+          return { text: `${who} : **${dn} ${fr(D)} mg**, **${fr(per)} comprimé${per > 1 ? 's' : ''} ${n} fois par jour pendant ${days} jours**. Les boîtes contiennent **${box} comprimés**. Combien de **boîtes** faut-il délivrer (au minimum) ?`, ans: boxes, unit: 'boîte(s)', tol: 0.001,
+            steps: [`Comprimés par jour : ${fr(per)} × ${n} = ${fr(per * n)}.`, `Sur ${days} jours : ${fr(per * n)} × ${days} = ${fr(tot)} comprimés.`, `Boîtes : ${fr(tot)} ÷ ${box} = ${fr(tot / box)} → on arrondit au NOMBRE ENTIER SUPÉRIEUR : ${boxes} boîte(s).`], tip: 'Quand on compte des boîtes, on arrondit toujours vers le haut (on ne peut pas délivrer une demi-boîte ni manquer de comprimés).', alt: [{ v: Math.round(tot / box), msg: 'Tu as arrondi au plus proche : ici il faut arrondir vers le haut.' }] }; }
+        // niveau 5 : AVK quadrisécable ou dose au poids
+        if (Math.random() < 0.5) { const D = pick([5, 20]), quarts = pick([1, 2, 3, 4, 5, 6, 7, 8, 10]), dose = D * quarts / 4; if (!nice(dose, 2)) continue;
+          return { text: `${who} sous anticoagulant oral. **Comprimé quadrisécable dosé à ${D} mg**. Prescription du jour : **${fr(dose)} mg**. Combien de **quarts de comprimé** donnes-tu ?${_ctx(l, 0)}`, ans: quarts, unit: 'quart(s)', tol: 0.001,
+            steps: [`Un quart de comprimé = ${D} ÷ 4 = ${fr(D / 4)} mg.`, `Nombre de quarts : ${fr(dose)} ÷ ${fr(D / 4)} = ${quarts}.`, `Soit ${fr(quarts / 4)} comprimé.`], tip: 'Avant de couper un comprimé : vérifier qu\'il est sécable et la prescription. Les anticoagulants oraux sont des médicaments à haut risque : double contrôle.', alt: [{ v: dose / D, msg: 'Tu as donné la réponse en comprimés entiers : on te demande des QUARTS.' }] }; }
+        const mk = pick([0.5, 1, 0.25]), kg = pick([48, 56, 60, 64, 72, 80]), D = pick([5, 20, 40]), tot = mk * kg, cp = tot / D; if (!nice(cp * 2, 6) || cp * 2 !== Math.round(cp * 2) || cp < 0.5 || cp > 8) continue;
+        return { text: `${who} (**${kg} kg**) : corticoïde à **${fr(mk)} mg/kg/jour en une prise**. Comprimés à **${D} mg**. Combien de comprimés par jour ?${_ctx(l, 0)}`, ans: cp, unit: 'comprimé(s)', tol: 0.001,
+          steps: [`Dose du jour : ${fr(mk)} × ${kg} = ${fr(tot)} mg.`, `Comprimés : ${fr(tot)} ÷ ${D} = ${fr(cp)}.`], tip: 'Dose du jour (mg) = mg/kg × poids ; puis ÷ dosage du comprimé.' };
+      }
+    },
+    liq(l) {
+      for (let k = 0; k < 500; k++) {
+        const [dn, A, B] = pick(DRUGS_INJ), who = pick(NAMES);
+        if (l === 4) { const f = pick([0.5, 0.75, 1.25, 1.5, 2.5, 3.5]), dose = A * f, vol = B * f, fin = pick([5, 10, 20]); if (!nice(vol, 2) || !nice(dose, 2) || vol >= fin) continue; const eau = fin - vol;
+          return { text: `${who} : **${dn} ${fr(dose)} mg** en injection lente, à diluer pour obtenir **${fin} mL** au total avec du NaCl 0,9 %. Ampoule : **${fr(A)} mg dans ${fr(B)} mL**. Quel volume de **NaCl 0,9 %** ajoutes-tu à la dose prélevée ?`, ans: eau, unit: 'mL', tol: 0.01,
+            steps: [`Volume d'ampoule à prélever : (${fr(dose)} × ${fr(B)}) ÷ ${fr(A)} = ${fr(vol)} mL.`, `Pour arriver à ${fin} mL : ${fin} − ${fr(vol)} = ${fr(eau)} mL de NaCl 0,9 %.`], tip: 'Deux temps : (1) le volume de médicament, (2) le solvant = volume final − volume de médicament.', alt: [{ v: vol, msg: 'Tu as donné le volume de médicament à prélever ; on demande le volume de NaCl à AJOUTER.' }] }; }
+        const mk = pick([60, 90, 100, 150]), kg = pick([12, 15, 18, 20, 24, 30, 36, 45, 60]), n = pick([2, 3, 4]), per = mk * kg / n, conc = 100;
+        if (!nice(per, 1) || per / conc < 1 || per / conc > 20) continue; const vol = per / conc;
+        return { text: `Enfant de **${kg} kg**. Antibiotique IV **${mk} mg/kg/jour en ${n} injections**. Flacon de poudre de **1 g reconstitué pour obtenir 10 mL** (soit ${conc} mg/mL). Quel volume prélèves-tu pour **une injection** ?${_ctxKid(l)}`, ans: vol, unit: 'mL', tol: 0.05,
+          steps: [`Dose du jour : ${mk} × ${kg} = ${fr(mk * kg)} mg.`, `Par injection : ${fr(mk * kg)} ÷ ${n} = ${fr(per)} mg.`, `Concentration : 1 g = 1000 mg dans 10 mL → ${conc} mg/mL.`, `Volume : ${fr(per)} ÷ ${conc} = ${fr(vol)} mL.`], tip: 'Quatre étapes : dose du jour → dose par injection → concentration après reconstitution → volume.' };
+      }
+    },
+    poids(l) {
+      for (let k = 0; k < 500; k++) {
+        const kid = pick(KIDS), kg = pick([8, 10, 12, 15, 16, 18, 20, 24, 25, 30, 35]);
+        if (l === 4) { const mk = pick([10, 15]), pr = pick([3, 4]), c = pick([120, 240]), vf = 5, per = mk * kg, vol = per * vf / c; if (!nice(vol, 1) || vol < 1 || vol > 20) continue; const jour = per * pr, max = 60 * kg;
+          return { text: `${kid} (**${kg} kg**) : paracétamol **${mk} mg/kg par prise, ${pr} prises par jour** (dose maximale : 60 mg/kg/jour). Sirop à **${c} mg pour ${vf} mL**. Quel volume de sirop par prise ?`, ans: vol, unit: 'mL', tol: 0.05,
+            steps: [`Dose par prise : ${mk} × ${kg} = ${per} mg.`, `Vérification : ${per} × ${pr} = ${jour} mg/jour, ${jour <= max ? 'inférieur ou égal à' : 'SUPÉRIEUR à'} la dose maximale (${max} mg).`, `Volume : (${per} × ${vf}) ÷ ${c} = ${fr(vol)} mL.`], tip: 'Un calcul de dose pédiatrique inclut toujours la vérification de la dose maximale par jour.' }; }
+        const mxk = pick([60, 80, 100]), done = pick([200, 300, 400, 500, 600, 750, 900, 1000, 1200]), lim = mxk * kg; if (done >= lim) continue;
+        return { text: `${kid} (**${kg} kg**). Dose maximale **${mxk} mg/kg/jour**. Il a déjà reçu **${done} mg** aujourd'hui. Quelle **quantité maximale** peut-il encore recevoir aujourd'hui ?${_ctxKid(l)}`, ans: lim - done, unit: 'mg', tol: 0.5,
+          steps: [`Dose maximale du jour : ${mxk} × ${kg} = ${lim} mg.`, `Reste : ${lim} − ${done} = ${lim - done} mg.`], tip: 'Dose maximale = mg/kg/jour × poids. On soustrait ensuite ce qui a déjà été donné (feuille de soins) avant d\'administrer.' };
+      }
+    },
+    gravite(l) {
+      for (let k = 0; k < 500; k++) {
+        const who = pick(NAMES);
+        if (l === 4) { const V = pick([500, 1000]), h = pick([6, 8, 10, 12]), t = pick([2, 3, 4]), restH = h - t, fct = 20; if (restH <= 0) continue;
+          const R = V - Math.round(V / h * (t - pick([0.5, 1]))); const rest = R; if (rest <= 0 || rest > V) continue; const raw = rest * fct / (restH * 60), ans = Math.round(raw);
+          return { text: `${who} : perfusion de **${V} mL prévue en ${h} h** par gravité (perfuseur **${fct} gouttes = 1 mL**). Au bout de **${t} h**, il reste **${rest} mL** dans la poche : la perfusion a pris du retard. Quel **débit en gouttes/min** pour finir à l'heure prévue ?`, ans, unit: 'gouttes/min', tol: 1,
+            steps: [`Temps restant : ${h} − ${t} = ${restH} h = ${restH * 60} min.`, `Gouttes restantes : ${rest} × ${fct} = ${rest * fct}.`, `Débit : ${rest * fct} ÷ ${restH * 60} = ${fr(raw)} → environ ${ans} gouttes/min.`], tip: 'Un retard se rattrape en recalculant sur ce qu\'il RESTE (volume restant, temps restant). Jamais de rattrapage brutal : on vérifie la tolérance du patient et le protocole du service.' }; }
+        const V = pick([250, 500]), mg = pick([1000, 2000, 2500, 4000]), perH = pick([250, 500, 400, 200, 125]), conc = mg / V, qml = perH / conc, fct = pick([20, 60]); if (!nice(qml, 1) || qml > 250) continue; const gtt = qml * fct / 60, ans = Math.round(gtt);
+        return { text: `${who} : poche de **${V} mL contenant ${fr(mg)} mg** de médicament. Prescription : **${perH} mg/h**. Perfuseur **${fct} gouttes = 1 mL**. Quel débit en **gouttes/min** (arrondi) ?${_ctx(l, 0)}`, ans, unit: 'gouttes/min', tol: 1,
+          steps: [`Concentration : ${fr(mg)} ÷ ${V} = ${fr(conc)} mg/mL.`, `Débit : ${perH} ÷ ${fr(conc)} = ${fr(qml)} mL/h.`, `Gouttes/min : ${fr(qml)} × ${fct} ÷ 60 = ${fr(gtt)} → environ ${ans}.`], tip: `mg/h → mL/h (÷ concentration) → gouttes/min (× gouttes par mL ÷ 60).${fct === 60 ? ' Avec 60 gouttes/mL, gouttes/min = mL/h.' : ''}` };
+      }
+    },
+    pse(l) {
+      for (let k = 0; k < 600; k++) {
+        const who = pick(NAMES);
+        if (l === 4) { const [dn, mg, V] = pick([['furosémide', 500, 50], ['morphine', 50, 50], ['midazolam', 100, 50], ['héparine (UI)', 25000, 50], ['noradrénaline', 8, 50]]), conc = mg / V, dose = pick([conc * 2, conc * 5, conc * 4, conc * 8, conc * 10]); if (!nice(conc, 3) || !nice(dose, 3)) continue; const ans = dose / conc; const u = dn.includes('UI') ? 'UI' : 'mg';
+          return { text: `${who} : seringue électrique de **${V} mL contenant ${fr(mg)} ${u}** de ${dn.replace(' (UI)', '')}. Prescription : **${fr(dose)} ${u}/h**. Quel **débit en mL/h** ?`, ans, unit: 'mL/h', tol: 0.02,
+            steps: [`Concentration : ${fr(mg)} ÷ ${V} = ${fr(conc)} ${u}/mL.`, `Débit : ${fr(dose)} ÷ ${fr(conc)} = ${fr(ans)} mL/h.`], tip: 'Toujours : concentration d\'abord (quantité ÷ volume), puis débit = dose par heure ÷ concentration.', alt: [{ v: dose * conc, msg: 'Tu as multiplié par la concentration : il faut DIVISER (dose par heure ÷ concentration).' }] }; }
+        const d = pick([0.05, 0.1, 0.2, 0.3, 0.5]), kg = pick([50, 60, 70, 75, 80, 90, 100]), mg = pick([4, 5, 8, 10]), V = 50, conc = mg * 1000 / V, ans = d * kg * 60 / conc; if (!nice(ans, 1)) continue;
+        return { text: `${who} (**${kg} kg**) en réanimation : noradrénaline à **${fr(d)} µg/kg/min**. Seringue électrique : **${mg} mg dans ${V} mL**. Quel **débit en mL/h** ?${_ctx(l, 0)}`, ans, unit: 'mL/h', tol: 0.05,
+          steps: [`Dose par minute : ${fr(d)} × ${kg} = ${fr(d * kg)} µg/min.`, `Par heure : × 60 = ${fr(d * kg * 60)} µg/h.`, `Concentration : ${mg} mg = ${mg * 1000} µg dans ${V} mL → ${fr(conc)} µg/mL.`, `Débit : ${fr(d * kg * 60)} ÷ ${fr(conc)} = ${fr(ans)} mL/h.`], tip: 'Chaîne µg/kg/min → mL/h : × poids, × 60, puis ÷ concentration en µg/mL (attention : mg → µg, × 1000).' };
+      }
+    },
+    pct(l) {
+      for (let k = 0; k < 500; k++) {
+        if (l === 4) { const [nm, p] = pick([['glucose', 30], ['glucose', 10], ['NaCl', 10], ['chlorure de calcium', 10]]), g = pick([2, 3, 4, 5, 6, 7.5, 10, 15, 20]), vol = g * 100 / p; if (!nice(vol, 1)) continue;
+          return { text: `Tu dois administrer **${fr(g)} g de ${nm}**. Tu disposes d'une solution à **${p} %**. Quel **volume** prélèves-tu ?`, ans: vol, unit: 'mL', tol: 0.05, steps: [`${p} % = ${p} g pour 100 mL.`, `Volume = (${fr(g)} × 100) ÷ ${p} = ${fr(vol)} mL.`], tip: 'Volume (mL) = quantité (g) × 100 ÷ pourcentage.' }; }
+        const p1 = pick([30, 20, 10]), p2 = pick([2.5, 5, 10]), V = pick([100, 200, 250, 500, 1000]); if (p2 >= p1) continue; const v1 = V * p2 / p1; if (!nice(v1, 1)) continue; const eau = V - v1;
+        return { text: `On veut préparer **${V} mL de glucose à ${fr(p2)} %** à partir de **glucose à ${p1} %** et d'eau pour préparations injectables. Quel volume de **glucose à ${p1} %** prélèves-tu ?${_ctx(l, 0)}`, ans: v1, unit: 'mL', tol: 0.1,
+          steps: [`Quantité de glucose voulue : ${fr(p2)} g pour 100 mL → ${fr(V * p2 / 100)} g pour ${V} mL.`, `Volume de solution à ${p1} % : (${fr(V * p2 / 100)} × 100) ÷ ${p1} = ${fr(v1)} mL.`, `(On complète avec ${fr(eau)} mL d'eau.)`], tip: 'Dilution : C₁ × V₁ = C₂ × V₂. Ici V₁ = (V₂ × C₂) ÷ C₁.' };
+      }
+    },
+    insuline(l) {
+      for (let k = 0; k < 500; k++) {
+        if (l === 4) { const G = pick([2.2, 2.6, 3, 3.4, 4, 2.8]), T = pick([1.2, 1.4, 1.5, 1.8]), f = pick([0.3, 0.5, 0.6, 0.4]), ui = (G - T) / f; if (G <= T || !nice(ui, 1)) continue;
+          return { text: `Protocole fictif : **1 UI d'insuline rapide baisse la glycémie de ${fr(f)} g/L**. Glycémie à **${fr(G)} g/L**, objectif **${fr(T)} g/L**. Combien d'**UI de correction** ?`, ans: ui, unit: 'UI', tol: 0.05,
+            steps: [`Écart à corriger : ${fr(G)} − ${fr(T)} = ${fr(G - T)} g/L.`, `UI : ${fr(G - T)} ÷ ${fr(f)} = ${fr(ui)} UI.`], tip: 'En vrai, la dose vient de la prescription / du protocole du service, pas d\'un calcul personnel : double contrôle systématique.' }; }
+        const g = pick([40, 50, 60, 70, 80, 90]), r = pick([8, 10, 12]), G = pick([2.2, 2.6, 3, 3.4]), T = 1.4, f = pick([0.4, 0.5]); const rep = g / r, cor = (G - T) / f, tot = rep + cor; if (!nice(rep, 2) || !nice(cor, 2) || !nice(tot, 2)) continue;
+        if (Math.random() < 0.5) return { text: `Protocole fictif : **1 UI pour ${r} g de glucides** (repas) et **1 UI baisse la glycémie de ${fr(f)} g/L** (correction, objectif ${fr(T)} g/L). Repas de **${g} g de glucides**, glycémie à **${fr(G)} g/L**. **Total d'UI** à injecter ?`, ans: tot, unit: 'UI', tol: 0.05,
+          steps: [`Insuline du repas : ${g} ÷ ${r} = ${fr(rep)} UI.`, `Correction : (${fr(G)} − ${fr(T)}) ÷ ${fr(f)} = ${fr(cor)} UI.`, `Total : ${fr(rep)} + ${fr(cor)} = ${fr(tot)} UI.`], tip: 'Deux calculs à additionner : repas + correction. Insuline = médicament à haut risque : relis la prescription en entier, double contrôle.' };
+        const kg = pick([50, 60, 70, 80, 90]), q = pick([0.05, 0.1]), ans = q * kg; if (!nice(ans, 2)) continue;
+        return { text: `Insuline rapide en **seringue électrique : 50 UI dans 50 mL** (1 UI/mL). Protocole : **${fr(q)} UI/kg/h**. Patient de **${kg} kg**. Quel **débit en mL/h** ?${_ctx(l, 0)}`, ans, unit: 'mL/h', tol: 0.02,
+          steps: [`Dose par heure : ${fr(q)} × ${kg} = ${fr(ans)} UI/h.`, `Concentration : 50 UI ÷ 50 mL = 1 UI/mL.`, `Débit : ${fr(ans)} ÷ 1 = ${fr(ans)} mL/h.`], tip: 'Avec une concentration de 1 UI/mL, le débit en mL/h est égal à la dose en UI/h : c\'est voulu pour limiter les erreurs.' };
+      }
+    },
+    debit(l) {
+      for (let k = 0; k < 600; k++) {
+        const who = pick(NAMES);
+        if (l === 4) { const kg = pick([50, 60, 70, 80, 90, 100]), c = pick([80, 100, 160, 200]), q = pick([3, 4, 5, 6, 8, 10, 12, 15, 20]), d = q * c / (60 * kg); if (!nice(d, 2)) continue;
+          return { text: `${who} (**${kg} kg**) : seringue de noradrénaline à **${c} µg/mL**, pompe réglée à **${q} mL/h**. Quelle **dose reçue** en µg/kg/min ?`, ans: d, unit: 'µg/kg/min', tol: 0.005,
+            steps: [`Par heure : ${q} × ${c} = ${q * c} µg/h.`, `Par minute : ${q * c} ÷ 60 = ${fr(q * c / 60)} µg/min.`, `Par kg : ${fr(q * c / 60)} ÷ ${kg} = ${fr(d)} µg/kg/min.`], tip: 'Sens inverse du calcul habituel : mL/h × µg/mL = µg/h ; ÷ 60 ; ÷ poids.' }; }
+        const q1 = pick([4, 6, 8, 10, 12, 15]), c1 = pick([80, 100]), c2 = pick([160, 200]), q2 = q1 * c1 / c2; if (!nice(q2, 2)) continue;
+        return { text: `${who} sous noradrénaline : seringue à **${c1} µg/mL** à **${q1} mL/h**. L'équipe passe à une seringue plus concentrée : **${c2} µg/mL**. Quel **nouveau débit** pour garder la **même dose** ?${_ctx(l, 0)}`, ans: q2, unit: 'mL/h', tol: 0.05,
+          steps: [`Dose actuelle : ${q1} × ${c1} = ${q1 * c1} µg/h.`, `Nouveau débit : ${q1 * c1} ÷ ${c2} = ${fr(q2)} mL/h.`], tip: 'Relais de seringue : la dose (µg/h) ne change pas. Si la concentration augmente, le débit diminue dans la même proportion. Relais fait avec double contrôle et sans interrompre le débit.', alt: [{ v: q1 * c2 / c1, msg: 'Tu as inversé le rapport : une seringue plus concentrée doit passer plus LENTEMENT.' }] };
+      }
+    },
+    dilu(l) {
+      for (let k = 0; k < 600; k++) {
+        if (l === 4) { const c0 = pick([1000, 500, 100, 50]), n1 = pick([10, 5, 2, 4]), n2 = pick([10, 5, 2]), cf = c0 / (n1 * n2); if (!nice(cf, 3)) continue;
+          return { text: `Solution mère à **${c0} µg/mL**. On réalise **deux dilutions successives** : d'abord **1 volume pour ${n1}**, puis le résultat est dilué **1 volume pour ${n2}**. Quelle **concentration finale** (µg/mL) ?`, ans: cf, unit: 'µg/mL', tol: Math.max(0.005, cf * 1e-4),
+            steps: [`Après la 1re dilution : ${c0} ÷ ${n1} = ${fr(c0 / n1)} µg/mL.`, `Après la 2e : ${fr(c0 / n1)} ÷ ${n2} = ${fr(cf)} µg/mL.`], tip: 'Dilutions successives : on divise la concentration par chaque facteur, l\'un après l\'autre (facteur total = n₁ × n₂).' }; }
+        const mg = pick([1, 0.1, 0.5]), n = pick([10, 5]), dose = pick([0.05, 0.1, 0.2, 0.25, 0.5]), cf = mg / n; const vol = dose / cf; if (!nice(vol, 2) || vol > 8 || dose >= mg) continue; // ampoule c mg/mL
+        return { text: `Ampoule de **${fr(mg)} mg dans 1 mL**. Tu en prélèves **1 mL** que tu complètes à **${n} mL** avec du NaCl 0,9 % (solution **diluée**). La prescription est de **${fr(dose)} mg**${l === 5 ? ' (urgence : arrêt cardio-respiratoire, protocole fictif)' : ''}. Quel **volume de solution diluée** injectes-tu ?`, ans: vol, unit: 'mL', tol: 0.02,
+          steps: [`Concentration après dilution : ${fr(mg)} mg ÷ ${n} mL = ${fr(cf)} mg/mL.`, `Volume : ${fr(dose)} ÷ ${fr(cf)} = ${fr(vol)} mL.`], tip: 'Toujours recalculer la concentration APRÈS dilution avant de calculer le volume à injecter. En urgence réelle : protocole affiché, lecture à voix haute et double contrôle.', alt: [{ v: dose / mg, msg: 'Tu as utilisé la concentration de l\'ampoule : la solution a été diluée, utilise la concentration APRÈS dilution.' }] };
+      }
+    }
+  };
+  // Nouveaux thèmes : niveaux 1 à 3
+  GEN.debit = function (l) {
+    for (let k = 0; k < 400; k++) {
+      const who = pick(NAMES), kg = pick([50, 60, 70, 80, 90]), d = pick([2, 3, 5, 8, 10]);
+      if (l === 1) return { text: `${who} (**${kg} kg**) : dopamine à **${d} µg/kg/min**. Quelle dose en **µg/min** ?`, ans: d * kg, unit: 'µg/min', tol: 0.05, steps: [`Dose = ${d} × ${kg} = ${d * kg} µg/min.`], tip: 'µg/kg/min × poids (kg) = µg/min.' };
+      if (l === 2) { const ans = d * kg * 60 / 1000; if (!nice(ans, 3)) continue; return { text: `${who} (**${kg} kg**) : dopamine à **${d} µg/kg/min**. Quelle dose en **mg/h** ?`, ans, unit: 'mg/h', tol: 0.005, steps: [`Par minute : ${d} × ${kg} = ${d * kg} µg/min.`, `Par heure : × 60 = ${d * kg * 60} µg/h = ${fr(ans)} mg/h.`], tip: '× poids, × 60 (min → h), ÷ 1000 (µg → mg).' }; }
+      const c = pick([1, 2, 4, 5]), mgh = d * kg * 60 / 1000, ans = mgh / c; if (!nice(ans, 2)) continue;
+      return { text: `${who} (**${kg} kg**) : dopamine à **${d} µg/kg/min**. Seringue à **${c} mg/mL**. Quel **débit en mL/h** ?`, ans, unit: 'mL/h', tol: 0.02, steps: [`Dose : ${d} × ${kg} × 60 ÷ 1000 = ${fr(mgh)} mg/h.`, `Débit : ${fr(mgh)} ÷ ${c} = ${fr(ans)} mL/h.`], tip: 'µg/kg/min → mg/h (× poids × 60 ÷ 1000) puis ÷ concentration (mg/mL) = mL/h.' };
+    }
+  };
+  GEN.dilu = function (l) {
+    for (let k = 0; k < 400; k++) {
+      if (l === 1) { const c = pick([10, 20, 50, 100]), v = pick([1, 2, 5]), Vf = pick([10, 20, 50]); const ans = c * v / Vf; if (!nice(ans, 3) || v >= Vf) continue;
+        return { text: `Solution à **${c} mg/mL**. Tu prélèves **${v} mL** et tu complètes à **${Vf} mL**. Quelle est la **concentration finale** ?`, ans, unit: 'mg/mL', tol: 0.005, steps: [`Quantité : ${c} × ${v} = ${c * v} mg.`, `Concentration : ${c * v} ÷ ${Vf} = ${fr(ans)} mg/mL.`], tip: 'La quantité de médicament ne change pas quand on dilue : seul le volume augmente.' }; }
+      if (l === 2) { const c1 = pick([10, 20, 40, 50]), c2 = pick([1, 2, 4, 5]), Vf = pick([10, 20, 50]), v = Vf * c2 / c1; if (c2 >= c1 || !nice(v, 2) || v >= Vf) continue; const eau = Vf - v;
+        return { text: `Tu veux **${Vf} mL à ${c2} mg/mL** à partir d'une solution à **${c1} mg/mL**. Quel volume d'**eau** ajoutes-tu à la solution prélevée ?`, ans: eau, unit: 'mL', tol: 0.01, steps: [`Solution à prélever : (${Vf} × ${c2}) ÷ ${c1} = ${fr(v)} mL.`, `Eau à ajouter : ${Vf} − ${fr(v)} = ${fr(eau)} mL.`], tip: 'C₁ × V₁ = C₂ × V₂, puis eau = volume final − V₁.', alt: [{ v: v, msg: 'Tu as donné le volume de solution mère ; on demande l\'eau à ajouter.' }] }; }
+      const mg = pick([100, 250, 500, 750, 1000, 2000]), sol = pick([2, 3, 4, 5, 8, 10, 15, 20]), add = pick([0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2]), Vf = sol + add, c = mg / Vf; if (!nice(c, 2)) continue;
+      return { text: `Flacon de poudre de **${mg} mg**. Tu ajoutes **${fr(sol)} mL de solvant** ; la poudre occupe **${fr(add)} mL** : le volume final est donc de **${fr(Vf)} mL**. Quelle est la **concentration** obtenue (mg/mL) ?`, ans: c, unit: 'mg/mL', tol: 0.02, steps: [`Volume final : ${fr(sol)} + ${fr(add)} = ${fr(Vf)} mL.`, `Concentration : ${mg} ÷ ${fr(Vf)} = ${fr(c)} mg/mL.`], tip: 'Pour une poudre, le volume final = solvant + volume pris par la poudre : lis la notice du flacon (tableau de reconstitution).' };
     }
   };
   const CATS = [
@@ -160,9 +304,11 @@ App.Dose = (() => {
     { id: 'gravite', ico: '💧', name: 'Perfusion par gravité', desc: 'Gouttes par minute' },
     { id: 'pse', ico: '🖲️', name: 'Pompe et seringue électrique', desc: 'Débit en mL/h, durée' },
     { id: 'pct', ico: '％', name: 'Pourcentages et concentrations', desc: 'g par poche, mg/mL' },
-    { id: 'insuline', ico: '🩸', name: 'Insuline (UI)', desc: 'UI et mL en U100' }
+    { id: 'insuline', ico: '🩸', name: 'Insuline (UI)', desc: 'UI, U100, corrections, IVSE' },
+    { id: 'debit', ico: '📈', name: 'µg/kg/min', desc: 'Doses par minute et par kg, relais de seringue' },
+    { id: 'dilu', ico: '🧪', name: 'Dilutions', desc: 'Dilutions, poudres à reconstituer' }
   ];
-  const LVL = { 1: 'Débutant', 2: 'Intermédiaire', 3: 'Avancé' };
+  const LVL = { 1: 'Débutant', 2: 'Intermédiaire', 3: 'Avancé', 4: 'Expert', 5: 'Réa / complexe' };
 
   const FICHES = [
     { t: 'La règle de trois (produit en croix)', p: "Quand tu connais la quantité d'un produit dans un certain volume, tu cherches le volume pour une autre quantité.\n**Exemple** : ampoule de 20 mg dans 2 mL ; prescription 30 mg → (30 × 2) ÷ 20 = **3 mL**.\nOn multiplie en diagonale, on divise par le nombre restant. **Toujours la même unité** des deux côtés." },
@@ -172,6 +318,9 @@ App.Dose = (() => {
     { t: 'Perfusion par gravité', p: "**Gouttes/min = (volume en mL × gouttes par mL) ÷ durée en minutes.**\nMacro-perfuseur courant : 20 gouttes = 1 mL (selon le matériel : lis l'emballage). Microgoutteur : 60 gouttes = 1 mL, donc gouttes/min = mL/h.\nOn arrondit à l'unité." },
     { t: 'Pompe et seringue électrique', p: "**Débit (mL/h) = volume (mL) ÷ durée (h)** · **Durée (h) = volume ÷ débit**.\nSeringue électrique avec une dose horaire : concentration = quantité ÷ volume de la seringue ; **débit (mL/h) = dose par heure (mg/h) ÷ concentration (mg/mL)**." },
     { t: 'Pourcentages', p: "1 % = **1 g pour 100 mL** (solution aqueuse) = 10 mg/mL.\nGlucose 5 % : 5 g pour 100 mL ; une poche de 500 mL contient 25 g." },
+    { t: 'µg/kg/min (dopamine, noradrénaline…)', p: "Dose (µg/min) = dose par kg × poids. Pour passer en **mg/h** : × 60 puis ÷ 1000. Pour le **débit en mL/h** : ÷ concentration (mg/mL ou µg/mL, même unité qu'en haut).\n**Chaîne type** : µg/kg/min → × poids → × 60 → ÷ concentration en µg/mL = mL/h.\nRelais de seringue : la dose (µg/h) ne change pas, donc nouveau débit = ancien débit × ancienne concentration ÷ nouvelle concentration." },
+    { t: 'Dilutions et poudres', p: "**C₁ × V₁ = C₂ × V₂** : la quantité de médicament ne change pas quand on dilue.\nVolume de solvant à ajouter = volume final − volume de solution prélevée.\nPoudre : volume final = solvant + volume de la poudre (lis la notice). Dilutions successives : on divise par chaque facteur." },
+    { t: 'Arrondir : vers le haut ou au plus proche ?', p: "Boîtes, flacons, comprimés à délivrer : toujours **vers le haut**. Gouttes/min : au plus proche (on ne compte pas de fraction de goutte). Doses : respecte la précision de la seringue et de la prescription.\nDose maximale/jour = mg/kg/jour × poids ; on retire ce qui a déjà été donné avant d'administrer." },
     { t: 'Insuline', p: "U100 : **100 UI par mL**. 10 UI = 0,1 mL. En pratique on lit des unités sur la seringue ou le stylo.\n⚠ L'insuline est un médicament à haut risque : prescription lue en entier, double contrôle, jamais de dose « à peu près »." }
   ];
   const DISC = "Outil d'entraînement : prescriptions et valeurs fictives. En soins, tu relis toute la prescription, tu fais un double contrôle et tu suis le protocole du service ; en cas de doute, tu demandes à l'infirmier(ère) ou à ton formateur. Cet outil ne remplace pas ton cours.";
@@ -208,7 +357,7 @@ App.Dose = (() => {
 
   // ══ Série ═══════════════════════════════════════════════════════════
   function _make(cat, lvl) {
-    for (let t = 0; t < 20; t++) { const p = GEN[cat](lvl); if (p && p.ans != null && isFinite(p.ans)) return Object.assign({ cat, lvl }, p); }
+    for (let t = 0; t < 20; t++) { const p = (lvl >= 4 ? EXP[cat] : GEN[cat])(lvl); if (p && p.ans != null && isFinite(p.ans)) return Object.assign({ cat, lvl }, p); }
     return null;
   }
   function start() {
@@ -283,7 +432,7 @@ App.Dose = (() => {
       const b = c.id === 'mix' ? null : P.best[c.id + '|' + cfg.lvl], bm = c.id === 'mix' ? P.best['mix|' + cfg.lvl] : null, v = b != null ? b : bm;
       return `<button type="button" class="dz-cat ${cfg.cat === c.id ? 'on' : ''}" aria-pressed="${cfg.cat === c.id}" onclick="App.Dose.setCat('${c.id}')"><span class="dz-cat-ico">${c.ico}</span><span class="dz-cat-t"><b>${_esc(c.name)}</b><small>${_esc(c.desc)}</small></span>${v != null ? `<span class="dz-best ${_cls(v)}">${v}%</span>` : ''}</button>`;
     }).join('');
-    const lv = [1, 2, 3].map(l => `<button type="button" class="dz-lvl ${cfg.lvl === l ? 'on' : ''}" aria-pressed="${cfg.lvl === l}" onclick="App.Dose.setLvl(${l})">${LVL[l]}</button>`).join('');
+    const lv = [1, 2, 3, 4, 5].map(l => `<button type="button" class="dz-lvl ${cfg.lvl === l ? 'on' : ''}" aria-pressed="${cfg.lvl === l}" onclick="App.Dose.setLvl(${l})">${LVL[l]}</button>`).join('');
     const miss = P.miss.slice(0, 6);
     const missH = miss.length ? `<h3 class="dz-h">🔁 Derniers calculs ratés</h3><div class="dz-card">${miss.map(m => `<div class="dz-miss"><div class="dz-miss-t">${_esc(m.text)}</div><div class="dz-muted dz-small">Réponse : ${_esc(m.ans)} · ${_esc(_catName(m.cat))}</div></div>`).join('')}<button type="button" class="btn btn-ghost btn-sm" onclick="App.Dose.clearMiss()">Effacer la liste</button></div>` : '';
     return `<div class="dz-bar"><button type="button" class="btn btn-ghost btn-sm" onclick="App.Dose.close()">← Entraînement</button></div>

@@ -151,6 +151,29 @@ App.Store = (() => {
     saveLog();
   }
 
+  // ── Correction manuelle du temps d'un jour (ex. chrono oublié en marche) ──
+  // On fixe le TOTAL du jour. Si on réduit : on retire d'abord le temps « cartes » (le reste du total), puis on réduit
+  // proportionnellement les parties détaillées (anglais, simulation, entraînements). Si on augmente : l'ajout va aux cartes.
+  // `fixAt` (horodatage) sert à la synchro : la correction la plus récente gagne au lieu du « max » habituel.
+  const TIME_FIELDS = ['seconds', 'englishSecs', 'simSecs', 'trainSecs', 'gameSecs', 'orthoSecs', 'pharmaSecs', 'gazoSecs', 'secoursSecs', 'tpSecs', 'doseSecs'];
+  function getDaySeconds(date) { return Math.round((state.studyLog[date] && state.studyLog[date].seconds) || 0); }
+  function setDaySeconds(date, total) {
+    total = Math.max(0, Math.min(24 * 3600, Math.round(Number(total) || 0)));
+    if (!state.studyLog[date]) state.studyLog[date] = { reviewed: 0, ok: 0, hard: 0, nope: 0 };
+    const e = state.studyLog[date], cur = e.seconds || 0;
+    const parts = (e.englishSecs || 0) + (e.simSecs || 0) + (e.trainSecs || 0);
+    const base = Math.max(0, cur - parts);
+    if (total < cur && parts > 0) {
+      const keepBase = Math.min(base, total), rest = total - keepBase, k = parts > 0 ? Math.min(1, rest / parts) : 0;
+      if (k < 1) TIME_FIELDS.slice(1).forEach(f => { if (e[f]) e[f] = Math.round(e[f] * k); });
+    }
+    e.seconds = total;
+    e.fixAt = Date.now();
+    saveLog();
+    if (window.App && App.Sync && App.Sync.pushDebounced) App.Sync.pushDebounced();
+    return total;
+  }
+
   // ── Anglais : compte dans les révisions du jour ────────────────
   // counted : true quand on compte UN mot (1 par mot et par leçon, pas par question)
   // → entre dans « révisées aujourd'hui », l'objectif de 100 et la série de jours.
@@ -246,5 +269,5 @@ App.Store = (() => {
     });
   }
 
-  return { state, load, save, saveLog, saveOrder, normCat, logReview, logSessionDuration, logEnglish, logSim, logTraining, getStreak, getDailyGoal, setDailyGoal, reviewedToday, getBackup, setBackup, deleteBackup, listBackupKeys };
+  return { state, load, save, saveLog, saveOrder, normCat, logReview, logSessionDuration, getDaySeconds, setDaySeconds, logEnglish, logSim, logTraining, getStreak, getDailyGoal, setDailyGoal, reviewedToday, getBackup, setBackup, deleteBackup, listBackupKeys };
 })();

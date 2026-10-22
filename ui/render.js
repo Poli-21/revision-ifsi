@@ -357,11 +357,11 @@ App.Render = (() => {
       return `<div style="display:grid;grid-template-columns:78px 1fr auto;gap:10px;align-items:center;margin:7px 0;opacity:${d.future ? 0.35 : 1}">
         <div style="font-size:.82rem;font-weight:${d.today ? 800 : 500};color:${d.today ? '#a78bfa' : '#9ca3af'}">${d.name}${d.today ? ' •' : ''}</div>
         <div style="height:10px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden"><div style="height:100%;width:${pct}%;border-radius:99px;background:${d.today ? 'linear-gradient(90deg,#34d399,#059669)' : '#6d28d9'}"></div></div>
-        <div style="font-size:.8rem;color:#e5e7eb;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap">${d.future ? '—' : (d.secs ? hms(d.secs) : '0 s')}${d.cards ? ` <span style="color:#6b7280">· ${d.cards} 🃏</span>` : ''}</div>
+        <div style="font-size:.8rem;color:#e5e7eb;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap">${d.future ? '—' : (d.secs ? hms(d.secs) : '0 s')}${d.cards ? ` <span style="color:#6b7280">· ${d.cards} 🃏</span>` : ''}${d.future ? '' : ` <button type="button" class="ypt-fix" aria-label="Corriger le temps de ${d.name}" title="Corriger le temps de ce jour" onclick="App.TimeFix.open('${d.key}')">✏️</button>`}</div>
       </div>`;
     }).join('');
 
-    el.innerHTML = `<div class="ypt-card-title">📆 Temps révisé cette semaine (lundi → dimanche)</div>
+    el.innerHTML = `<div class="ypt-card-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">📆 Temps révisé cette semaine (lundi → dimanche) <button type="button" class="ypt-fix ypt-fix-big" onclick="App.TimeFix.open()">✏️ Corriger les heures</button></div>
       <div style="font-size:2.1rem;font-weight:800;color:#fff;line-height:1.1;font-variant-numeric:tabular-nums">${hms(totSecs)}</div>
       <div style="font-size:.85rem;color:#9ca3af;margin:6px 0 14px">${totCards} carte${totCards > 1 ? 's' : ''} révisée${totCards > 1 ? 's' : ''} · ${active} jour${active > 1 ? 's' : ''} actif${active > 1 ? 's' : ''} sur 7 · 7 derniers jours glissants : ${hms(roll)}</div>
       ${totEng || totEngSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">dont anglais : ${totEng} mot${totEng > 1 ? 's' : ''} · ${hms(totEngSecs)}</div>` : ''}

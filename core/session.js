@@ -117,16 +117,19 @@ App.Session = (() => {
   // Réordonne `list` : blocs de 10 cartes d'une même UE, intercalés proportionnellement aux ECTS
   // du semestre en cours (ordonnancement par "temps virtuel de fin" : plus le poids est grand,
   // plus les blocs de cette UE reviennent tôt et souvent). Cartes sans UE : poids 1.
+  // Dans chaque UE, les cartes avec schéma passent EN PREMIER (puis les autres, dans l'ordre déjà établi).
+  const _schemaFirst = arr => { const a = [], b = []; arr.forEach(x => (App.UE.hasSchema(x.c || x) ? a : b).push(x)); return a.concat(b); };
   function _ectsBlocks(list, size = 10) {
     if (!list || list.length < 2) return list || [];
     const sem = App.UE.currentSemester();
     const groups = new Map();
     list.forEach((c, i) => {
       const code = App.UE.ueOfCard(c) || '_none';
-      if (!groups.has(code)) groups.set(code, { w: code === '_none' ? 1 : Math.max(0.5, App.UE.ectsWeight(code, sem)), cards: [] });
+      if (!groups.has(code)) groups.set(code, { w: code === '_none' ? 1 : Math.max(0.3, App.UE.studyWeight(code, sem)), cards: [] });
       groups.get(code).cards.push({ c, i });
     });
-    if (groups.size < 2) return list;
+    groups.forEach(g => { g.cards = _schemaFirst(g.cards); });
+    if (groups.size < 2) return [...groups.values()][0].cards.map(x => x.c);
     const blocks = [];
     groups.forEach(g => {
       for (let k = 0; k < g.cards.length; k += size) {
@@ -150,7 +153,7 @@ App.Session = (() => {
     const groups = new Map();
     (cards || []).forEach(c => {
       const code = App.UE.ueOfCard(c) || '_none';
-      if (!groups.has(code)) groups.set(code, { code, w: code === '_none' ? 1 : Math.max(0.5, App.UE.ectsWeight(code, sem)), avail: 0, n: 0 });
+      if (!groups.has(code)) groups.set(code, { code, w: code === '_none' ? 1 : Math.max(0.3, App.UE.studyWeight(code, sem)), avail: 0, n: 0 });
       groups.get(code).avail++;
     });
     let rem = Math.min(limit, (cards || []).length);
@@ -174,14 +177,12 @@ App.Session = (() => {
   // Applique le plan : garde, dans l'ordre de priorité de la liste, les n premières cartes de chaque UE
   function _pickByEcts(list, limit) {
     const quota = new Map(ectsPlan(list, limit).map(p => [p.code, p.n]));
-    const used = new Map();
-    return list.filter(c => {
-      const code = App.UE.ueOfCard(c) || '_none';
-      const k = used.get(code) || 0;
-      if (k >= (quota.get(code) || 0)) return false;
-      used.set(code, k + 1);
-      return true;
-    });
+    // Dans chaque UE : on retient d'abord les cartes avec schéma (dans l'ordre de priorité), puis les autres
+    const byUE = new Map();
+    list.forEach(c => { const code = App.UE.ueOfCard(c) || '_none'; (byUE.get(code) || byUE.set(code, []).get(code)).push(c); });
+    const keep = new Set();
+    byUE.forEach((arr, code) => _schemaFirst(arr).slice(0, quota.get(code) || 0).forEach(c => keep.add(c)));
+    return list.filter(c => keep.has(c));
   }
 
   // Carte au palier « J+1 » (niveau 1 de l'algorithme : vue une fois, intervalle de 1 à 2 jours)

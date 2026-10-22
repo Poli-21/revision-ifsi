@@ -98,6 +98,17 @@ App.UE = (() => {
     if (typeof sem !== 'number') return u.ects;
     return hasSemEcts(u, sem) ? ectsFor(u, sem) : UNKNOWN_SEM_WEIGHT;
   }
+  // Poids de RÉVISION (≠ poids de moyenne) : une UE jugée secondaire par l'étudiante passe plus tard et reçoit moins de cartes.
+  // D.4 « Numérique en santé » : peu de points et peu de risque → poids réduit à 30 % dans l'ordre des cartes et les quotas du jour.
+  const LOW_PRIORITY = { 'D.4': 0.3 };
+  function studyWeight(u, sem) {
+    const code = typeof u === 'string' ? u : (u && u.code);
+    return ectsWeight(u, sem) * (LOW_PRIORITY[code] || 1);
+  }
+  // Carte avec schéma : dessin intégré (c.image) ou photo/schéma ajouté (c.customImage)
+  function hasSchema(c) {
+    return !!(c && ((c.image && window.App && App.SVG && App.SVG[c.image]) || c.customImage));
+  }
   // Semestre en cours = celui choisi dans l'onglet Partiels (S1 par défaut).
   function currentSemester() {
     try { const n = Number(localStorage.getItem('ifsi_partiel_semestre')); if (n >= 1 && n <= 6) return n; } catch (e) {}
@@ -229,5 +240,5 @@ App.UE = (() => {
     return changed;
   }
 
-  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, ectsFor, ectsWeight, currentSemester, ueOfCard, hasSemEcts, setEctsSem, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards, migrateReferenceCategories, removeReferenceCards };
+  return { DOMAINS, LIST, COMPETENCES, TOTAL_ECTS, ectsFor, ectsWeight, studyWeight, hasSchema, currentSemester, ueOfCard, hasSemEcts, setEctsSem, SEMESTRES, byCode, domainInfo, domainOfUE, anneeOfSemestre, grouped, label, optionsHTML, migrateReferenceCards, migrateReferenceCategories, removeReferenceCards };
 })();

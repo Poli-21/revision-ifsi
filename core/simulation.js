@@ -11,6 +11,26 @@ App.Sim = (() => {
   const KEY = 'ifsi_sim_v1';
   const NB_KEY = 'ifsi_sim_nb';          // préférence « mode bloc-notes » (l'étudiant note lui-même)
   function _nbPref() { try { return localStorage.getItem(NB_KEY) === '1'; } catch (e) { return false; } }
+  // ── Mode réaliste : horloge qui avance, imprévus, patient qui hésite ou entend mal, mesure qui rate (data/sim_real.js) ──
+  // Activé par défaut. (Dans un navigateur piloté par un robot de test, il reste éteint tant qu'on ne l'a pas demandé : les tests vérifient d'abord le jeu de base.)
+  const RL_KEY = 'ifsi_sim_real';
+  function _rlPref() {
+    try { const v = localStorage.getItem(RL_KEY); if (v === '1') return true; if (v === '0') return false; } catch (e) {}
+    try { return !navigator.webdriver; } catch (e) { return true; }
+  }
+  const _RL = () => window.App.SimReal || null;
+  const _rlOn = () => { const c = _cur(); return !!(c && c.rl && c.rl.on && _RL()); };
+  const _hm = min => { min = Math.round(min); return (Math.floor(min / 60) % 24) + ' h ' + String(((min % 60) + 60) % 60).padStart(2, '0'); };
+  function _rlStartMin(scn) { const m = String((scn && scn.intro && scn.intro.heure) || '7 h 30').match(/(\d+)\s*h\s*(\d*)/); return m ? (+m[1]) * 60 + (+m[2] || 0) : 450; }
+  function _rlNow() { const c = _cur(), scn = _curScn(); return _rlStartMin(scn) + ((c && c.rl && c.rl.min) || 0); }
+  function _rlAdv(n) { if (_rlOn()) _cur().rl.min += n; }
+  function _rlClock() {
+    const e = _el('sim-rl-clk'); if (e && _rlOn()) e.textContent = '🕖 ' + _hm(_rlNow());
+  }
+  function setRl(on) {
+    try { localStorage.setItem(RL_KEY, on ? '1' : '0'); } catch (e) {}
+    const el = _el('sim-rl-state'); if (el) el.textContent = on ? 'activé pour la prochaine partie' : 'désactivé';
+  }
   const MAX_HISTORY = 30;
   const MAX_LOG = 400;
 
@@ -80,6 +100,8 @@ App.Sim = (() => {
     c.rx = c.rx || { ecg: null, skipped: false, gazo: null, gazoSkipped: false };
     c.wr = c.wr || { txt: { C: '', D: '', A: '', R: '' }, graded: false, pts: 0, warn: '' };
     c.ai = c.ai || {}; c.prep = c.prep || {}; c.waste = c.waste || null;
+    c.rl = (c.rl && typeof c.rl === 'object') ? c.rl : { on: false };
+    c.rl.min = c.rl.min || 0; c.rl.ints = Array.isArray(c.rl.ints) ? c.rl.ints : []; c.rl.pardon = c.rl.pardon || 0; c.rl.art = c.rl.art || 0; c.rl.pend = c.rl.pend || null;
     c.nb = !!c.nb; c.notes = typeof c.notes === 'string' ? c.notes : ''; c.nbExp = c.nbExp || {}; c.nbWarn = c.nbWarn || {};
     const k = c.care = (c.care && typeof c.care === 'object') ? c.care : {};
     k.pos = k.pos || null; k.o2 = k.o2 || null; k.alert = k.alert || null; k.stay = !!k.stay; k.stayShown = !!k.stayShown; k.bad = k.bad || 0;
@@ -289,9 +311,50 @@ App.Sim = (() => {
   function _afterAction() {
     _checkAuto();
     _urgentHint();
+    if (_rlOn() && _cur().stage === 'chambre') _rlAdv(1);          // chaque action fait avancer l'horloge d'au moins une minute
     _save();
     if (!_cur() || _cur().stage !== 'chambre') return;
     _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderSheet();
+    _rlClock(); _rlCheck();
+  }
+  // ── Imprévus : une interruption (sonnette, collègue, proche, alarme, médecin) à gérer pendant le recueil ──
+  function _rlSub(t, scn) { const p = (scn && scn.patient) || {}; return _gen(String(t || '').replace(/\{civ\}/g, p.civ || '').replace(/\{nom\}/g, p.nom || ''), scn); }
+  function _rlCheck() {
+    const c = _cur(), scn = _curScn(); if (!_rlOn() || !scn || c.stage !== 'chambre' || _G || c.rl.pend || scn.urgent) return;
+    const R = _RL(), k = c.rl.ints.length; if (k >= R.INT_AT.length || c.actions < R.INT_AT[k]) return;
+    const pool = R.INTERRUPTS.filter(i => (!i.setting || i.setting === scn.setting) && !c.rl.ints.some(x => x.id === i.id));
+    if (!pool.length) return;
+    const it = pool[Math.floor(Math.random() * pool.length)];
+    c.rl.pend = { id: it.id, sel: null };
+    _log('sys', it.ico + ' ' + it.title);
+    _save(); _renderLog(); _rlModal();
+  }
+  function _rlModal() {
+    const c = _cur(), scn = _curScn(); let ov = _el('sim-rl-ov');
+    if (!c || !scn || !c.rl || !c.rl.pend || !_RL()) { if (ov) ov.remove(); return; }
+    const it = _RL().INTERRUPTS.find(i => i.id === c.rl.pend.id); if (!it) { c.rl.pend = null; return; }
+    if (!ov) { ov = document.createElement('div'); ov.id = 'sim-rl-ov'; ov.className = 'overlay open sim-rl-ov'; document.body.appendChild(ov); }
+    const sel = c.rl.pend.sel, ch = it.choices[sel];
+    const body = sel == null
+      ? `<div class="sim-rl-choices">${it.choices.map((x, i) => `<button type="button" class="sim-q sim-rl-ch" onclick="App.Sim.rlChoose(${i})">${_esc(_rlSub(x.label, scn))}</button>`).join('')}</div>`
+      : `<div class="sim-fb ${ch.ok ? 'good' : 'danger'}" role="status"><b>${ch.ok ? '✓ Bonne réaction' : '✗ À revoir'}</b><p>${_esc(_rlSub(ch.fb, scn))}</p></div><div class="sim-row"><button type="button" class="btn btn-primary" id="sim-rl-go" onclick="App.Sim.rlClose()">Continuer le recueil →</button></div>`;
+    ov.innerHTML = `<div class="modal sim-rl-modal" role="dialog" aria-modal="true" aria-labelledby="sim-rl-t"><div class="sim-rl-ico" aria-hidden="true">${it.ico}</div><h3 id="sim-rl-t">${_esc(_rlSub(it.title, scn))}</h3><p>${_esc(_rlSub(it.text, scn))}</p>${body}<p class="sim-muted sim-small">🕖 ${_hm(_rlNow())} · imprévu : hors score, réponse analysée dans ton bilan.</p></div>`;
+    try { const f = ov.querySelector('button'); if (f) f.focus(); } catch (e) {}
+  }
+  function rlChoose(i) {
+    const c = _cur(), scn = _curScn(); if (!c || !c.rl || !c.rl.pend || c.rl.pend.sel != null) return;
+    const it = _RL().INTERRUPTS.find(x => x.id === c.rl.pend.id), ch = it && it.choices[i]; if (!ch) return;
+    c.rl.pend.sel = i; c.rl.ints.push({ id: it.id, i, ok: !!ch.ok });
+    _rlAdv(ch.ok ? 1 : 3);
+    _log('sys', (ch.ok ? '✓ ' : '✗ ') + _rlSub(ch.fb, scn));
+    _save(); _renderLog(); _rlClock(); _rlModal();
+  }
+  function rlClose() {
+    const c = _cur(); if (!c || !c.rl) return;
+    c.rl.pend = null; _save();
+    const ov = _el('sim-rl-ov'); if (ov) ov.remove();
+    _rlClock(); _syncScene();
+    try { const i = _el('sim-input'); if (i && !('ontouchstart' in window)) i.focus(); } catch (e) {}
   }
 
   function say(text) {
@@ -337,11 +400,18 @@ App.Sim = (() => {
         alt = (w.found || []).some(f => c.found[f]) || (w.asked || []).some(q => c.asked[q]);
         if (alt) a = a.alt;
       }
+      // Mode réaliste : une personne âgée entend mal une question importante (une fois par partie) : il faut répéter, plus fort
+      if (_rlOn() && a && (a.reveals || []).length && !it.contact && !scn.urgent && c.rl.pardon < 1 && ((scn.patient && scn.patient.age) || 0) >= 78 && c.actions >= 2 && Math.random() < 0.35) {
+        c.rl.pardon++; const R = _RL();
+        _log('pat', R.PARDON[Math.floor(Math.random() * R.PARDON.length)]); _log('sys', R.PARDON_TIP);
+        return;
+      }
       const altKey = id + '#alt';
       const again = alt ? (c.asked[altKey] || 0) > 0 : ((c.asked[id] || 0) > 0 && !it.contact);
       c.asked[id] = (c.asked[id] || 0) + 1;
       if (alt) c.asked[altKey] = (c.asked[altKey] || 0) + 1;
-      _log('pat', (again ? 'Je vous l\'ai déjà dit… ' : '') + (a ? a.text : scn.fallbackAnswer));
+      const fill = (!again && _rlOn() && a && (a.reveals || []).length && !scn.urgent && Math.random() < 0.3) ? _RL().FILLERS[Math.floor(Math.random() * _RL().FILLERS.length)] : '';
+      _log('pat', (again ? 'Je vous l\'ai déjà dit… ' : '') + fill + (a ? a.text : scn.fallbackAnswer));
       if (a) { (a.reveals || []).forEach(_find); (a.logs || []).forEach(_markDone); }
     });
     c.actions++;
@@ -731,9 +801,17 @@ App.Sim = (() => {
   }
   function _gToRead() {                  // l'écran affiche la valeur : à l'étudiant de la lire et de la noter
     const c = _cur(); if (!_G) return;
+    if (_rlOn() && _G.tool === 'saturometre' && !c.rl.art && Math.random() < 0.45) {        // mode réaliste : doigt froid → signal faible, il faut refaire la mesure
+      c.rl.art = 1; _G.phase = 'artefact'; _rlAdv(1); _log('narr', _RL().SAT_ART.log); _save(); _renderLog(); _rlClock(); _renderGesture(true); _syncScene(); return;
+    }
     _G.phase = 'read';
     c.pending[_G.tool] = _G.kind === 'count' ? { n: _G.n } : true;
     _save(); _renderRecueil(); _renderToolbar(); _renderGesture(true); _syncScene();
+  }
+  function gRetry() {                   // signal faible : on réchauffe la main puis on refait la mesure
+    const c = _cur(); if (!c || !_G || _G.phase !== 'artefact') return;
+    c.rl.art = 2; _rlAdv(2); _log('narr', 'Tu réchauffes sa main entre les tiennes quelques instants, puis tu replaces le saturomètre.');
+    _gMeasure(_curScn().tools[_G.tool].seconds); _save(); _renderLog(); _rlClock(); _renderGesture();
   }
   // comptage chronométré (pouls, respiration)
   function gStartCount() {
@@ -921,6 +999,7 @@ App.Sim = (() => {
     delete c.pending[key];
     const list = t.multi ? t.multi : [{ fact: t.fact, noted: t.noted }].concat(t.also ? [{ fact: t.also.fact, noted: t.also.noted }] : []);
     const facts = [], notes = [];
+    if (_rlOn()) _rlAdv(Math.max(0, ((_RL().MIN[key] != null ? _RL().MIN[key] : _RL().MIN_DEFAULT)) - 1));
     list.forEach(m => { c.entered[m.fact] = true; _find(m.fact); facts.push(m.fact); notes.push(m.noted); });
     const noted = notes.join(' · ');
     if (t.kind === 'scope') c.mon = { live: true };                 // le scope reste branché sur le patient
@@ -1131,7 +1210,8 @@ App.Sim = (() => {
     const c = _cur(), scn = _curScn(); if (!c || !scn || c.stage !== 'chambre') return;
     _confirmFinish = false;
     _gReset();
-    c.stage = 'decision'; c.last = null;
+    c.stage = 'decision'; c.last = null; if (c.rl) { c.rl.end = c.rl.min; c.rl.pend = null; }
+    const rov = _el('sim-rl-ov'); if (rov) rov.remove();
     _save(); render(); _top();
   }
 
@@ -1560,7 +1640,7 @@ App.Sim = (() => {
     try { App.Games.reset(); } catch (e) { const s = _el('games-setup'); if (s) s.style.display = 'block'; }
     _refreshToday();
   }
-  function toList() { screen = 'liste'; _confirmFinish = false; render(); }
+  function toList() { screen = 'liste'; _confirmFinish = false; const rov = _el('sim-rl-ov'); if (rov) rov.remove(); render(); }
   function resume() {
     if (!_cur()) return;
     screen = 'jeu'; render();
@@ -1569,7 +1649,7 @@ App.Sim = (() => {
     const scn = _scn(id); if (!scn) return;
     st.current = { scenarioId: id, startedAt: Date.now(), stage: 'couloir', tab: 'dialogue', log: [], found: {}, done: {},
                    asked: {}, seenObj: {}, pending: {}, entered: {}, errors: 0, misplaced: 0,
-                   actions: 0, firstCare: null, secs: 0, dossierOpen: false, misses: 0, last: null, saved: false, nb: _nbPref(), notes: '' };
+                   actions: 0, firstCare: null, secs: 0, dossierOpen: false, misses: 0, last: null, saved: false, nb: _nbPref(), notes: '', rl: { on: _rlPref() && !!window.App.SimReal, min: 0, ints: [], pardon: 0, art: 0, pend: null } };
     _fix(st.current);
     _gReset();
     _confirmFinish = false; _menuOpen = false; _menuAct = false;
@@ -1654,6 +1734,7 @@ App.Sim = (() => {
       🤖 <b>IA facultative</b> : si tu as ajouté une clé Gemini dans les réglages, un bouton permet de demander un avis plus fin sur ton appel et ta transmission (internet nécessaire, hors score). <br>
       🏅 <b>Ta progression</b> (niveau, XP, badges) reste sur cet appareil.</div>
       ${_progHtml()}
+      <label class="sim-nbtog"><input type="checkbox" id="sim-rl-tog" ${_rlPref() ? 'checked' : ''} onchange="App.Sim.setRl(this.checked)"><span><b>⏱️ Mode réaliste</b> · <span id="sim-rl-state">${_rlPref() ? 'activé pour la prochaine partie' : 'désactivé'}</span><br><small>L'heure de la chambre avance à chaque geste, des imprévus arrivent (sonnette, collègue, médecin), une personne âgée peut mal entendre, le saturomètre peut rater sa première mesure. Hors score : tout est expliqué dans ton bilan.</small></span></label>
       <label class="sim-nbtog"><input type="checkbox" id="sim-nb-tog" ${_nbPref() ? 'checked' : ''} onchange="App.Sim.setNb(this.checked)"><span><b>📝 Mode bloc-notes</b> · <span id="sim-nb-state">${_nbPref() ? 'activé pour la prochaine partie' : 'désactivé'}</span><br><small>Plus difficile : le recueil n'est plus rempli pour toi. Tu relèves tension, température… et tu les écris toi-même dans un bloc-notes libre, puis tu t'en sers pour transmettre à l'infirmière.</small></span></label>
       ${resumeHtml}
       <h3 class="sim-h">Scénarios</h3>
@@ -1722,7 +1803,7 @@ App.Sim = (() => {
     const c = _cur(), scn = _curScn();
     root.innerHTML = `<div class="sim-wrap sim-wrap-play">
       <div class="sim-bar"><button class="btn btn-ghost btn-sm" onclick="App.Sim.toList()">← Menu</button>
-        <div class="sim-bar-title">${_esc(scn.title)}</div><div class="sim-bar-time" id="sim-clock" title="Temps actif">${_hms(c.secs)}</div></div>
+        <div class="sim-bar-title">${_esc(scn.title)}</div>${c.rl && c.rl.on ? `<div class="sim-rl-clk" id="sim-rl-clk" title="Heure dans la chambre : elle avance à chaque geste" aria-label="Heure dans la chambre">🕖 ${_hm(_rlNow())}</div>` : ''}<div class="sim-bar-time" id="sim-clock" title="Temps actif">${_hms(c.secs)}</div></div>
       <div id="sim-stepper">${_stepper()}</div>
       <nav class="sim-tabbar" id="sim-tabbar" aria-label="Panneaux"></nav>
       <div class="sim-play" id="sim-play" data-tab="${_esc(c.tab || 'dialogue')}">
@@ -1794,9 +1875,11 @@ App.Sim = (() => {
       }
       scope = Object.assign({}, o.scope, { on: live });
     }
-    return Object.assign({}, o, { patient, scope, nurse: !!k.alert, room: scn.patient && scn.patient.chambre });
+    const o2 = Object.assign({}, o, { patient, scope, nurse: !!k.alert, room: scn.patient && scn.patient.chambre });
+    if (c && c.rl && c.rl.on) { const t = _rlNow(); o2.clock = { h: Math.floor(t / 60) % 24, m: t % 60 }; }
+    return o2;
   }
-  const _sceneSigOf = o => JSON.stringify([o.patient.pos, o.patient.o2, o.patient.sat, o.patient.mon, o.nurse, o.scope && o.scope.on]);
+  const _sceneSigOf = o => JSON.stringify([o.patient.pos, o.patient.o2, o.patient.sat, o.patient.mon, o.nurse, o.scope && o.scope.on, o.clock]);
   let _sceneSig = '';
   function _sceneSvg(scn) {
     const o = _sceneOpts(scn); _sceneSig = _sceneSigOf(o);
@@ -1991,6 +2074,11 @@ App.Sim = (() => {
       return head + `<div class="sim-prep"><div class="sim-readlbl">🛡️ ${_esc(pp.title)}</div><p class="sim-muted sim-small">${_esc(pp.intro)}</p>${warn}<div class="sim-prep-list">${list}</div>
         <div class="sim-readrow"><button type="button" class="btn btn-primary" onclick="App.Sim.gPrepSubmit()">${pr.revealed ? 'Compris : continuer vers le geste' : 'Valider ma préparation (' + pr.sel.length + ')'}</button></div></div>`;
     }
+    if (g.phase === 'artefact') {
+      const SA = _RL().SAT_ART;
+      return head + `${_lcd({ big: '--', unit: '%', pulse: '--', sub: 'Signal faible' })}<div class="sim-g-warn" role="alert">${_esc(SA.note)}</div><p class="sim-muted sim-small">${_esc(SA.why)}</p>
+        <div class="sim-row"><button type="button" class="btn btn-primary" onclick="App.Sim.gRetry()">${_esc(SA.btn)}</button></div>`;
+    }
     if (g.phase === 'measuring') {
       const txt = g.sub === 'inflate' ? 'Le brassard se gonfle… Reste immobile et ne parle pas.' : (g.sub === 'scope' ? 'Le scope démarre : le brassard se gonfle tout seul et les courbes apparaissent… patiente quelques secondes.' : 'Mesure en cours… patiente quelques secondes.');
       const dv = (t.display && !t.multi && g.sub !== 'scope' && _DEVS[g.tool]) ? _dev(g.tool, t.display, true) : '';
@@ -2176,6 +2264,17 @@ App.Sim = (() => {
       <b>${ok ? 'Préparation de sécurité réussie du premier coup.' : (mid ? 'Préparation réussie après une correction.' : 'Préparation à revoir.')}</b>
       <div class="sim-muted sim-small">Mains frictionnées, gants, lecteur et bandelette vérifiés, autopiqueur de sécurité à usage unique, collecteur à portée, doigt préparé ; on ne rebouche jamais une lancette et on pique sur le côté de la pulpe.${inGrid ? '' : ' (Information : ce geste n\'est pas noté dans le score de ce cas.)'}</div></div></div>${wRow}</div>`;
   }
+  function _rlBilanHtml(c, scn) {         // réalisme : horloge, imprévus, mesure refaite, question répétée (hors score)
+    if (!c.rl || !c.rl.on || !_RL()) return '';
+    const R = _RL(), start = _rlStartMin(scn), end = start + (c.rl.end != null ? c.rl.end : c.rl.min), lim = start + R.DEADLINE_MIN, late = end > lim;
+    const rows = [`<div class="sim-row-res ${late ? 'late' : 'ok'}"><span class="sim-mark">${late ? '◐' : '✓'}</span><div><b>Recueil terminé à ${_hm(end)}</b> <span class="sim-muted">(début ${_hm(start)})</span>
+      <div class="sim-muted sim-small">${late ? 'L\'infirmière t\'attendait vers ' + _hm(lim) + ' : un recueil bien préparé est aussi un recueil tenu dans le temps (sans bâcler).' : 'Dans les temps : l\'infirmière t\'attendait vers ' + _hm(lim) + '.'}</div></div></div>`];
+    c.rl.ints.forEach(x => { const it = R.INTERRUPTS.find(i => i.id === x.id); if (!it) return; const ch = it.choices[x.i];
+      rows.push(`<div class="sim-row-res ${x.ok ? 'ok' : 'miss'}"><span class="sim-mark">${x.ok ? '✓' : '✗'}</span><div><b>${it.ico} ${_esc(_rlSub(it.title, scn))}</b><div class="sim-muted sim-small">${_esc(_rlSub(ch.fb, scn))}</div></div></div>`); });
+    if (c.rl.art) rows.push(`<div class="sim-row-res ${c.rl.art === 2 ? 'ok' : 'late'}"><span class="sim-mark">${c.rl.art === 2 ? '✓' : '◐'}</span><div><b>Saturomètre : signal faible</b><div class="sim-muted sim-small">${_esc(R.SAT_ART.why)}</div></div></div>`);
+    if (c.rl.pardon) rows.push(`<div class="sim-row-res late"><span class="sim-mark">◐</span><div><b>Question à répéter</b><div class="sim-muted sim-small">${_esc(R.PARDON_TIP.replace('💡 ', ''))}</div></div></div>`);
+    return `<h3 class="sim-h">⏱️ Réalisme : le temps et les imprévus</h3><div class="sim-card">${rows.join('')}<div class="sim-muted sim-small" style="margin-top:6px">Hors score : ces situations t'entraînent à garder ton calme et tes priorités.</div></div>`;
+  }
   function _nbBilanHtml(c, scn) {
     if (!c.nb) return '';
     const keys = Object.keys(c.nbExp || {});
@@ -2263,6 +2362,7 @@ App.Sim = (() => {
       </div>
       ${_soinsBilanHtml(c, scn, R)}
       ${_glycBilanHtml(c, scn)}
+      ${_rlBilanHtml(c, scn)}
       ${earned}${stats}
       ${tips.length ? `<h3 class="sim-h">Pour progresser</h3><div class="sim-card"><ul class="sim-ul">${tips.map(t => `<li>${_esc(t)}</li>`).join('')}</ul></div>` : ''}
       ${_nbBilanHtml(c, scn)}
@@ -2333,7 +2433,7 @@ App.Sim = (() => {
 
   return {
     open, close, start, resume, toList, discard, setTab, say, submit, askMenu, toggleMenu, toggleAct, act, thToggle,
-    pickTool, dropTool, hot, sheetDo, sheetClose, gCuffMove, gCuffRot, gCuffPalp, gCuffOk, cuffDown, cuffMove, cuffUp, gStartCount, gTap, gRecount, gInflate, gSubmit, gPrepToggle, gPrepSubmit, gWasteSet, gWasteSubmit, gNbDone, nbTxt, setNb, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
+    pickTool, dropTool, hot, sheetDo, sheetClose, gCuffMove, gCuffRot, gCuffPalp, gCuffOk, cuffDown, cuffMove, cuffUp, gStartCount, gTap, gRecount, gInflate, gSubmit, rlChoose, rlClose, setRl, gRetry, gPrepToggle, gPrepSubmit, gWasteSet, gWasteSubmit, gNbDone, nbTxt, setNb, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
     decLevel, decLevelOk, decPick, decActionsOk, decNext, txt, sendSaed, saedRetry, saedDone, rxEcg, rxSkip, rxGazo, rxGazoSkip, rxNext, unkCopy, unkClear, wrSubmit, wrDone, aiReview,
     parse, parseAct, _t: { norm: _norm, prep: _prep, suggest: _suggest, unk: _unkRead, state: () => st, tick: _tick, grade: (kind, texts) => { const scn = _curScn() || _scenarios()[0]; return _grade(kind === 'saed' ? scn.call.sections : scn.written.fields, texts); }, results: () => _results(), levelOf: _levelOf, cuff: () => (_G && _G.cuff) || null }
   };
