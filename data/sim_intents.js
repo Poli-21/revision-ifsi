@@ -338,6 +338,14 @@ App.SimIntents = {
       menu: 'Avez-vous utilisé votre spray (Ventoline) ? Cela vous a-t-il soulagé ?', ask: 'Avez-vous utilisé votre spray, la Ventoline ? Est-ce que cela vous a soulagé ?',
       strong: [/\bventol/, /\bsalbut/, /\bspray\b/, /\binhalateur\b/, /\bbouffees?\b/, /\bpompe\b/, /\baerosol\b/, /\bbronchodilat/, /\bsoulag/, /\bspiriva\b/, /\btiotropium\b/],
       kw: ['ventoline', 'salbutamol', 'inhalateur'] },
+    { id: 'q_tabac', theme: 'respi', extra: true,
+      menu: 'Fumez-vous ou avez-vous fumé ?', ask: 'Est-ce que vous fumez, ou est-ce que vous avez fumé ?',
+      strong: [/\bfum(e|ez|er|eur|euse|ait|iez|ais)\b/, /\btabac\b/, /\bcigarettes?\b/, /\bpaquets?\b/, /\btabagi/, /\bclope/],
+      kw: ['tabac', 'cigarette', 'tabagisme'] },
+    { id: 'q_o2dom', theme: 'respi', extra: true,
+      menu: "Avez-vous de l'oxygène chez vous ?", ask: "Est-ce que vous avez de l'oxygène à la maison ?",
+      strong: [/\boxygene\b.*\b(maison|domicile|chez vous)\b/, /\b(maison|domicile|chez vous)\b.*\boxygene\b/, /\bconcentrateur\b/, /\boxygenotherapie\b/, /\bbouteille d oxygene\b/, /\bavez vous de l oxygene\b/, /\bsous oxygene\b/],
+      kw: ['oxygene', 'concentrateur'] },
 
     // Insuffisance cardiaque (cas hospitalier) : s'allonger, jambes gonflées, poids, cœur qui s'emballe
     { id: 'q_orthopnee', theme: 'cardio', extra: true, over: ['q_sommeil'],

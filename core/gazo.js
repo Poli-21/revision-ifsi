@@ -178,6 +178,31 @@ App.Gazo = (() => {
     hco3: { up: '↑ élevés', down: '↓ bas', norm: 'normaux' },
     pao2: { hypo: '↓ hypoxémie', hyper: '↑ hyperoxémie', norm: 'normoxémie' }
   };
+  // Jauge graphique : zone normale en vert pâle, repère à la valeur (couleur seulement une fois la ligne révélée, pour ne pas donner la réponse)
+  const _SCALE = { ph: [7.0, 7.6], paco2: [20, 100], hco3: [10, 40], pao2: [30, 200] };
+  const _gpos = (key, v) => { const sc = _SCALE[key]; return Math.max(0, Math.min(100, (Number(v) - sc[0]) / (sc[1] - sc[0]) * 100)); };
+  function _gauge(key, val, revealed) {
+    const N = D().norms[key], out = val < N[0] || val > N[1];
+    return `<div class="gz-gauge" aria-hidden="true"><span class="gz-gz" style="left:${_gpos(key, N[0]).toFixed(1)}%;width:${(_gpos(key, N[1]) - _gpos(key, N[0])).toFixed(1)}%"></span><span class="gz-mk ${revealed ? (out ? 'bad' : 'ok') : ''}" style="left:${_gpos(key, val).toFixed(1)}%"></span></div>`;
+  }
+  // Comparaison de deux gaz du sang (avant / après) : un repère creux (avant) et un repère plein (après) sur la même jauge
+  // pair = { title, before:{ label, gaz }, after:{ label, gaz }, note }
+  function compareHtml(pair) {
+    if (!pair || !pair.before || !pair.after) return '';
+    const b = pair.before.gaz, a = pair.after.gaz, N = D().norms;
+    const rows = [['ph', 'pH', ''], ['paco2', 'PaCO₂', 'mmHg'], ['hco3', 'HCO₃⁻', 'mmol/L'], ['pao2', 'PaO₂', 'mmHg']].map(r => {
+      const k = r[0], vb = b[k], va = a[k], oB = vb < N[k][0] || vb > N[k][1], oA = va < N[k][0] || va > N[k][1];
+      const dir = va > vb ? '↗' : (va < vb ? '↘' : '→');
+      return `<div class="gz-crow"><div class="gz-cn"><b>${r[1]}</b><span>${_numOf(k, vb)} ${dir} <b class="${oA ? 'gz-c-bad' : 'gz-c-ok'}">${_numOf(k, va)}</b> ${r[2]}</span></div>
+        <div class="gz-gauge gz-gauge-c" aria-hidden="true"><span class="gz-gz" style="left:${_gpos(k, N[k][0]).toFixed(1)}%;width:${(_gpos(k, N[k][1]) - _gpos(k, N[k][0])).toFixed(1)}%"></span>
+          <span class="gz-link" style="left:${Math.min(_gpos(k, vb), _gpos(k, va)).toFixed(1)}%;width:${Math.abs(_gpos(k, va) - _gpos(k, vb)).toFixed(1)}%"></span>
+          <span class="gz-mk gz-mk-b ${oB ? 'bad' : 'ok'}" style="left:${_gpos(k, vb).toFixed(1)}%"></span><span class="gz-mk ${oA ? 'bad' : 'ok'}" style="left:${_gpos(k, va).toFixed(1)}%"></span></div></div>`;
+    }).join('');
+    return `<div class="gz-ws gz-cmp" role="group" aria-label="${_esc(pair.title || 'Comparaison de deux gaz du sang')}"><div class="gz-gas">
+      <div class="gz-gas-h">📊 ${_esc(pair.title || 'Avant / après')}<span>patient fictif</span></div>${rows}
+      <div class="gz-cleg"><span><i class="gz-mk gz-mk-b"></i> ${_esc(pair.before.label || 'Avant')}</span><span><i class="gz-mk"></i> ${_esc(pair.after.label || 'Après')}</span><span><i class="gz-gz gz-gz-k"></i> zone normale</span></div>
+      ${pair.note ? `<div class="gz-cnote">${_fmt(pair.note)}</div>` : ''}</div></div>`;
+  }
   // reveal : { ph:true, paco2:true, hco3:true, pao2:true } → affiche l'écart (flèche + mot) pour ces lignes.
   function gasCard(g, ans, reveal, opts) {
     reveal = reveal || {}; opts = opts || {};
@@ -193,7 +218,7 @@ App.Gazo = (() => {
       const cls = code ? (code === 'norm' ? 'gz-fl-ok' : 'gz-fl-bad') : '';
       return `<div class="gz-row"><div class="gz-n"><b>${r[1]}</b><span class="gz-nm">normale : ${r[4]}</span></div>
         <div class="gz-v">${_esc(r[2])}<span class="gz-u">${r[3]}</span></div>
-        <div class="gz-fl ${cls}">${code ? _esc(FLAG[r[0]][code]) : '<span class="gz-q">?</span>'}</div></div>`;
+        <div class="gz-fl ${cls}">${code ? _esc(FLAG[r[0]][code]) : '<span class="gz-q">?</span>'}</div>${_gauge(r[0], r[0] === 'ph' ? g.ph : g[r[0]], !!shown)}</div>`;
     }).join('');
     return `<div class="gz-gas" role="group" aria-label="Résultat du gaz du sang">
       <div class="gz-gas-h">🧪 ${_esc(opts.title || 'Gaz du sang artériel')}<span>patient fictif</span></div>${rows}</div>`;
@@ -691,7 +716,7 @@ App.Gazo = (() => {
     open, close, toMenu, showFiche, startRun, retryMistakes, again, askQuit, keepGoing, quit, next,
     pick, submitTxt, ascTap, casPick, casNext, isTraining,
     workshop, wsPick, wsNext, wsBack, wsFinish, wsActive,
-    interpret, check, conclusion, gasCard, steps: () => STEPS,
+    interpret, check, conclusion, gasCard, compareHtml, steps: () => STEPS,
     _t: { norm: _norm, lev: _lev, grade: _gradeTxt, pick: _pick, why: _why, state: () => ({ screen, run, P, WS }), stats: _stats, reset: () => { P = { v: 1, q: {}, runs: [] }; _save(); } }
   };
 })();

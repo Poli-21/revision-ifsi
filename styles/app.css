@@ -2731,3 +2731,88 @@ body.dark .sim-rl-modal { background: var(--sim-card); }
 @media (max-width: 480px) { .sim-rl-modal { padding: 18px; } .sim-bar { flex-wrap: wrap; } }
 .sim-rl-modal .sim-fb { margin: 10px 0 14px; }
 .sim-rl-modal .sim-row { margin-top: 8px; }
+
+/* ── Reprise d'une série de cartes interrompue ── */
+.resume-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--primary-light); border: 1px solid var(--primary); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 14px; }
+.resume-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 200px; }
+.resume-txt b { font-size: .95rem; color: var(--primary); }
+.resume-txt span { font-size: .85rem; color: var(--gray-700); overflow-wrap: anywhere; }
+.resume-act { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 640px) { .resume-banner { flex-direction: column; align-items: stretch; } .resume-txt { flex: none; } .resume-act .btn-primary { flex: 1; justify-content: center; } }
+
+/* ── Patient qui évolue : tendances du scope ── */
+.sim-evo { margin: 10px 0; }
+.evo-card { background: var(--sim-card); border: 1px solid var(--sim-line); border-radius: var(--radius); padding: 10px 12px; }
+.evo-card > summary { font-weight: 800; font-size: .92rem; cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.evo-now { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
+.evo-pill { font-size: .78rem; font-weight: 800; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--sim-line); background: var(--sim-soft); font-variant-numeric: tabular-nums; }
+.evo-pill.ok { background: var(--sim-okbg); color: var(--sim-ok); border-color: var(--sim-ok); }
+.evo-pill.warn { background: var(--sim-warnbg); color: var(--sim-warn); border-color: var(--sim-warn); }
+.evo-pill.bad { background: var(--sim-badbg); color: var(--sim-bad); border-color: var(--sim-bad); }
+.evo-svg { display: block; width: 100%; height: auto; max-height: 230px; }
+.evo-plot { fill: var(--sim-soft); stroke: var(--sim-line); stroke-width: 1; }
+.evo-tgt { fill: var(--sim-ok); opacity: .22; }
+.evo-vig.v1 { fill: var(--sim-warn); opacity: .22; } .evo-vig.v2 { fill: var(--sim-bad); opacity: .3; }
+.evo-spo2 { fill: none; stroke: var(--primary); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+.evo-fr { fill: none; stroke: #ea580c; stroke-width: 2; stroke-dasharray: 5 3; stroke-linejoin: round; }
+.evo-dot { fill: var(--primary); stroke: var(--sim-card); stroke-width: 1.5; } .evo-dotf { fill: #ea580c; }
+.evo-mk { stroke: var(--gray-500); stroke-width: 1; stroke-dasharray: 2 3; }
+.evo-mt { font-size: 8.5px; fill: var(--gray-600); font-weight: 700; }
+.evo-tk { font-size: 9px; fill: var(--gray-600); } .evo-tkf { fill: #ea580c; }
+.evo-ax { font-size: 9px; fill: var(--gray-600); font-weight: 700; } .evo-axf { fill: #ea580c; }
+.evo-leg { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .74rem; color: var(--gray-600); margin: 4px 0 2px; }
+.evo-leg span { display: inline-flex; align-items: center; gap: 5px; }
+.evo-k { display: inline-block; width: 16px; height: 0; border-top: 3px solid var(--primary); border-radius: 2px; }
+.evo-k2 { border-top: 3px dashed #ea580c; } .evo-k3 { height: 9px; border: none; background: var(--sim-ok); opacity: .4; } .evo-k4 { height: 9px; border: none; background: var(--sim-warn); opacity: .45; }
+/* ── Gaz du sang : jauges et comparaison ── */
+.gz-gauge { grid-column: 1 / -1; position: relative; height: 12px; margin: 2px 4px 0; border-radius: 6px; background: var(--ph-line, #e5e7eb); }
+.gz-gz { position: absolute; top: 0; bottom: 0; background: var(--ph-ok, #15803d); opacity: .35; border-radius: 4px; }
+.gz-gz-k { position: static; display: inline-block; width: 16px; height: 9px; vertical-align: middle; }
+.gz-mk { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--gray-500, #6b7280); border: 2px solid var(--ph-card, #fff); box-shadow: 0 0 0 1px var(--gray-500, #6b7280); }
+.gz-mk.ok { background: var(--ph-ok, #15803d); box-shadow: 0 0 0 1px var(--ph-ok, #15803d); } .gz-mk.bad { background: var(--ph-bad, #b91c1c); box-shadow: 0 0 0 1px var(--ph-bad, #b91c1c); }
+.gz-mk-b { background: var(--ph-card, #fff) !important; border: 3px solid var(--gray-500, #6b7280); box-shadow: none !important; }
+.gz-mk-b.bad { border-color: var(--ph-bad, #b91c1c); } .gz-mk-b.ok { border-color: var(--ph-ok, #15803d); }
+.gz-cleg .gz-mk, .gz-cleg .gz-gz { position: static; display: inline-block; margin: 0 6px 0 0; vertical-align: middle; }
+.gz-cleg .gz-mk { width: 12px; height: 12px; }
+.gz-link { position: absolute; top: 50%; height: 3px; margin-top: -1.5px; background: var(--gray-500, #6b7280); opacity: .6; }
+.gz-crow { padding: 8px 0 10px; border-bottom: 1px solid var(--ph-line); }
+.gz-crow:last-of-type { border-bottom: none; }
+.gz-cn { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+.gz-cn span { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92rem; }
+.gz-c-bad { color: var(--ph-bad); } .gz-c-ok { color: var(--ph-ok); }
+.gz-gauge-c { grid-column: auto; margin: 2px 4px 0; }
+.gz-cleg { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .74rem; color: var(--gray-600); padding-top: 6px; }
+.gz-cleg span { display: inline-flex; align-items: center; }
+.gz-cnote { font-size: .84rem; line-height: 1.5; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--ph-card, #fff); border: 1px solid var(--ph-line); }
+.gz-cmp { margin: 12px 0; }
+
+/* ── Simulation : bilan sanguin et radio à lire (ui/sim_labs.js) ── */
+.lab-wrap { display: grid; gap: 12px; margin: 12px 0; }
+.lab-card { border: 1px solid var(--gray-200, #e5e7eb); border-radius: 12px; padding: 12px 14px; background: var(--gray-50, #f9fafb); min-width: 0; }
+.lab-t { font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lab-cnt { font-size: .75rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--sim-okbg, #dcfce7); color: var(--sim-ok, #15803d); }
+.lab-r, .lab-it { padding: 10px 0; border-top: 1px solid var(--gray-200, #e5e7eb); }
+.lab-r:first-of-type { border-top: 0; }
+.lab-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.lab-n { font-weight: 700; flex: 1 1 140px; min-width: 0; }
+.lab-v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; font-size: 1.1rem; }
+.lab-v small { font-weight: 600; font-size: .7rem; color: var(--gray-500, #6b7280); }
+.lab-ref { font-size: .75rem; color: var(--gray-500, #6b7280); flex: 1 1 100%; }
+.lab-g { position: relative; height: 10px; border-radius: 6px; background: var(--gray-200, #e5e7eb); margin: 8px 4px 6px; }
+.lab-z { position: absolute; top: 0; bottom: 0; background: var(--sim-ok, #15803d); opacity: .35; border-radius: 4px; }
+.lab-m { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid var(--gray-50, #fff); background: var(--sim-ok, #15803d); box-shadow: 0 0 0 1px currentColor; }
+.lab-m.bad { background: var(--sim-bad, #b91c1c); }
+.lab-bs { display: flex; flex-wrap: wrap; gap: 6px; }
+.lab-b { flex: 1 1 90px; min-height: 40px; border-radius: 10px; border: 2px solid var(--gray-300, #d1d5db); background: var(--gray-100, #fff); color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.lab-b:hover:not(:disabled) { border-color: var(--primary, #2563eb); }
+.lab-b:disabled { cursor: default; opacity: .65; }
+.lab-b.good { border-color: var(--sim-ok, #15803d); background: var(--sim-okbg, #dcfce7); opacity: 1; }
+.lab-b.bad { border-color: var(--sim-bad, #b91c1c); background: var(--sim-badbg, #fee2e2); opacity: 1; }
+.lab-fb { margin-top: 8px; padding: 8px 10px; border-radius: 8px; font-size: .85rem; line-height: 1.4; }
+.lab-fb.good { background: var(--sim-okbg, #dcfce7); color: var(--sim-ok, #15803d); }
+.lab-fb.avoid { background: var(--sim-warnbg, #fef3c7); color: var(--sim-warn, #b45309); }
+.lab-xr { max-width: 340px; margin: 8px auto; }
+.lab-its { display: grid; gap: 0; }
+.lab-lb { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.4; }
+.lab-lb input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
+.lab-it.is-good .lab-lb span { font-weight: 600; }

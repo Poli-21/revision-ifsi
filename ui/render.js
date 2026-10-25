@@ -113,8 +113,20 @@ App.Render = (() => {
     }
   }
 
+  // Bandeau « Reprendre ma série » (série de cartes interrompue)
+  function _renderResume() {
+    const el = document.getElementById('resume-banner'); if (!el) return;
+    let ri = null; try { ri = App.Session.resumeInfo(); } catch (e) {}
+    if (!ri) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    el.innerHTML = `<div class="resume-txt"><b>▶ Série en cours</b><span>${esc(ri.label)} · ${ri.done} faite${ri.done > 1 ? 's' : ''}, ${ri.left} restante${ri.left > 1 ? 's' : ''}${ri.tryhard ? ' · 🔥 série ' + ri.serie : ''}</span></div>
+      <div class="resume-act"><button type="button" class="btn btn-primary" onclick="App.Session.resume()">Reprendre →</button><button type="button" class="btn btn-ghost btn-sm" onclick="if(confirm('Abandonner cette série ? Les cartes déjà répondues restent enregistrées.')) App.Session.dropResume()">Abandonner</button></div>`;
+    el.style.display = 'flex';
+  }
+
   function all() {
     const { state } = App.Store;
+    _renderResume();
     const { SRS } = App;
     const due  = state.cards.filter(c => SRS.isDue(c));
     const cats = orderedCats();

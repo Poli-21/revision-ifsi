@@ -188,6 +188,51 @@ App.Session = (() => {
   // Carte au palier « J+1 » (niveau 1 de l'algorithme : vue une fois, intervalle de 1 à 2 jours)
   function _isJ1(c) { return !!(c && c.progress && App.SRS.getLevel(c) === 1); }
 
+  // ── Reprise d'une série interrompue ────────────────────────────
+  // À chaque carte répondue, on mémorise (sur cet appareil) quelles cartes, dans quel ordre, et où tu en es.
+  // Si tu quittes avant la fin, un bandeau « Reprendre ma série » apparaît sur l'accueil : mêmes cartes, même ordre, pas de nouveau tirage.
+  const RESUME_KEY = 'ifsi_session_resume';
+  function _readResume() { try { const o = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); return (o && o.v === 1 && Array.isArray(o.queue)) ? o : null; } catch (e) { return null; } }
+  function _clearResume() { try { localStorage.removeItem(RESUME_KEY); } catch (e) {} }
+  function _saveResume() {
+    try {
+      if (!current || current.chronoOnly || current.isPractice) return;
+      const t = current.tryhard;
+      if (current.idx >= current.queue.length && !(t && t.pool.length)) { _clearResume(); return; }    // série terminée : rien à reprendre
+      localStorage.setItem(RESUME_KEY, JSON.stringify({
+        v: 1, at: Date.now(), cat: current.cat || '', mode, idx: current.idx, stats: current.stats,
+        queue: current.queue.map(c => c.id),
+        tryhard: t ? Object.assign({}, t, { pool: t.pool.map(c => c.id) }) : null
+      }));
+    } catch (e) {}
+  }
+  // Informations pour le bandeau de l'accueil (null = rien à reprendre)
+  function resumeInfo() {
+    const r = _readResume(); if (!r) return null;
+    const have = new Set(App.Store.state.cards.map(c => c.id));
+    const left = r.queue.slice(r.idx).filter(id => have.has(id)).length + (r.tryhard ? r.tryhard.pool.filter(id => have.has(id)).length : 0);
+    if (left < 1) { _clearResume(); return null; }
+    const done = r.stats ? (r.stats.ok + r.stats.hard + r.stats.nope) : r.idx;
+    return { label: r.cat || 'Toutes les matières', left, done, tryhard: !!r.tryhard, serie: r.tryhard ? r.tryhard.serie : 0, at: r.at };
+  }
+  function resume() {
+    const r = _readResume(); if (!r) return;
+    const byId = new Map(App.Store.state.cards.map(c => [c.id, c]));
+    let idx = 0; const queue = [];
+    r.queue.forEach((id, i) => { const c = byId.get(id); if (c) { if (i < r.idx) idx++; queue.push({ ...c }); } });
+    const pool = r.tryhard ? r.tryhard.pool.map(id => byId.get(id)).filter(Boolean).map(c => ({ ...c })) : [];
+    if (!queue.length && !pool.length) { _clearResume(); alert('Cette série n\'existe plus (les cartes ont été supprimées).'); App.Render.all(); return; }
+    current = { queue, idx, stats: Object.assign({ ok: 0, hard: 0, nope: 0, again: 0 }, r.stats || {}), startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: r.cat || '' };
+    if (r.tryhard) current.tryhard = Object.assign({}, r.tryhard, { pool });
+    if (['flip', 'write', 'qcm'].includes(r.mode)) { mode = r.mode; ['flip','write','qcm'].forEach(id => { const b = document.getElementById('mode-' + id); if (b) b.classList.toggle('active', id === mode); }); }
+    App.UI.showView('session');
+    _initAfkListeners();
+    _resetAfkTimer();
+    _startTicker();
+    show();
+  }
+  function dropResume() { _clearResume(); try { App.Render.all(); } catch (e) {} }
+
   function start(cat, type, limit, tryhard) {
     const { state } = App.Store;
     let cards = state.cards.filter(c => App.SRS.isDue(c));
@@ -206,6 +251,7 @@ App.Session = (() => {
       sessionLabel = (sessionLabel ? sessionLabel + ' — ' : '') + (type === 'CM' ? '📘 CM' : '📗 TD');
     }
     if (!cards.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
+    { const ri = resumeInfo(); if (ri && !confirm('Tu as une série en cours (' + ri.left + ' carte' + (ri.left > 1 ? 's' : '') + ' restantes).\n\nOK = abandonner cette série et en commencer une nouvelle\nAnnuler = revenir à l\'accueil pour la reprendre')) return; }
 
     // Tri : cartes à risque exam → révisions → apprentissage → nouvelles
     const exams = (() => { try { return JSON.parse(localStorage.getItem('ifsi_exams_v2')||'[]'); } catch(e){return[];} })();
@@ -272,6 +318,7 @@ App.Session = (() => {
     _initAfkListeners();
     _resetAfkTimer();
     _startTicker();
+    _saveResume();
     show();
   }
 
@@ -281,7 +328,7 @@ App.Session = (() => {
       const b = document.getElementById('mode-' + id);
       if (b) b.classList.toggle('active', id === m);
     });
-    if (current) show();
+    if (current) { _saveResume(); show(); }
   }
 
   // ── Affichage carte courante ────────────────────────────────────
@@ -592,6 +639,7 @@ App.Session = (() => {
       else current.tryhard.fails++;
     }
     current.idx++;
+    _saveResume();
     show();
   }
 
@@ -622,11 +670,13 @@ App.Session = (() => {
     current.idx = 0;
     t.batchSize = current.queue.length;
     t.serie++; t.validated = 0; t.fails = 0;
+    _saveResume();
     show();
   }
 
   // ── Fin de session ─────────────────────────────────────────────
   function showDone() {
+    _clearResume();
     _stopAfkTimer();
     const elapsed  = _effectiveSecs();
     const total    = current.stats.ok + current.stats.hard + current.stats.nope;
@@ -695,6 +745,7 @@ App.Session = (() => {
 
   function startWithCards(cards, label) {
     if (!cards || !cards.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
+    { const ri = resumeInfo(); if (ri && !confirm('Tu as une série en cours (' + ri.left + ' carte' + (ri.left > 1 ? 's' : '') + ' restantes).\n\nOK = abandonner cette série et en commencer une nouvelle\nAnnuler = revenir à l\'accueil pour la reprendre')) return; }
     // Applique le même tri : fragiles par chapitre, maîtrisés mélangés
     const MASTERED_DAYS = 30;
     function _shuffle(arr) {
@@ -722,10 +773,11 @@ App.Session = (() => {
     _initAfkListeners();
     _resetAfkTimer();
     _startTicker();
+    _saveResume();
     show();
   }
 
-  return { start, ectsPlan, _queue: () => (current ? [...current.queue] : []), startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
+  return { resumeInfo, resume, dropResume, start, ectsPlan, _queue: () => (current ? [...current.queue] : []), startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
   // matière de la série en cours (pour "Recommencer") : '' = toutes les cartes à réviser
   getCurrentCat: () => { const k = current && current.cat; return (k && App.Store.state.cards.some(c => c.cat === k)) ? k : ''; } };
 })();

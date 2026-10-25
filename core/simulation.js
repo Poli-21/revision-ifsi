@@ -11,6 +11,111 @@ App.Sim = (() => {
   const KEY = 'ifsi_sim_v1';
   const NB_KEY = 'ifsi_sim_nb';          // préférence « mode bloc-notes » (l'étudiant note lui-même)
   function _nbPref() { try { return localStorage.getItem(NB_KEY) === '1'; } catch (e) { return false; } }
+  // ── Patient qui évolue (scénarios avec scn.evo) ──
+  // Les constantes, la vigilance, le dessin du scope et les valeurs lues dépendent de ce que fait l'étudiant (oxygène, position)
+  // et du temps qui passe (un pas par geste). Le scénario fournit : init(), step(état, ctx), vitals(état, ctx), facts(v, ctx), events(prev, v, ctx, evo), speak(vigil, texte).
+  const _evoOn = () => { const c = _cur(), s = _curScn(); return !!(c && s && s.evo && c.evo); };
+  function _evoCtx(c) { const k = c.care || {}; return { pos: k.pos ? k.pos.id : null, o2: k.o2 ? { dev: k.o2.dev, deb: k.o2.deb } : null, alert: !!k.alert }; }
+  function _evoO2Lab(o2) { return o2 ? (o2.dev === 'mhc' ? 'masque haute concentration ' : (o2.dev === 'masque' ? 'masque ' : 'lunettes ')) + String(o2.deb).replace('.', ',') + ' L/min' : ''; }
+  function _evoPoint(c) { const v = c.evo.v; return { n: c.evo.n, spo2: v.spo2, fr: v.fr, fc: v.fc, vig: v.vigil || 0, o2: _evoO2Lab(c.care && c.care.o2 ? c.care.o2 : null) }; }
+  function _evoInit(c) {
+    const scn = _scn(c.scenarioId); if (!scn || !scn.evo) return;
+    if (!c.evo || typeof c.evo !== 'object' || !c.evo.s) c.evo = { n: 0, s: scn.evo.init(), hist: [], maxVig: 0, over: 0, v: null, flags: {} };
+    c.evo.hist = Array.isArray(c.evo.hist) ? c.evo.hist : []; c.evo.flags = c.evo.flags || {}; c.evo.over = c.evo.over || 0; c.evo.maxVig = c.evo.maxVig || 0;
+    c.evo.v = scn.evo.vitals(c.evo.s, _evoCtx(c));
+    if (!c.evo.hist.length) c.evo.hist.push(_evoPoint(c));
+    _evoApply(c);
+  }
+  function _evoStep() {
+    const c = _cur(), scn = _curScn(); if (!c || !scn || !scn.evo || !c.evo || c.stage !== 'chambre') return;
+    const E = scn.evo, ctx = _evoCtx(c), prev = c.evo.v;
+    c.evo.n++; c.evo.s = E.step(c.evo.s, ctx);
+    const v = c.evo.v = E.vitals(c.evo.s, ctx);
+    c.evo.maxVig = Math.max(c.evo.maxVig, v.vigil || 0);
+    if (v.harm) c.evo.over++;
+    c.evo.hist.push(_evoPoint(c)); if (c.evo.hist.length > 140) c.evo.hist.splice(1, 1);
+    if (E.events) (E.events(prev, v, ctx, c.evo) || []).forEach(e => _log(e.who || 'narr', _gen(e.text, scn)));
+    _evoApply(c);
+  }
+  // Recopie les valeurs courantes dans les instruments, les faits du recueil et le dessin (le moteur lit ces champs au moment de la mesure)
+  function _evoApply(c) {
+    c = c || _cur(); const scn = c && _scn(c.scenarioId); if (!c || !scn || !scn.evo || !c.evo || !c.evo.v) return;
+    const v = c.evo.v, T = scn.tools || {}, ctx = _evoCtx(c), fr = x => String(x).replace('.', ','), air = !ctx.o2;
+    const sub = air ? 'en air ambiant' : 'sous oxygène (' + _evoO2Lab(ctx.o2) + ')', rhythm = v.rhythm || 'régulier', pa = v.pa[0] + '/' + v.pa[1];
+    const sat = T.saturometre;
+    if (sat) { sat.display.big = String(v.spo2); sat.display.pulse = v.fc; sat.display.sub = 'SpO₂ et pouls, ' + (air ? 'air ambiant' : 'sous O₂'); sat.input.value = v.spo2; sat.also.input.value = v.fc; sat.also.noted = 'Pouls : ' + v.fc + ' /min, ' + rhythm; sat.noted = 'Saturation : ' + v.spo2 + ' % ' + sub; }
+    const rs = T.respiration; if (rs) { rs.rate = v.fr; rs.input.value = v.fr; rs.noted = 'Fréquence respiratoire : ' + v.fr + ' /min'; }
+    const te = T.tension; if (te) { te.display.big = v.pa[0] + ' / ' + v.pa[1]; te.input.sys = v.pa[0]; te.input.dia = v.pa[1]; te.noted = 'Pression artérielle : ' + pa + ' mmHg'; }
+    const th = T.thermometre; if (th && v.temp != null) { th.display.big = fr(v.temp.toFixed(1)); th.input.value = v.temp; th.noted = 'Température : ' + fr(v.temp.toFixed(1)) + ' °C'; }
+    const sc = T.scope;
+    if (sc) {
+      Object.assign(sc.display, { fc: v.fc, spo2: v.spo2, pa: v.pa[0] + ' / ' + v.pa[1], fr: v.fr, irregular: /irr/i.test(rhythm), alarms: v.alarms || [] });
+      sc.multi.forEach(m => {
+        if (m.fact === 'm_spo2') { m.value = v.spo2; m.noted = 'Saturation : ' + v.spo2 + ' % ' + sub; }
+        else if (m.fact === 'm_fc') { m.value = v.fc; m.noted = 'Pouls : ' + v.fc + ' /min, ' + rhythm; }
+        else if (m.fact === 'm_pa') { m.sys = v.pa[0]; m.dia = v.pa[1]; m.noted = 'Pression artérielle : ' + pa + ' mmHg'; }
+        else if (m.fact === 'm_fr') { m.value = v.fr; m.noted = 'Fréquence respiratoire : ' + v.fr + ' /min'; }
+      });
+    }
+    if (scn.evo.facts) { const F = scn.evo.facts(v, ctx) || {}; Object.keys(F).forEach(k => { if (scn.facts[k]) Object.assign(scn.facts[k], F[k]); }); }
+    if (scn.scene) {
+      if (scn.scene.scope) Object.assign(scn.scene.scope, { fc: v.fc, spo2: v.spo2, pa: pa, fr: v.fr, alarms: v.alarms || [], irregular: /irr/i.test(rhythm) });
+      if (scn.evo.scene) scn.scene.patient = Object.assign(scn.scene.patient || {}, scn.evo.scene(v, ctx) || {});
+    }
+  }
+  // Graphique des tendances du scope : SpO₂ (zone cible), fréquence respiratoire, vigilance, changements d'oxygène
+  function _evoChart(c, scn, full) {
+    const E = scn.evo, H = c.evo.hist.slice(), tg = E.target || { lo: 88, hi: 92 };
+    if (H.length < 2) return '';
+    const W = 340, Ht = full ? 190 : 160, L = 34, R = 34, T = 16, B = 30, pw = W - L - R, ph = Ht - T - B, n = H.length;
+    const sLo = 76, sHi = 100, fLo = 6, fHi = 36, x = i => L + (n <= 1 ? 0 : i / (n - 1)) * pw, sy = v => T + ph * (1 - (Math.max(sLo, Math.min(sHi, v)) - sLo) / (sHi - sLo)), fy = v => T + ph * (1 - (Math.max(fLo, Math.min(fHi, v)) - fLo) / (fHi - fLo));
+    let bands = '', marks = '';
+    for (let i = 0; i < n - 1; i++) if (H[i].vig >= 1) bands += `<rect x="${x(i).toFixed(1)}" y="${T}" width="${(x(i + 1) - x(i)).toFixed(1)}" height="${ph}" class="evo-vig v${Math.min(2, H[i].vig)}"/>`;
+    let prev = H[0].o2, lastLab = -99;
+    for (let i = 1; i < n; i++) if (H[i].o2 !== prev) {
+      prev = H[i].o2; const xi = x(i), short = H[i].o2 ? H[i].o2.replace('masque haute concentration ', 'MHC ').replace('masque ', 'masque ').replace('lunettes ', 'lun. ').replace(' L/min', ' L') : 'O₂ arrêté';
+      marks += `<line x1="${xi.toFixed(1)}" y1="${T}" x2="${xi.toFixed(1)}" y2="${T + ph}" class="evo-mk"/>`;
+      if (xi - lastLab > 46) { marks += `<text x="${xi.toFixed(1)}" y="${Ht - 18}" class="evo-mt" text-anchor="middle">${_esc(short)}</text>`; lastLab = xi; }
+    }
+    const pt = (arr, f, key) => arr.map((h, i) => x(i).toFixed(1) + ',' + f(h[key]).toFixed(1)).join(' ');
+    const lastH = H[n - 1];
+    const ticksL = [80, 88, 92, 100].map(v => `<text x="${L - 4}" y="${(sy(v) + 3).toFixed(1)}" class="evo-tk" text-anchor="end">${v}</text>`).join('');
+    const ticksR = [10, 20, 30].map(v => `<text x="${W - R + 4}" y="${(fy(v) + 3).toFixed(1)}" class="evo-tk evo-tkf" text-anchor="start">${v}</text>`).join('');
+    const desc = `Tendance : SpO₂ ${lastH.spo2} % (cible ${tg.lo} à ${tg.hi} %), fréquence respiratoire ${lastH.fr} par minute` + (lastH.vig ? ', vigilance diminuée' : '') + '.';
+    return `<svg class="evo-svg" viewBox="0 0 ${W} ${Ht}" role="img" aria-label="${_esc(desc)}" preserveAspectRatio="xMidYMid meet">
+      <rect x="${L}" y="${T}" width="${pw}" height="${ph}" class="evo-plot"/>
+      <rect x="${L}" y="${sy(tg.hi).toFixed(1)}" width="${pw}" height="${(sy(tg.lo) - sy(tg.hi)).toFixed(1)}" class="evo-tgt"/>
+      ${bands}${marks}
+      <polyline points="${pt(H, fy, 'fr')}" class="evo-fr"/>
+      <polyline points="${pt(H, sy, 'spo2')}" class="evo-spo2"/>
+      <circle cx="${x(n - 1).toFixed(1)}" cy="${sy(lastH.spo2).toFixed(1)}" r="3.4" class="evo-dot"/>
+      <circle cx="${x(n - 1).toFixed(1)}" cy="${fy(lastH.fr).toFixed(1)}" r="3" class="evo-dot evo-dotf"/>
+      ${ticksL}${ticksR}
+      <text x="${L}" y="${T - 4}" class="evo-ax" text-anchor="start">SpO₂ %</text><text x="${W - R}" y="${T - 4}" class="evo-ax evo-axf" text-anchor="end">FR /min</text>
+      <text x="${L + pw / 2}" y="${Ht - 4}" class="evo-ax" text-anchor="middle">temps (un pas = un geste)</text>
+    </svg>`;
+  }
+  function _evoLegend(scn) {
+    const tg = scn.evo.target || { lo: 88, hi: 92 };
+    return `<div class="evo-leg"><span><i class="evo-k evo-k1"></i> SpO₂</span><span><i class="evo-k evo-k2"></i> Fréquence respiratoire</span><span><i class="evo-k evo-k3"></i> Cible SpO₂ ${tg.lo}-${tg.hi} %</span><span><i class="evo-k evo-k4"></i> Somnolence</span></div>`;
+  }
+  function _renderEvo() {
+    const el = _el('sim-evo'), c = _cur(), scn = _curScn(); if (!el) return;
+    if (!c || !scn || !scn.evo || !c.evo || !(c.mon && c.mon.live) || c.evo.hist.length < 2) { el.hidden = true; el.innerHTML = ''; return; }
+    const v = c.evo.v, tg = scn.evo.target || { lo: 88, hi: 92 }, inT = v.spo2 >= tg.lo && v.spo2 <= tg.hi;
+    const vigTxt = ['Éveillée, répond', 'Somnolente : s\'endort si on ne lui parle pas', 'Très somnolente : répond à peine'][Math.min(2, v.vigil || 0)];
+    el.hidden = false;
+    el.innerHTML = `<details class="evo-card" open><summary>📈 Tendances du scope</summary>
+      <div class="evo-now"><span class="evo-pill ${inT ? 'ok' : (v.spo2 < tg.lo ? 'bad' : 'warn')}">SpO₂ ${v.spo2} %</span><span class="evo-pill ${v.fr < 10 || v.fr > 24 ? 'bad' : 'ok'}">FR ${v.fr} /min</span><span class="evo-pill ${(v.vigil || 0) ? 'bad' : 'ok'}">${_esc(vigTxt)}</span></div>
+      ${_evoChart(c, scn, false)}${_evoLegend(scn)}
+      <p class="sim-muted sim-small">Le scope te montre des chiffres, pas la personne : regarde aussi son visage, sa respiration, et parle-lui.</p></details>`;
+  }
+  function _evoBilanHtml(c, scn) {
+    if (!c.evo || !scn.evo || !scn.evo.bilan) return '';
+    const B = scn.evo.bilan(c.evo, c) || {}; const rows = (B.rows || []).map(r => `<div class="sim-row-res ${r.k}"><span class="sim-mark">${r.k === 'ok' ? '✓' : (r.k === 'miss' ? '✗' : '◐')}</span><div><b>${_esc(r.t)}</b><div class="sim-muted sim-small">${_esc(_gen(r.d, scn))}</div></div></div>`).join('');
+    return `<h3 class="sim-h">📈 Comment ${_gen('la patiente', scn)} a évolué</h3><div class="sim-card">${_evoChart(c, scn, true)}${_evoLegend(scn)}${rows}<div class="sim-muted sim-small" style="margin-top:6px">Hors score : c'est ton entraînement à surveiller, pas seulement à mesurer.</div></div>`;
+  }
+
   // ── Mode réaliste : horloge qui avance, imprévus, patient qui hésite ou entend mal, mesure qui rate (data/sim_real.js) ──
   // Activé par défaut. (Dans un navigateur piloté par un robot de test, il reste éteint tant qu'on ne l'a pas demandé : les tests vérifient d'abord le jeu de base.)
   const RL_KEY = 'ifsi_sim_real';
@@ -106,6 +211,7 @@ App.Sim = (() => {
     const k = c.care = (c.care && typeof c.care === 'object') ? c.care : {};
     k.pos = k.pos || null; k.o2 = k.o2 || null; k.alert = k.alert || null; k.stay = !!k.stay; k.stayShown = !!k.stayShown; k.bad = k.bad || 0;
     k.ev = Array.isArray(k.ev) ? k.ev : [];
+    _evoInit(c);
   }
   function _save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
 
@@ -312,9 +418,10 @@ App.Sim = (() => {
     _checkAuto();
     _urgentHint();
     if (_rlOn() && _cur().stage === 'chambre') _rlAdv(1);          // chaque action fait avancer l'horloge d'au moins une minute
+    _evoStep();
     _save();
     if (!_cur() || _cur().stage !== 'chambre') return;
-    _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderSheet();
+    _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderSheet(); _renderEvo();
     _rlClock(); _rlCheck();
   }
   // ── Imprévus : une interruption (sonnette, collègue, proche, alarme, médecin) à gérer pendant le recueil ──
@@ -407,11 +514,14 @@ App.Sim = (() => {
         return;
       }
       const altKey = id + '#alt';
+      // Patient qui évolue : somnolente, elle répond mal ; très somnolente, elle ne répond plus (la question compte pour rien, on pourra la reposer)
+      const vg = _evoOn() ? (c.evo.v.vigil || 0) : 0, sp = (vg >= 1 && scn.evo.speak && !it.contact) ? scn.evo.speak(vg, a ? a.text : scn.fallbackAnswer) : null;
+      if (sp && sp.mute) { _log('pat', _gen(sp.text, scn)); return; }
       const again = alt ? (c.asked[altKey] || 0) > 0 : ((c.asked[id] || 0) > 0 && !it.contact);
       c.asked[id] = (c.asked[id] || 0) + 1;
       if (alt) c.asked[altKey] = (c.asked[altKey] || 0) + 1;
       const fill = (!again && _rlOn() && a && (a.reveals || []).length && !scn.urgent && Math.random() < 0.3) ? _RL().FILLERS[Math.floor(Math.random() * _RL().FILLERS.length)] : '';
-      _log('pat', (again ? 'Je vous l\'ai déjà dit… ' : '') + fill + (a ? a.text : scn.fallbackAnswer));
+      _log('pat', (again ? 'Je vous l\'ai déjà dit… ' : '') + fill + (sp ? _gen(sp.text, scn) : (a ? a.text : scn.fallbackAnswer)));
       if (a) { (a.reveals || []).forEach(_find); (a.logs || []).forEach(_markDone); }
     });
     c.actions++;
@@ -1363,7 +1473,8 @@ App.Sim = (() => {
         else if (R.skipped) extra = `<div class="sim-rx-ecg">${_esc(who)} réalise l'ECG à ta place. <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxEcg()">Finalement, je le fais</button></div>`;
         else extra = `<div class="sim-rx-ecg"><button class="btn btn-primary btn-sm" onclick="App.Sim.rxEcg()">🫀 Réaliser l'ECG (atelier)</button><button class="btn btn-ghost btn-sm" onclick="App.Sim.rxSkip()">Laisser ${_esc(who)} le faire</button><div class="sim-muted sim-small">Facultatif. ${_esc(who)} reste à côté de toi : en 1re année, un geste technique se fait sous la supervision d'un soignant. L'ECG simulé est celui de ${_esc(ecgWho)} (pouls à ${_esc(ecgCtx.rate)}/min).</div></div>`;
       }
-      if (l.gazo && rx.gazo) {
+      const gzCfg = rx.gazoFor ? rx.gazoFor(c) : rx.gazo;
+      if (l.gazo && gzCfg) {
         if (R.gazo) extra = `<div class="sim-rx-ecg ok">✓ Gaz du sang lu · ${R.gazo.score}/100 <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxGazo()">Refaire</button></div>`;
         else if (R.gazoSkipped) extra = `<div class="sim-rx-ecg">${_esc(who)} lit le résultat à ta place. <button class="btn btn-ghost btn-sm" onclick="App.Sim.rxGazo()">Finalement, je le lis</button></div>`;
         else extra = `<div class="sim-rx-ecg"><button class="btn btn-primary btn-sm" onclick="App.Sim.rxGazo()">🩸 Lire le gaz du sang (atelier)</button><button class="btn btn-ghost btn-sm" onclick="App.Sim.rxGazoSkip()">Laisser ${_esc(who)} le lire</button><div class="sim-muted sim-small">Facultatif et hors score (bonus d'XP). C'est un exercice de raisonnement : tu fais une lecture sommaire, c'est le médecin qui interprète et décide. Les valeurs sont fictives.</div></div>`;
@@ -1377,6 +1488,8 @@ App.Sim = (() => {
       <div class="sim-rx"><div class="sim-rx-h">📄 ${_esc(rx.from)}</div><div class="sim-rx-p">${_esc(ident)}</div>
         <ul class="sim-rx-l">${lines}</ul>
         ${foot ? `<div class="sim-rx-a">${_esc(foot)}</div>` : ''}</div>
+      ${rx.gazoPair && window.App.Gazo && window.App.Gazo.compareHtml ? (() => { const gp = rx.gazoPair(c); return gp ? window.App.Gazo.compareHtml(gp) : ''; })() : ''}
+      ${rx.labs && window.App.SimLabs ? window.App.SimLabs.html(rx.labs(c), { labs: R.labs, radio: R.radio }) : ''}
       <p class="sim-muted sim-small">${_esc(rx.note)}</p>
       <div class="sim-row sim-enter"><button class="btn btn-primary" onclick="App.Sim.rxNext()">Continuer : écrire mes transmissions →</button></div></div>`;
   }
@@ -1471,9 +1584,9 @@ App.Sim = (() => {
   // Atelier facultatif « lire le gaz du sang » (scénarios dont la consigne comporte rx.gazo) : bonus d'XP, hors score
   function rxGazo() {
     const c = _cur(), scn = _curScn();
-    if (!_stage('decision') || c.dec.step !== 'rx' || !window.App.Gazo || !scn.rx || !scn.rx.gazo) return;
+    if (!_stage('decision') || c.dec.step !== 'rx' || !window.App.Gazo || !scn.rx || !(scn.rx.gazo || scn.rx.gazoFor)) return;
     _save();
-    const g = scn.rx.gazo;
+    const g = scn.rx.gazoFor ? scn.rx.gazoFor(c) : scn.rx.gazo;
     window.App.Gazo.workshop({
       q: g.q, title: g.title, intro: g.intro, backLabel: g.backLabel, doneLabel: g.doneLabel,
       onDone: r => {
@@ -1483,6 +1596,23 @@ App.Sim = (() => {
       },
       onBack: () => { screen = 'jeu'; render(); _top(); }
     });
+  }
+  // « Autres paramètres » (scn.rx.labs) : bilan sanguin à lire et radio à décrire, hors score
+  function rxLab(id, ch) {
+    const c = _cur(); if (!_stage('decision') || c.dec.step !== 'rx') return;
+    c.rx.labs = c.rx.labs || { a: {} }; c.rx.labs.a = c.rx.labs.a || {};
+    if (!c.rx.labs.a[id] && ['low', 'ok', 'high'].indexOf(ch) >= 0) c.rx.labs.a[id] = ch;
+    _save(); const y = window.scrollY; render(); window.scrollTo(0, y);
+  }
+  function rxRadioTog(id) {
+    const c = _cur(); if (!_stage('decision') || c.dec.step !== 'rx') return;
+    c.rx.radio = c.rx.radio || { sel: {}, checked: false }; if (c.rx.radio.checked) return;
+    c.rx.radio.sel = c.rx.radio.sel || {}; c.rx.radio.sel[id] = !c.rx.radio.sel[id]; _save();
+  }
+  function rxRadioCheck() {
+    const c = _cur(); if (!_stage('decision') || c.dec.step !== 'rx') return;
+    c.rx.radio = c.rx.radio || { sel: {}, checked: false }; c.rx.radio.checked = true; _save();
+    const y = window.scrollY; render(); window.scrollTo(0, y);
   }
   function rxGazoSkip() { const c = _cur(); if (!_stage('decision') || c.dec.step !== 'rx') return; c.rx.gazoSkipped = true; _save(); render(); }
   function rxNext() {
@@ -1830,6 +1960,7 @@ App.Sim = (() => {
           <div class="sim-toolbar" id="sim-toolbar" role="group" aria-label="Instruments"></div>
           <div class="sim-gesture" id="sim-gesture" aria-live="polite"></div>
           <div class="sim-last" id="sim-last" hidden></div>
+          <div class="sim-evo" id="sim-evo" hidden></div>
           <details class="sim-list"><summary>Voir la liste des objets de la chambre</summary><div class="sim-acts" id="sim-list-body"></div></details>
           <div id="sim-finish"></div>
         </section>
@@ -1846,7 +1977,7 @@ App.Sim = (() => {
         if (g) { ev.preventDefault(); hot(g.getAttribute('data-hot')); }
       });
     }
-    _sheet = null; _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderGesture(); _renderSheet();
+    _sheet = null; _renderLog(); _renderMenu(); _renderActMenu(); _renderStatus(); _renderChambre(); _renderRecueil(); _renderTabs(); _renderGesture(); _renderSheet(); _renderEvo();
     setTimeout(_scrollLog, 0);
   }
 
@@ -1879,7 +2010,7 @@ App.Sim = (() => {
     if (c && c.rl && c.rl.on) { const t = _rlNow(); o2.clock = { h: Math.floor(t / 60) % 24, m: t % 60 }; }
     return o2;
   }
-  const _sceneSigOf = o => JSON.stringify([o.patient.pos, o.patient.o2, o.patient.sat, o.patient.mon, o.nurse, o.scope && o.scope.on, o.clock]);
+  const _sceneSigOf = o => JSON.stringify([o.patient.pos, o.patient.o2, o.patient.sat, o.patient.mon, o.nurse, o.scope && [o.scope.on, o.scope.spo2, o.scope.fr, o.scope.fc, o.scope.pa], o.patient.eyes, o.patient.cyan, o.patient.gasp, o.patient.sweat, o.clock]);
   let _sceneSig = '';
   function _sceneSvg(scn) {
     const o = _sceneOpts(scn); _sceneSig = _sceneSigOf(o);
@@ -2363,6 +2494,7 @@ App.Sim = (() => {
       ${_soinsBilanHtml(c, scn, R)}
       ${_glycBilanHtml(c, scn)}
       ${_rlBilanHtml(c, scn)}
+      ${_evoBilanHtml(c, scn)}
       ${earned}${stats}
       ${tips.length ? `<h3 class="sim-h">Pour progresser</h3><div class="sim-card"><ul class="sim-ul">${tips.map(t => `<li>${_esc(t)}</li>`).join('')}</ul></div>` : ''}
       ${_nbBilanHtml(c, scn)}
@@ -2434,7 +2566,7 @@ App.Sim = (() => {
   return {
     open, close, start, resume, toList, discard, setTab, say, submit, askMenu, toggleMenu, toggleAct, act, thToggle,
     pickTool, dropTool, hot, sheetDo, sheetClose, gCuffMove, gCuffRot, gCuffPalp, gCuffOk, cuffDown, cuffMove, cuffUp, gStartCount, gTap, gRecount, gInflate, gSubmit, rlChoose, rlClose, setRl, gRetry, gPrepToggle, gPrepSubmit, gWasteSet, gWasteSubmit, gNbDone, nbTxt, setNb, reopen, toggleZoom, useObject, sha, knock, readDossier, enter, askFinish, cancelFinish, finish, closeBilan, replay,
-    decLevel, decLevelOk, decPick, decActionsOk, decNext, txt, sendSaed, saedRetry, saedDone, rxEcg, rxSkip, rxGazo, rxGazoSkip, rxNext, unkCopy, unkClear, wrSubmit, wrDone, aiReview,
+    decLevel, decLevelOk, decPick, decActionsOk, decNext, txt, sendSaed, saedRetry, saedDone, rxEcg, rxSkip, rxGazo, rxGazoSkip, rxLab, rxRadioTog, rxRadioCheck, rxNext, unkCopy, unkClear, wrSubmit, wrDone, aiReview,
     parse, parseAct, _t: { norm: _norm, prep: _prep, suggest: _suggest, unk: _unkRead, state: () => st, tick: _tick, grade: (kind, texts) => { const scn = _curScn() || _scenarios()[0]; return _grade(kind === 'saed' ? scn.call.sections : scn.written.fields, texts); }, results: () => _results(), levelOf: _levelOf, cuff: () => (_G && _G.cuff) || null }
   };
 })();
