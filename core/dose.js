@@ -296,6 +296,68 @@ App.Dose = (() => {
       return { text: `Flacon de poudre de **${mg} mg**. Tu ajoutes **${fr(sol)} mL de solvant** ; la poudre occupe **${fr(add)} mL** : le volume final est donc de **${fr(Vf)} mL**. Quelle est la **concentration** obtenue (mg/mL) ?`, ans: c, unit: 'mg/mL', tol: 0.02, steps: [`Volume final : ${fr(sol)} + ${fr(add)} = ${fr(Vf)} mL.`, `Concentration : ${mg} ÷ ${fr(Vf)} = ${fr(c)} mg/mL.`], tip: 'Pour une poudre, le volume final = solvant + volume pris par la poudre : lis la notice du flacon (tableau de reconstitution).' };
     }
   };
+  // ══ Thème « Perfusions complètes (type TD) » : électrolytes en ampoules, reconstitution, planification sur 24 h, sous-cutané ══
+  // Inspiré des TD 7.2 et 7.3 de l'UE B3 (calculs de doses simples et débits). Chiffres tirés au hasard ; valeurs fictives.
+  // Convention de l'exercice : le volume à perfuser = poche + médicament / électrolytes ajoutés ; 20 gouttes = 1 mL ; débit en gouttes/min arrondi à l'unité.
+  const _halfSafe = x => Math.abs((x - Math.floor(x)) - 0.5) > 0.03;     // évite les arrondis ambigus (….5)
+  const _ELEC = { NaCl: { pct: [20, 10], lab: 'NaCl' }, KCl: { pct: [10], lab: 'KCl' } };
+  const _hh = x => { const h = ((Math.round(x) % 24) + 24) % 24; return h; };
+  GEN.td = function (l) {
+    for (let k = 0; k < 500; k++) {
+      if (l === 1) {                                    // volume d'électrolyte à prélever
+        const el = pick(['NaCl', 'KCl']), pc = pick(_ELEC[el].pct), g = el === 'NaCl' ? pick([2, 3, 4, 6]) : pick([1, 1.5, 2]), V = pick([1, 1, 0.5]), tot = g * V, vol = tot / (pc / 100);
+        if (!nice(vol, 2)) continue;
+        return { text: `Prescription : **${fr(V * 1000)} mL de glucosé à 5 %** avec **${fr(tot)} g de ${el}** au total. Tu disposes de ${el} à **${pc} %** (${pc} g pour 100 mL). Quel **volume de ${el}** prélèves-tu ?`, ans: vol, unit: 'mL', tol: 0.05,
+          steps: [`${pc} % = ${pc} g pour 100 mL, soit ${fr(pc / 100)} g par mL.`, `Volume = quantité ÷ concentration = ${fr(tot)} ÷ ${fr(pc / 100)} = ${fr(vol)} mL.`], tip: 'Volume (mL) = quantité (g) × 100 ÷ pourcentage. Avec des ampoules de 10 mL, ' + fr(vol) + ' mL = ' + fr(vol / 10) + ' ampoule(s).', alt: [{ v: tot * pc / 100, msg: 'Tu as multiplié par le pourcentage : il faut diviser la quantité voulue par la concentration (g/mL).' }] };
+      }
+      if (l === 2) {
+        const t = ri(1, 3);
+        if (t === 1) { const el = pick(['NaCl', 'KCl']), pc = pick(_ELEC[el].pct), amp = pick([10, 20]), g = el === 'NaCl' ? pick([2, 3, 4, 6]) : pick([1.5, 2, 3]), vol = g / (pc / 100), n = _ceil(vol / amp); if (!nice(vol, 2)) continue;
+          return { text: `Il faut **${fr(g)} g de ${el}** (solution à **${pc} %**). Tu as des ampoules de **${amp} mL**. Combien d'**ampoules** dois-tu au minimum **ouvrir** ?`, ans: n, unit: 'ampoule(s)', tol: 0.001,
+            steps: [`Volume nécessaire : ${fr(g)} ÷ ${fr(pc / 100)} = ${fr(vol)} mL.`, `Ampoules : ${fr(vol)} ÷ ${amp} = ${fr(vol / amp)} → on ouvre le NOMBRE ENTIER SUPÉRIEUR : ${n}.`], tip: 'Le reste de l\'ampoule ouverte n\'est jamais conservé : on jette. On arrondit donc les ampoules vers le haut.' }; }
+        if (t === 2) { const V = pick([1000, 500]), n = pick([2, 3, 4]), g = pick([2, 3, 4]), vN = g * V / 1000 / 0.2, vK = pick([1, 1.5, 2]) * V / 1000 / 0.1; if (!nice(vN, 2) || !nice(vK, 2)) continue; const tot = V + vN + vK;
+          return { text: `Poche de **${V} mL de glucosé 5 %** avec **${fr(g)} g de NaCl/L** (ampoules à 20 %) et **${fr(vK * 0.1 / (V / 1000))} g de KCl/L** (ampoules à 10 %). Quel est le **volume total** de la poche après ajout des deux électrolytes ?`, ans: tot, unit: 'mL', tol: 0.1,
+            steps: [`NaCl : ${fr(g * V / 1000)} g ÷ 0,2 g/mL = ${fr(vN)} mL.`, `KCl : ${fr(vK * 0.1)} g ÷ 0,1 g/mL = ${fr(vK)} mL.`, `Total : ${V} + ${fr(vN)} + ${fr(vK)} = ${fr(tot)} mL.`], tip: 'Le volume des électrolytes s\'ajoute à celui de la poche : c\'est ce volume total qui sert pour le débit.' }; }
+        const H = pick([6, 8, 10, 12, 14, 16, 18]), n = pick([2, 3, 4]), ans = _hh(H + 24 / n); if (ans === 0) continue;
+        return { text: `Prescription faite à **${H} h** : un médicament **${n} fois par 24 heures**, à intervalles réguliers, première administration à ${H} h. À quelle **heure** (0 à 23) la **2e administration** a-t-elle lieu ?`, ans, unit: 'h', tol: 0.001,
+          steps: [`Intervalle = 24 h ÷ ${n} = ${24 / n} h.`, `2e administration : ${H} h + ${24 / n} h = ${H + 24 / n} h${H + 24 / n >= 24 ? ' soit ' + ans + ' h le lendemain' : ''}.`], tip: 'Planifier = diviser 24 h par le nombre de prises, puis repartir de l\'heure de la première.' };
+      }
+      // l === 3 : débit en gouttes/min d'une poche avec électrolytes
+      const n = pick([2, 3]), V = 1000, gN = pick([2, 3, 4]), gK = pick([1, 1.5, 2]), vN = gN / 0.2, vK = gK / 0.1, tot = V + vN + vK, h = 24 / n, raw = tot * 20 / (h * 60), ans = Math.round(raw);
+      if (!nice(vN, 2) || !nice(vK, 2) || !_halfSafe(raw)) continue;
+      return { text: `Prescription : **1 L de glucosé 5 % ${n} fois par 24 h** (perfusions de même durée, à la suite), avec **${fr(gN)} g de NaCl/L** (ampoules à 20 %) et **${fr(gK)} g de KCl/L** (ampoules à 10 %). Perfuseur **20 gouttes = 1 mL**. Quel **débit en gouttes/min** (arrondi) pour une poche ?`, ans, unit: 'gouttes/min', tol: 1,
+        steps: [`Durée d'une poche : 24 ÷ ${n} = ${h} h = ${h * 60} min.`, `NaCl : ${fr(gN)} ÷ 0,2 = ${fr(vN)} mL · KCl : ${fr(gK)} ÷ 0,1 = ${fr(vK)} mL.`, `Volume total : ${V} + ${fr(vN)} + ${fr(vK)} = ${fr(tot)} mL.`, `Gouttes/min : ${fr(tot)} × 20 ÷ ${h * 60} = ${fr(raw)} → environ ${ans}.`], tip: 'Ordre de travail : durée → volume des électrolytes → volume total → gouttes/min. Vérifie la vraisemblance : une perfusion de 12 h pour 1 L tourne autour de 30 gouttes/min.', alt: [{ v: Math.round(V * 20 / (h * 60)), msg: 'Tu as oublié d\'ajouter le volume des électrolytes au litre de glucosé.' }] };
+    }
+  };
+  EXP.td = function (l) {
+    for (let k = 0; k < 800; k++) {
+      const t = ri(1, l === 4 ? 3 : 4);
+      if (t === 1) {                                    // poudre reconstituée (flacon 1 g dans 10 mL), dans une poche
+        const [dn, fl] = pick([['Claforan', 1000], ['Rocéphine', 1000]]), mg = pick([235, 325, 480, 650, 825, 900]), n = pick([2, 3, 4]), poche = pick([50, 100]), min = pick([15, 20, 30, 60]), vr = 10, vol = mg * vr / fl, tot = poche + vol, raw = tot * 20 / min, ans = Math.round(raw);
+        if (!nice(vol, 2) || !_halfSafe(raw)) continue;
+        return { text: `${dn} **${mg} mg ${n} fois par 24 h**, IV lente dans une **poche de ${poche} mL** de NaCl 0,9 % **sur ${min} min**. Flacon de poudre dosé à **${fl} mg**, reconstitué dans **${vr} mL** (le flacon contient alors ${fl} mg dans ${vr} mL). Perfuseur **20 gouttes = 1 mL**. Quel **débit en gouttes/min** (arrondi) ? Volume à perfuser = poche + médicament ajouté.${_ctx(l, 0)}`, ans, unit: 'gouttes/min', tol: 1,
+          steps: [`Intervalle entre deux perfusions : 24 ÷ ${n} = ${fr(24 / n)} h.`, `Volume de médicament : ${mg} × ${vr} ÷ ${fl} = ${fr(vol)} mL.`, `Volume total : ${poche} + ${fr(vol)} = ${fr(tot)} mL.`, `Gouttes/min : ${fr(tot)} × 20 ÷ ${min} = ${fr(raw)} → environ ${ans}.`], tip: 'Reconstitution : la dose se calcule sur la concentration APRÈS reconstitution. Puis on additionne le volume ajouté à la poche avant de calculer le débit. Modalités réelles : notice et protocole du service.', alt: [{ v: Math.round(poche * 20 / min), msg: 'Tu as oublié d\'ajouter le volume du médicament à celui de la poche.' }, { v: vol, msg: 'Tu as donné le volume à prélever, pas le débit demandé.' }] };
+      }
+      if (t === 2) {                                    // ampoule en mg/mL dans une poche
+        const [dn, A, B] = pick([['Gentalline', 80, 2], ['Nétromycine', 150, 1.5], ['Tobramycine', 100, 2]]), mg = pick([60, 75, 90, 120, 135, 150]) , poche = 50, min = pick([20, 30]), vol = mg * B / A, tot = poche + vol, raw = tot * 20 / min, ans = Math.round(raw);
+        if (!nice(vol, 2) || !_halfSafe(raw) || vol > 4) continue;
+        return { text: `${dn} **${mg} mg** par administration, IV lente dans une **poche de ${poche} mL** de glucosé 5 % **sur ${min} min**. Ampoule : **${fr(A)} mg dans ${fr(B)} mL**. Perfuseur **20 gouttes = 1 mL**. Donne le **débit en gouttes/min** (arrondi), volume à perfuser = poche + médicament.${_ctx(l, 0)}`, ans, unit: 'gouttes/min', tol: 1,
+          steps: [`Volume à prélever : ${mg} × ${fr(B)} ÷ ${fr(A)} = ${fr(vol)} mL.`, `Volume total : ${poche} + ${fr(vol)} = ${fr(tot)} mL.`, `Gouttes/min : ${fr(tot)} × 20 ÷ ${min} = ${fr(raw)} → environ ${ans}.`], tip: 'Deux temps : le prélèvement (règle de trois), puis le débit sur le volume TOTAL.', alt: [{ v: Math.round(poche * 20 / min), msg: 'Tu n\'as pas compté le médicament ajouté dans le volume total.' }] };
+      }
+      if (t === 3) {                                    // sous-cutané / débit simple + mL/h
+        const V = pick([250, 500, 750, 1000]), h = pick([6, 8, 10, 12]), raw = V * 20 / (h * 60), ans = Math.round(raw), mlh = V / h;
+        if (!_halfSafe(raw) || !nice(mlh, 2)) continue;
+        const both = l === 5;
+        return { text: `Perfusion **sous-cutanée** de **${V} mL de NaCl 0,9 % sur ${h} h** (perfuseur **20 gouttes = 1 mL**). ${both ? 'Quel **débit en mL/h** à programmer ?' : 'Quel **débit en gouttes/min** (arrondi) ?'}`, ans: both ? mlh : ans, unit: both ? 'mL/h' : 'gouttes/min', tol: both ? 0.02 : 1,
+          steps: [`mL/h : ${V} ÷ ${h} = ${fr(mlh)} mL/h.`, `Gouttes/min : ${V} × 20 ÷ ${h * 60} = ${fr(raw)} → environ ${ans}.`], tip: 'Deux formes du même débit : mL/h (pompe) = volume ÷ heures ; gouttes/min (gravité) = volume × 20 ÷ minutes. Contrôle de vraisemblance : gouttes/min ≈ mL/h ÷ 3.' };
+      }
+      // t === 4 (niveau 5) : perfusion de 24 h avec électrolytes, volume en L
+      const V = pick([1.5, 2, 2.5]), gN = pick([2, 3, 4]), gK = pick([1, 1.5, 2]), vN = gN * V / 0.2, vK = gK * V / 0.1, tot = V * 1000 + vN + vK, raw = tot * 20 / (24 * 60), ans = Math.round(raw);
+      if (!nice(vN, 2) || !nice(vK, 2) || !_halfSafe(raw)) continue;
+      return { text: `Prescription : **${fr(V)} L de glucosé 5 % sur 24 h**, avec **${fr(gN)} g de NaCl/L** (ampoules à 20 %) et **${fr(gK)} g de KCl/L** (ampoules à 10 %). Perfuseur **20 gouttes = 1 mL**. Quel **débit en gouttes/min** (arrondi) ?${_ctx(l, 0)}`, ans, unit: 'gouttes/min', tol: 1,
+        steps: [`Quantités sur ${fr(V)} L : NaCl ${fr(gN * V)} g, KCl ${fr(gK * V)} g.`, `Volumes : NaCl ${fr(gN * V)} ÷ 0,2 = ${fr(vN)} mL ; KCl ${fr(gK * V)} ÷ 0,1 = ${fr(vK)} mL.`, `Volume total : ${fr(V * 1000)} + ${fr(vN)} + ${fr(vK)} = ${fr(tot)} mL.`, `Gouttes/min : ${fr(tot)} × 20 ÷ 1440 = ${fr(raw)} → environ ${ans}.`], tip: 'Les grammes prescrits sont « par litre » : multiplie par le nombre de litres avant de convertir en mL d\'ampoule.', alt: [{ v: Math.round(V * 1000 * 20 / 1440), msg: 'Tu as oublié le volume des électrolytes ajoutés.' }, { v: Math.round(tot * 20 / (24 * 60) * V), msg: 'Les g/L ne se multiplient par le volume qu\'une seule fois.' }] };
+    }
+  };
   const CATS = [
     { id: 'conv', ico: '🔄', name: 'Conversions', desc: 'g, mg, µg · L, mL · kg' },
     { id: 'cp', ico: '💊', name: 'Comprimés', desc: 'Nombre de comprimés selon la prescription' },
@@ -306,7 +368,8 @@ App.Dose = (() => {
     { id: 'pct', ico: '％', name: 'Pourcentages et concentrations', desc: 'g par poche, mg/mL' },
     { id: 'insuline', ico: '🩸', name: 'Insuline (UI)', desc: 'UI, U100, corrections, IVSE' },
     { id: 'debit', ico: '📈', name: 'µg/kg/min', desc: 'Doses par minute et par kg, relais de seringue' },
-    { id: 'dilu', ico: '🧪', name: 'Dilutions', desc: 'Dilutions, poudres à reconstituer' }
+    { id: 'dilu', ico: '🧪', name: 'Dilutions', desc: 'Dilutions, poudres à reconstituer' },
+    { id: 'td', ico: '🧫', name: 'Perfusions complètes (type TD)', desc: 'Électrolytes en ampoules, poudre à reconstituer, planning sur 24 h, sous-cutané' }
   ];
   const LVL = { 1: 'Débutant', 2: 'Intermédiaire', 3: 'Avancé', 4: 'Expert', 5: 'Réa / complexe' };
 
@@ -320,6 +383,7 @@ App.Dose = (() => {
     { t: 'Pourcentages', p: "1 % = **1 g pour 100 mL** (solution aqueuse) = 10 mg/mL.\nGlucose 5 % : 5 g pour 100 mL ; une poche de 500 mL contient 25 g." },
     { t: 'µg/kg/min (dopamine, noradrénaline…)', p: "Dose (µg/min) = dose par kg × poids. Pour passer en **mg/h** : × 60 puis ÷ 1000. Pour le **débit en mL/h** : ÷ concentration (mg/mL ou µg/mL, même unité qu'en haut).\n**Chaîne type** : µg/kg/min → × poids → × 60 → ÷ concentration en µg/mL = mL/h.\nRelais de seringue : la dose (µg/h) ne change pas, donc nouveau débit = ancien débit × ancienne concentration ÷ nouvelle concentration." },
     { t: 'Dilutions et poudres', p: "**C₁ × V₁ = C₂ × V₂** : la quantité de médicament ne change pas quand on dilue.\nVolume de solvant à ajouter = volume final − volume de solution prélevée.\nPoudre : volume final = solvant + volume de la poudre (lis la notice). Dilutions successives : on divise par chaque facteur." },
+    { t: 'Perfusions avec électrolytes et reconstitution (type TD 7)', p: "**1.** Planifie : 24 h ÷ nombre de prises = intervalle ; repars de l'heure de la prescription.\n**2.** Électrolytes : quantité prescrite (g/L × nombre de litres) ÷ concentration de l'ampoule (20 % = 0,2 g/mL ; 10 % = 0,1 g/mL) = mL à prélever. Ampoule de 10 mL : arrondis les ampoules à ouvrir vers le haut.\n**3.** Poudre : dose ÷ concentration après reconstitution (ex. 1 g dans 10 mL = 100 mg/mL) = mL à prélever.\n**4.** Volume total = poche + produits ajoutés.\n**5.** Débit : mL/h = volume total ÷ heures ; gouttes/min = volume total × gouttes par mL ÷ minutes (arrondi). **6.** Vérifie la vraisemblance. En pratique : notice, compatibilité, stabilité et protocole du service." },
     { t: 'Arrondir : vers le haut ou au plus proche ?', p: "Boîtes, flacons, comprimés à délivrer : toujours **vers le haut**. Gouttes/min : au plus proche (on ne compte pas de fraction de goutte). Doses : respecte la précision de la seringue et de la prescription.\nDose maximale/jour = mg/kg/jour × poids ; on retire ce qui a déjà été donné avant d'administrer." },
     { t: 'Insuline', p: "U100 : **100 UI par mL**. 10 UI = 0,1 mL. En pratique on lit des unités sur la seringue ou le stylo.\n⚠ L'insuline est un médicament à haut risque : prescription lue en entier, double contrôle, jamais de dose « à peu près »." }
   ];
@@ -338,7 +402,7 @@ App.Dose = (() => {
   function open() {
     _load();
     const root = _el('dose-root'); if (!root) return;
-    ['games-setup', 'games-practice', 'games-done', 'sim-root', 'pharma-root', 'gazo-root', 'secours-root', 'tp-root'].forEach(id => { const e = _el(id); if (e) e.style.display = 'none'; });
+    ['games-setup', 'games-practice', 'games-done', 'sim-root', 'pharma-root', 'gazo-root', 'patho-root'].forEach(id => { const e = _el(id); if (e) e.style.display = 'none'; });
     root.style.display = 'block';
     screen = 'menu'; run = null;
     render(); _top();

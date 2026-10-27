@@ -65,8 +65,6 @@ App.Activity = (() => {
   // ── Les types d'entraînement de l'app ──────────────────
   // Jeux (Vrai/Faux, trous, association, tryhard) : seulement pendant une partie.
   register('game',   () => _shown('games-view') && _shown('games-practice'));
-  // Orthographe : seulement pendant l'exercice d'un mot.
-  register('ortho',  () => _shown('ortho-view') && _shown('ortho-practice'));
   // Pharmaco : pendant une série (questions, correction). Ni le menu ni l'écran de bilan.
   register('pharma', () => _shown('games-view') && _shown('pharma-root')
                           && !!(App.Pharma && App.Pharma.isTraining && App.Pharma.isTraining()));
@@ -87,6 +85,10 @@ App.Activity = (() => {
   // Calcul de doses : pendant une série (pas le menu ni le résultat).
   register('dose', () => _shown('games-view') && _shown('dose-root')
                       && !!(App.Dose && App.Dose.isTraining && App.Dose.isTraining()));
+
+  // Pathologies aux urgences : pendant l'observation et le choix de réponse (pas le menu ni le résultat).
+  register('patho', () => _shown('games-view') && _shown('patho-root')
+                       && !!(App.Patho && App.Patho.isTraining && App.Patho.isTraining()));
 
   return { register, markActivity: _mark, _t: { tick: _tick, kinds: () => Object.keys(kinds) } };
 })();

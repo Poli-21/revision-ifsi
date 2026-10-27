@@ -116,11 +116,13 @@ App.Render = (() => {
   // Bandeau « Reprendre ma série » (série de cartes interrompue)
   function _renderResume() {
     const el = document.getElementById('resume-banner'); if (!el) return;
-    let ri = null; try { ri = App.Session.resumeInfo(); } catch (e) {}
-    if (!ri) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    let list = []; try { list = App.Session.resumeList(); } catch (e) {}
+    if (!list.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
     const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    el.innerHTML = `<div class="resume-txt"><b>▶ Série en cours</b><span>${esc(ri.label)} · ${ri.done} faite${ri.done > 1 ? 's' : ''}, ${ri.left} restante${ri.left > 1 ? 's' : ''}${ri.tryhard ? ' · 🔥 série ' + ri.serie : ''}</span></div>
-      <div class="resume-act"><button type="button" class="btn btn-primary" onclick="App.Session.resume()">Reprendre →</button><button type="button" class="btn btn-ghost btn-sm" onclick="if(confirm('Abandonner cette série ? Les cartes déjà répondues restent enregistrées.')) App.Session.dropResume()">Abandonner</button></div>`;
+    const ago = at => { const m = Math.max(0, Math.round((Date.now() - (at || 0)) / 60000)); return m < 2 ? 'à l\'instant' : m < 60 ? 'il y a ' + m + ' min' : m < 1440 ? 'il y a ' + Math.round(m / 60) + ' h' : 'il y a ' + Math.round(m / 1440) + ' j'; };
+    el.innerHTML = list.map((ri, i) => `<div class="resume-row" data-sid="${esc(ri.sid)}"><div class="resume-txt"><b>▶ Série en cours${list.length > 1 ? ' ' + (i + 1) : ''}</b><span>${esc(ri.label)} · ${ri.done} faite${ri.done > 1 ? 's' : ''}, ${ri.left} restante${ri.left > 1 ? 's' : ''}${ri.tryhard ? ' · 🔥 série ' + ri.serie : ''} · ${ago(ri.at)}</span></div>
+      <div class="resume-act"><button type="button" class="btn btn-primary" onclick="App.Session.resume('${esc(ri.sid)}')">Reprendre →</button><button type="button" class="btn btn-ghost btn-sm" onclick="if(confirm('Abandonner cette série ? Les cartes déjà répondues restent enregistrées.')) App.Session.dropResume('${esc(ri.sid)}')">Abandonner</button></div></div>`).join('')
+      + (list.length === 1 ? '<div class="resume-hint">Tu peux commencer une autre série : celle-ci reste en pause (2 séries maximum en même temps).</div>' : '');
     el.style.display = 'flex';
   }
 
@@ -352,7 +354,7 @@ App.Render = (() => {
     const dayAt = off => {            // off = décalage en jours par rapport à aujourd'hui
       const d = new Date(base); d.setUTCDate(d.getUTCDate() + off);
       const key = d.toISOString().slice(0, 10), e = log[key] || {};
-      return { key, secs: (e.seconds || 0) + (key === todayKey ? pending : 0), cards: e.reviewed || 0, eng: e.english || 0, engSecs: e.englishSecs || 0, simSecs: e.simSecs || 0, trainSecs: e.trainSecs || 0, pharmaSecs: e.pharmaSecs || 0, gazoSecs: e.gazoSecs || 0, secoursSecs: e.secoursSecs || 0, tpSecs: e.tpSecs || 0, doseSecs: e.doseSecs || 0 };
+      return { key, secs: (e.seconds || 0) + (key === todayKey ? pending : 0), cards: e.reviewed || 0, eng: e.english || 0, engSecs: e.englishSecs || 0, simSecs: e.simSecs || 0, trainSecs: e.trainSecs || 0, pharmaSecs: e.pharmaSecs || 0, gazoSecs: e.gazoSecs || 0, secoursSecs: e.secoursSecs || 0, tpSecs: e.tpSecs || 0, doseSecs: e.doseSecs || 0, pathoSecs: e.pathoSecs || 0 };
     };
     const week = NAMES.map((name, i) => ({ name, i, ...dayAt(i - dowIdx), future: i > dowIdx, today: i === dowIdx }));
     const totSecs  = week.reduce((a, d) => a + d.secs, 0);
@@ -360,7 +362,7 @@ App.Render = (() => {
     const active   = week.filter(d => d.secs > 0 || d.cards > 0).length;
     const totEng   = week.reduce((a, d) => a + d.eng, 0), totEngSecs = week.reduce((a, d) => a + d.engSecs, 0);
     const totSimSecs = week.reduce((a, d) => a + d.simSecs, 0);
-    const totTrainSecs = week.reduce((a, d) => a + d.trainSecs, 0), totPharmaSecs = week.reduce((a, d) => a + d.pharmaSecs, 0), totGazoSecs = week.reduce((a, d) => a + d.gazoSecs, 0), totSecoursSecs = week.reduce((a, d) => a + d.secoursSecs, 0), totTpSecs = week.reduce((a, d) => a + d.tpSecs, 0), totDoseSecs = week.reduce((a, d) => a + d.doseSecs, 0);
+    const totTrainSecs = week.reduce((a, d) => a + d.trainSecs, 0), totPharmaSecs = week.reduce((a, d) => a + d.pharmaSecs, 0), totGazoSecs = week.reduce((a, d) => a + d.gazoSecs, 0), totSecoursSecs = week.reduce((a, d) => a + d.secoursSecs, 0), totTpSecs = week.reduce((a, d) => a + d.tpSecs, 0), totDoseSecs = week.reduce((a, d) => a + d.doseSecs, 0), totPathoSecs = week.reduce((a, d) => a + d.pathoSecs, 0);
     let roll = 0; for (let k = 0; k < 7; k++) roll += dayAt(-k).secs;   // 7 jours glissants
     const maxS = Math.max(...week.map(d => d.secs), 1);
 
@@ -378,7 +380,7 @@ App.Render = (() => {
       <div style="font-size:.85rem;color:#9ca3af;margin:6px 0 14px">${totCards} carte${totCards > 1 ? 's' : ''} révisée${totCards > 1 ? 's' : ''} · ${active} jour${active > 1 ? 's' : ''} actif${active > 1 ? 's' : ''} sur 7 · 7 derniers jours glissants : ${hms(roll)}</div>
       ${totEng || totEngSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">dont anglais : ${totEng} mot${totEng > 1 ? 's' : ''} · ${hms(totEngSecs)}</div>` : ''}
       ${totSimSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">dont simulation clinique : ${hms(totSimSecs)}</div>` : ''}
-      ${totTrainSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">dont entraînements : ${hms(totTrainSecs)}${(totPharmaSecs || totGazoSecs || totSecoursSecs || totTpSecs || totDoseSecs) ? ` (${[totPharmaSecs ? 'pharmaco : ' + hms(totPharmaSecs) : '', totGazoSecs ? 'gaz du sang : ' + hms(totGazoSecs) : '', totSecoursSecs ? 'secourisme : ' + hms(totSecoursSecs) : '', totTpSecs ? 'TP : ' + hms(totTpSecs) : '', totDoseSecs ? 'calcul de doses : ' + hms(totDoseSecs) : ''].filter(Boolean).join(' · ')})` : ''}</div>` : ''}
+      ${totTrainSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">dont entraînements : ${hms(totTrainSecs)}${(totPharmaSecs || totGazoSecs || totSecoursSecs || totTpSecs || totDoseSecs || totPathoSecs) ? ` (${[totPharmaSecs ? 'pharmaco : ' + hms(totPharmaSecs) : '', totGazoSecs ? 'gaz du sang : ' + hms(totGazoSecs) : '', totSecoursSecs ? 'secourisme : ' + hms(totSecoursSecs) : '', totTpSecs ? 'TP : ' + hms(totTpSecs) : '', totDoseSecs ? 'calcul de doses : ' + hms(totDoseSecs) : '', totPathoSecs ? 'pathologies : ' + hms(totPathoSecs) : ''].filter(Boolean).join(' · ')})` : ''}</div>` : ''}
       ${rows}
       <div style="font-size:.7rem;color:#6b7280;margin-top:10px">Le temps d'une série est enregistré à sa fin (la série en cours est incluse ici). Les périodes d'inactivité de plus de 10 min ne sont pas comptées. Le jour change vers 1 h–2 h du matin (heure française).</div>`;
   }

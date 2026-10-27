@@ -44,7 +44,6 @@
   <button role="menuitem" onclick="moreGo('home')">🏠 Tableau de bord</button>
   <button role="menuitem" onclick="moreGo('browse')">📚 Toutes les cartes</button>
   <button role="menuitem" onclick="moreGo('stats')">📊 Statistiques</button>
-  <button role="menuitem" onclick="moreGo('ortho')">✏️ Orthographe</button>
   <button role="menuitem" onclick="moreGo('games')">🎯 Entraînement</button>
   <button role="menuitem" onclick="moreGo('english')">🇬🇧 Anglais</button>
   <button role="menuitem" onclick="moreGo('partiels')">📝 Partiels</button>
@@ -109,7 +108,6 @@
       <button class="tab active" onclick="switchTab('home')"   id="tab-home">🏠 Tableau de bord</button>
       <button class="tab"        onclick="switchTab('browse')" id="tab-browse">📚 Toutes les cartes</button>
       <button class="tab"        onclick="switchTab('stats')"  id="tab-stats">📊 Statistiques</button>
-      <button class="tab"        onclick="switchTab('ortho')"  id="tab-ortho">✏️ Orthographe</button>
       <button class="tab"        onclick="switchTab('games')"  id="tab-games">🎯 Entraînement</button>
       <button class="tab"        onclick="switchTab('english')" id="tab-english">🇬🇧 Anglais</button>
       <button class="tab"        onclick="switchTab('partiels')" id="tab-partiels">📝 Partiels</button>
@@ -210,114 +208,6 @@
       </div>
     </div>
 
-    <!-- ── ORTHOGRAPHE ────────────────────────────────────────── -->
-    <div id="ortho-view" style="display:none">
-
-      <!-- Écran de sélection -->
-      <div id="ortho-setup" class="ortho-setup-screen">
-        <div class="ortho-setup-icon">✏️</div>
-        <h2 class="ortho-setup-title">Entraînement à l'orthographe</h2>
-        <p class="ortho-setup-desc">Apprends à écrire les termes médicaux par cœur en 5 étapes : examiner, épeler, copier, mémoriser et vérifier.</p>
-        <div class="ortho-setup-row">
-          <select id="ortho-cat-select" class="ortho-cat-select">
-            <option value="">Toutes les matières</option>
-          </select>
-          <button class="btn btn-primary" onclick="App.Ortho.start()">Commencer →</button>
-        </div>
-      </div>
-
-      <!-- Pratique -->
-      <div id="ortho-practice" style="display:none">
-        <!-- Barre de progression -->
-        <div class="ortho-topbar">
-          <button class="btn btn-ghost btn-sm" onclick="App.Ortho.reset()">← Quitter</button>
-          <div class="ortho-prog-wrap">
-            <div class="ortho-prog-bar"><div class="ortho-prog-fill" id="ortho-progress-fill" style="width:0%"></div></div>
-            <span class="ortho-word-count" id="ortho-word-count">1 / —</span>
-          </div>
-        </div>
-
-        <!-- Indicateur d'étapes -->
-        <div class="ortho-steps-row">
-          <div class="ortho-dot active" id="ortho-dot1" title="Examiner">1</div>
-          <div class="ortho-step-line"></div>
-          <div class="ortho-dot" id="ortho-dot2" title="Épeler">2</div>
-          <div class="ortho-step-line"></div>
-          <div class="ortho-dot" id="ortho-dot3" title="Copier">3</div>
-          <div class="ortho-step-line"></div>
-          <div class="ortho-dot" id="ortho-dot4" title="Mémoriser">4</div>
-          <div class="ortho-step-line"></div>
-          <div class="ortho-dot" id="ortho-dot5" title="Vérifier">5</div>
-        </div>
-
-        <!-- Étape 1 : Examiner -->
-        <div id="ortho-step1" class="ortho-card">
-          <div class="ortho-step-label">Étape 1 · Examine précieusement le mot</div>
-          <div class="ortho-cat-tag" id="ortho-cat-display"></div>
-          <div class="ortho-big-word" id="ortho-word-display"></div>
-          <div class="ortho-def-box" id="ortho-def-display"></div>
-          <div class="ortho-actions">
-            <button class="btn btn-primary" onclick="App.Ortho.showStep(2)">J'ai bien regardé →</button>
-          </div>
-        </div>
-
-        <!-- Étape 2 : Épeler (vocal) -->
-        <div id="ortho-step2" class="ortho-card" style="display:none">
-          <div class="ortho-step-label">Étape 2 · Épelle le mot lettre par lettre à voix haute</div>
-          <div class="ortho-big-word" id="ortho-spell-word" style="margin-bottom:16px"></div>
-          <div class="ortho-spell-dots" id="ortho-spell-dots" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px"></div>
-          <div id="ortho-spell-feedback" style="font-size:1.1rem;font-weight:700;min-height:28px;text-align:center;margin-bottom:16px"></div>
-          <div class="ortho-actions" style="flex-direction:column;gap:10px">
-            <button class="ortho-mic-btn" id="ortho-mic-btn" onclick="App.Ortho.toggleMic()">🎤 Commencer à épeler</button>
-            <button class="btn btn-primary" id="ortho-spell-continue" style="display:none" onclick="App.Ortho.showStep(3)">Continuer →</button>
-          </div>
-        </div>
-
-        <!-- Étape 3 : Copier -->
-        <div id="ortho-step3" class="ortho-card" style="display:none">
-          <div class="ortho-step-label">Étape 3 · Copie le mot exactement</div>
-          <div class="ortho-copy-ref" id="ortho-copy-ref"></div>
-          <div class="ortho-copy-feedback" id="ortho-copy-feedback"></div>
-          <input class="ortho-input" id="ortho-copy-input" type="text" placeholder="Tape le mot ici…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-          <div class="ortho-actions">
-            <button class="btn btn-primary" id="ortho-copy-next" style="display:none" onclick="App.Ortho.showStep(4)">J'ai copié →</button>
-          </div>
-        </div>
-
-        <!-- Étape 4 : Écrire de mémoire -->
-        <div id="ortho-step4" class="ortho-card" style="display:none">
-          <div class="ortho-step-label">Étape 4 · Écris le mot de mémoire (mot caché)</div>
-          <div class="ortho-memory-hint-row">
-            <span class="ortho-memory-blanks" id="ortho-memory-blanks"></span>
-            <span class="ortho-memory-hint" id="ortho-memory-hint"></span>
-          </div>
-          <input class="ortho-input" id="ortho-memory-input" type="text" placeholder="Écris le mot sans regarder…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-          <div class="ortho-actions">
-            <button class="btn btn-primary" onclick="App.Ortho.verify()">Vérifier →</button>
-          </div>
-        </div>
-
-        <!-- Étape 5 : Résultat -->
-        <div id="ortho-step5" class="ortho-card" style="display:none">
-          <div class="ortho-step-label">Étape 5 · Résultat</div>
-          <div id="ortho-result" class="ortho-result-block"></div>
-          <div class="ortho-actions" style="gap:12px">
-            <button class="btn btn-primary" id="ortho-next-btn" onclick="App.Ortho.nextWord()">Mot suivant →</button>
-            <button class="btn btn-ghost"   id="ortho-retry-btn" style="display:none" onclick="App.Ortho.retry()">🔁 Recommencer ce mot</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Fin de session -->
-      <div id="ortho-done" class="ortho-done-screen" style="display:none">
-        <div class="ortho-done-icon">🏆</div>
-        <h2>Bravo !</h2>
-        <p>Tu as entraîné l'orthographe de <strong id="ortho-done-count">0</strong> mot(s).</p>
-        <button class="btn btn-primary" onclick="App.Ortho.reset()">Recommencer une série</button>
-      </div>
-
-    </div>
-
     <!-- ── ENTRAÎNEMENT ───────────────────────────────────────── -->
     <div id="games-view" style="display:none">
 
@@ -353,29 +243,20 @@
           <span class="sim-entry-go">S'entraîner →</span>
         </button>
 
-        <button class="sim-entry-card" id="gm-secours" onclick="App.Sec.open()">
-          <span class="sim-entry-ico">🚑</span>
-          <span class="sim-entry-txt">
-            <span class="sim-entry-name">Secourisme PSE1 <em class="sim-new">Nouveau</em></span>
-            <span class="sim-entry-desc">Cas de secours dans les rues de Paris, en sauveteur isolé (alerte 15/18) ou en équipe (compte rendu au chef d'agrès). Bilan en 4 regards, « je fais quoi ? », gestes, transmission. Cas fictifs, correction par mots-clés. Fonctionne hors ligne.</span>
-          </span>
-          <span class="sim-entry-go">S'entraîner →</span>
-        </button>
-
-        <button class="sim-entry-card" id="gm-tp" onclick="App.Tp.open()">
-          <span class="sim-entry-ico">🧪</span>
-          <span class="sim-entry-txt">
-            <span class="sim-entry-name">Entraînement TP <em class="sim-new">Nouveau</em></span>
-            <span class="sim-entry-desc">Révise tes travaux pratiques, d'abord l'hygiène des mains (friction hydro-alcoolique, lavage) calquée sur ta grille officielle : prérequis, gestes dessinés, pratique guidée avec minuteur, situations de soins et auto-évaluation Oui/Non. Fonctionne hors ligne.</span>
-          </span>
-          <span class="sim-entry-go">S'entraîner →</span>
-        </button>
-
         <button class="sim-entry-card" id="gm-dose" onclick="App.Dose.open()">
           <span class="sim-entry-ico">🧮</span>
           <span class="sim-entry-txt">
             <span class="sim-entry-name">Calcul de doses <em class="sim-new">Nouveau</em></span>
-            <span class="sim-entry-desc">Comprimés, volumes à prélever, dose selon le poids, gouttes par minute, mL/h, pourcentages, insuline. Chiffres différents à chaque série, 3 niveaux, correction détaillée et erreur typique repérée. Fonctionne hors ligne.</span>
+            <span class="sim-entry-desc">Comprimés, volumes à prélever, dose selon le poids, gouttes par minute, mL/h, pourcentages, insuline, perfusions complètes type TD (électrolytes, poudres à reconstituer, planning 24 h). Chiffres différents à chaque série, 5 niveaux, correction détaillée et erreur typique repérée. Fonctionne hors ligne.</span>
+          </span>
+          <span class="sim-entry-go">S'entraîner →</span>
+        </button>
+
+        <button class="sim-entry-card" id="gm-patho" onclick="App.Patho.open()">
+          <span class="sim-entry-ico">🩺</span>
+          <span class="sim-entry-txt">
+            <span class="sim-entry-name">Pathologies aux urgences <em class="sim-new">Nouveau</em></span>
+            <span class="sim-entry-desc">Un patient arrive aux urgences : 5 minutes (temps simulé) pour poser des questions et faire des examens de base. Rien n'est corrigé avant la fin : tu dis alors quelle pathologie tu suspectes et quels soins tu proposes, puis tu vois la note, les indices ratés et le raisonnement. 8 cas fictifs. Fonctionne hors ligne.</span>
           </span>
           <span class="sim-entry-go">S'entraîner →</span>
         </button>
@@ -459,12 +340,11 @@
       <!-- Gaz du sang (rendu par core/gazo.js) -->
       <div id="gazo-root" style="display:none"></div>
 
-      <!-- Secourisme PSE1 (rendu par core/secours.js) -->
-      <div id="secours-root" style="display:none"></div>
-      <!-- Entraînement TP (rendu par core/tp.js) -->
-      <div id="tp-root" style="display:none"></div>
       <!-- Calcul de doses (rendu par core/dose.js) -->
       <div id="dose-root" style="display:none"></div>
+
+      <!-- Pathologies aux urgences (rendu par core/patho.js) -->
+      <div id="patho-root" style="display:none"></div>
 
     </div>
 
@@ -923,7 +803,6 @@
 <script src="core/session.js"></script>
 <script src="ui/render.js"></script>
 <script src="ui/modal.js"></script>
-<script src="core/ortho.js"></script>
 <script src="core/games.js"></script>
 <script src="core/activity.js"></script>
 <script src="data/sim_intents.js"></script>
@@ -944,16 +823,9 @@
 <script src="core/sim_ecg.js"></script>
 <script src="data/gazo.js"></script>
 <script src="core/gazo.js"></script>
-<script src="ui/sec_scene.js"></script>
-<script src="data/secours.js"></script>
-<script src="data/secours_a.js"></script>
-<script src="data/secours_b.js"></script>
-<script src="data/secours_c.js"></script>
-<script src="core/secours.js"></script>
-<script src="ui/tp_art.js"></script>
-<script src="data/tp_fha.js"></script>
-<script src="core/tp.js"></script>
 <script src="core/dose.js"></script>
+<script src="data/patho.js"></script>
+<script src="core/patho.js"></script>
 <script src="core/timefix.js"></script>
 <script src="core/simulation.js"></script>
 <script src="data/pharma.js"></script>

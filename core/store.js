@@ -155,7 +155,7 @@ App.Store = (() => {
   // On fixe le TOTAL du jour. Si on réduit : on retire d'abord le temps « cartes » (le reste du total), puis on réduit
   // proportionnellement les parties détaillées (anglais, simulation, entraînements). Si on augmente : l'ajout va aux cartes.
   // `fixAt` (horodatage) sert à la synchro : la correction la plus récente gagne au lieu du « max » habituel.
-  const TIME_FIELDS = ['seconds', 'englishSecs', 'simSecs', 'trainSecs', 'gameSecs', 'orthoSecs', 'pharmaSecs', 'gazoSecs', 'secoursSecs', 'tpSecs', 'doseSecs'];
+  const TIME_FIELDS = ['seconds', 'englishSecs', 'simSecs', 'trainSecs', 'gameSecs', 'orthoSecs', 'pharmaSecs', 'gazoSecs', 'secoursSecs', 'tpSecs', 'doseSecs', 'pathoSecs'];
   function getDaySeconds(date) { return Math.round((state.studyLog[date] && state.studyLog[date].seconds) || 0); }
   function setDaySeconds(date, total) {
     total = Math.max(0, Math.min(24 * 3600, Math.round(Number(total) || 0)));
@@ -209,7 +209,7 @@ App.Store = (() => {
   // Temps passé en ENTRAÎNEMENT (jeux, orthographe, pharmaco, gaz du sang) : s'ajoute à « Temps » (seconds) et est
   // détaillé dans trainSecs (total) + gameSecs / orthoSecs / pharmaSecs / gazoSecs / secoursSecs. Aucune carte comptée, aucun
   // effet sur l'objectif de 100 ni sur la série.
-  const TRAIN_KINDS = { game: 'gameSecs', ortho: 'orthoSecs', pharma: 'pharmaSecs', gazo: 'gazoSecs', secours: 'secoursSecs', tp: 'tpSecs', dose: 'doseSecs' };
+  const TRAIN_KINDS = { game: 'gameSecs', ortho: 'orthoSecs', pharma: 'pharmaSecs', gazo: 'gazoSecs', secours: 'secoursSecs', tp: 'tpSecs', dose: 'doseSecs', patho: 'pathoSecs' };
   function logTraining({ kind = 'game', seconds = 0 } = {}) {
     if (!(seconds > 0)) return;
     const field = TRAIN_KINDS[kind];

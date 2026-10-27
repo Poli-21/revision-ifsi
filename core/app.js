@@ -27,7 +27,6 @@ App.UI = (() => {
     document.getElementById('home-view').style.display   = tab === 'home'   ? 'block' : 'none';
     document.getElementById('browse-view').style.display = tab === 'browse'  ? 'block' : 'none';
     document.getElementById('stats-view').style.display  = tab === 'stats'   ? 'block' : 'none';
-    document.getElementById('ortho-view').style.display  = tab === 'ortho'   ? 'block' : 'none';
     document.getElementById('games-view').style.display  = tab === 'games'   ? 'block' : 'none';
     document.getElementById('english-view').style.display = tab === 'english' ? 'block' : 'none';
     document.getElementById('partiels-view').style.display = tab === 'partiels' ? 'block' : 'none';
@@ -36,7 +35,7 @@ App.UI = (() => {
     if (tab === 'english')  App.English.init();
     if (tab === 'partiels') App.Partiels.init();
     if (tab === 'tuteur')   App.Tuteur.init();
-    ['home','browse','stats','ortho','games','english','partiels','tuteur'].forEach(t => {
+    ['home','browse','stats','games','english','partiels','tuteur'].forEach(t => {
       const btn = document.getElementById('tab-' + t);
       if (btn) btn.classList.toggle('active', t === tab);
     });
@@ -44,7 +43,6 @@ App.UI = (() => {
     if (tab === 'home')   App.Render.all();     // objectif du jour à jour (ex. mots d'anglais travaillés)
     if (tab === 'browse') App.Render.browse();
     if (tab === 'stats')  App.Render.stats();
-    if (tab === 'ortho')  App.Ortho.populateCatSelect();
     if (tab === 'games')  App.Games.populateCatSelect();
   }
 

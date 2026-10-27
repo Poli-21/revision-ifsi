@@ -188,41 +188,67 @@ App.Session = (() => {
   // Carte au palier « J+1 » (niveau 1 de l'algorithme : vue une fois, intervalle de 1 à 2 jours)
   function _isJ1(c) { return !!(c && c.progress && App.SRS.getLevel(c) === 1); }
 
-  // ── Reprise d'une série interrompue ────────────────────────────
+  // ── Reprise de séries interrompues (jusqu'à 2 en parallèle) ────────────────────────────
   // À chaque carte répondue, on mémorise (sur cet appareil) quelles cartes, dans quel ordre, et où tu en es.
-  // Si tu quittes avant la fin, un bandeau « Reprendre ma série » apparaît sur l'accueil : mêmes cartes, même ordre, pas de nouveau tirage.
-  const RESUME_KEY = 'ifsi_session_resume';
-  function _readResume() { try { const o = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); return (o && o.v === 1 && Array.isArray(o.queue)) ? o : null; } catch (e) { return null; } }
-  function _clearResume() { try { localStorage.removeItem(RESUME_KEY); } catch (e) {} }
+  // Tu peux garder 2 séries en pause : un bandeau « ▶ Série en cours » par série apparaît sur l'accueil (mêmes cartes, même ordre).
+  // Une 3e série ne peut démarrer qu'en abandonnant la plus ancienne (confirmation demandée).
+  const RESUME_KEY = 'ifsi_session_resume';          // ancien format (1 série) : migré automatiquement
+  const RESUME_KEY2 = 'ifsi_session_resume2';        // { v: 2, slots: [ { sid, at, cat, mode, idx, stats, queue, tryhard } ] }
+  const MAX_SLOTS = 2;
+  const _newSid = () => 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  function _readSlots() {
+    try {
+      let o = JSON.parse(localStorage.getItem(RESUME_KEY2) || 'null');
+      if (!o || o.v !== 2 || !Array.isArray(o.slots)) {
+        o = { v: 2, slots: [] };
+        const old = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null');       // migration de l'ancienne reprise
+        if (old && old.v === 1 && Array.isArray(old.queue)) { old.sid = _newSid(); o.slots.push(old); }
+        if (localStorage.getItem(RESUME_KEY) != null) { localStorage.removeItem(RESUME_KEY); if (o.slots.length) localStorage.setItem(RESUME_KEY2, JSON.stringify(o)); }
+      }
+      return o.slots.filter(r => r && Array.isArray(r.queue) && r.sid).slice(0, MAX_SLOTS);
+    } catch (e) { return []; }
+  }
+  function _writeSlots(slots) { try { if (slots.length) localStorage.setItem(RESUME_KEY2, JSON.stringify({ v: 2, slots })); else localStorage.removeItem(RESUME_KEY2); } catch (e) {} }
+  function _removeSlot(sid) { if (!sid) return; _writeSlots(_readSlots().filter(r => r.sid !== sid)); }
+  function _clearResume() { if (current && current.sid) _removeSlot(current.sid); }      // la série qu'on vient de terminer
   function _saveResume() {
     try {
       if (!current || current.chronoOnly || current.isPractice) return;
       const t = current.tryhard;
-      if (current.idx >= current.queue.length && !(t && t.pool.length)) { _clearResume(); return; }    // série terminée : rien à reprendre
-      localStorage.setItem(RESUME_KEY, JSON.stringify({
-        v: 1, at: Date.now(), cat: current.cat || '', mode, idx: current.idx, stats: current.stats,
+      if (!current.sid) current.sid = _newSid();
+      if (current.idx >= current.queue.length && !(t && t.pool.length)) { _removeSlot(current.sid); return; }    // série terminée : rien à reprendre
+      const slot = {
+        v: 1, sid: current.sid, at: Date.now(), cat: current.cat || '', mode, idx: current.idx, stats: current.stats,
         queue: current.queue.map(c => c.id),
         tryhard: t ? Object.assign({}, t, { pool: t.pool.map(c => c.id) }) : null
-      }));
+      };
+      const slots = _readSlots().filter(r => r.sid !== slot.sid); slots.push(slot);
+      slots.sort((x, y) => (y.at || 0) - (x.at || 0));
+      _writeSlots(slots.slice(0, MAX_SLOTS));
     } catch (e) {}
   }
-  // Informations pour le bandeau de l'accueil (null = rien à reprendre)
-  function resumeInfo() {
-    const r = _readResume(); if (!r) return null;
-    const have = new Set(App.Store.state.cards.map(c => c.id));
+  function _slotInfo(r, have) {
     const left = r.queue.slice(r.idx).filter(id => have.has(id)).length + (r.tryhard ? r.tryhard.pool.filter(id => have.has(id)).length : 0);
-    if (left < 1) { _clearResume(); return null; }
     const done = r.stats ? (r.stats.ok + r.stats.hard + r.stats.nope) : r.idx;
-    return { label: r.cat || 'Toutes les matières', left, done, tryhard: !!r.tryhard, serie: r.tryhard ? r.tryhard.serie : 0, at: r.at };
+    return { sid: r.sid, label: r.cat || 'Toutes les matières', left, done, tryhard: !!r.tryhard, serie: r.tryhard ? r.tryhard.serie : 0, at: r.at };
   }
-  function resume() {
-    const r = _readResume(); if (!r) return;
+  // Liste pour l'accueil (vide = rien à reprendre) ; la série la plus récente d'abord
+  function resumeList() {
+    const have = new Set(App.Store.state.cards.map(c => c.id));
+    const out = [];
+    _readSlots().forEach(r => { const i = _slotInfo(r, have); if (i.left < 1) _removeSlot(r.sid); else out.push(i); });
+    return out.sort((x, y) => (y.at || 0) - (x.at || 0));
+  }
+  // Compatibilité : la plus récente (ou null)
+  function resumeInfo() { const l = resumeList(); return l.length ? l[0] : null; }
+  function resume(sid) {
+    const list = _readSlots(); const r = sid ? list.find(x => x.sid === sid) : list.sort((x, y) => (y.at || 0) - (x.at || 0))[0]; if (!r) return;
     const byId = new Map(App.Store.state.cards.map(c => [c.id, c]));
     let idx = 0; const queue = [];
     r.queue.forEach((id, i) => { const c = byId.get(id); if (c) { if (i < r.idx) idx++; queue.push({ ...c }); } });
     const pool = r.tryhard ? r.tryhard.pool.map(id => byId.get(id)).filter(Boolean).map(c => ({ ...c })) : [];
-    if (!queue.length && !pool.length) { _clearResume(); alert('Cette série n\'existe plus (les cartes ont été supprimées).'); App.Render.all(); return; }
-    current = { queue, idx, stats: Object.assign({ ok: 0, hard: 0, nope: 0, again: 0 }, r.stats || {}), startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: r.cat || '' };
+    if (!queue.length && !pool.length) { _removeSlot(r.sid); alert('Cette série n\'existe plus (les cartes ont été supprimées).'); App.Render.all(); return; }
+    current = { queue, idx, stats: Object.assign({ ok: 0, hard: 0, nope: 0, again: 0 }, r.stats || {}), startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: r.cat || '', sid: r.sid };
     if (r.tryhard) current.tryhard = Object.assign({}, r.tryhard, { pool });
     if (['flip', 'write', 'qcm'].includes(r.mode)) { mode = r.mode; ['flip','write','qcm'].forEach(id => { const b = document.getElementById('mode-' + id); if (b) b.classList.toggle('active', id === mode); }); }
     App.UI.showView('session');
@@ -231,7 +257,18 @@ App.Session = (() => {
     _startTicker();
     show();
   }
-  function dropResume() { _clearResume(); try { App.Render.all(); } catch (e) {} }
+  function dropResume(sid) {
+    if (sid) _removeSlot(sid); else { const l = resumeList(); if (l.length) _removeSlot(l[0].sid); }
+    try { App.Render.all(); } catch (e) {}
+  }
+  // Avant de commencer une NOUVELLE série : s'il y a déjà 2 séries en pause, il faut en abandonner une (la plus ancienne).
+  // Retourne false si l'étudiant renonce.
+  function _roomForNew() {
+    const l = resumeList(); if (l.length < MAX_SLOTS) return true;
+    const old = l[l.length - 1];
+    if (!confirm('Tu as déjà 2 séries en cours.\n\nOK = abandonner la plus ancienne (' + old.label + ', ' + old.left + ' carte' + (old.left > 1 ? 's' : '') + ' restantes) et commencer une nouvelle série\nAnnuler = revenir à l\'accueil pour reprendre l\'une des deux')) return false;
+    _removeSlot(old.sid); return true;
+  }
 
   function start(cat, type, limit, tryhard) {
     const { state } = App.Store;
@@ -251,7 +288,7 @@ App.Session = (() => {
       sessionLabel = (sessionLabel ? sessionLabel + ' — ' : '') + (type === 'CM' ? '📘 CM' : '📗 TD');
     }
     if (!cards.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
-    { const ri = resumeInfo(); if (ri && !confirm('Tu as une série en cours (' + ri.left + ' carte' + (ri.left > 1 ? 's' : '') + ' restantes).\n\nOK = abandonner cette série et en commencer une nouvelle\nAnnuler = revenir à l\'accueil pour la reprendre')) return; }
+    if (!_roomForNew()) return;
 
     // Tri : cartes à risque exam → révisions → apprentissage → nouvelles
     const exams = (() => { try { return JSON.parse(localStorage.getItem('ifsi_exams_v2')||'[]'); } catch(e){return[];} })();
@@ -745,7 +782,7 @@ App.Session = (() => {
 
   function startWithCards(cards, label) {
     if (!cards || !cards.length) { alert('Aucune carte à réviser pour le moment ! 🎉'); return; }
-    { const ri = resumeInfo(); if (ri && !confirm('Tu as une série en cours (' + ri.left + ' carte' + (ri.left > 1 ? 's' : '') + ' restantes).\n\nOK = abandonner cette série et en commencer une nouvelle\nAnnuler = revenir à l\'accueil pour la reprendre')) return; }
+    if (!_roomForNew()) return;
     // Applique le même tri : fragiles par chapitre, maîtrisés mélangés
     const MASTERED_DAYS = 30;
     function _shuffle(arr) {
@@ -777,7 +814,7 @@ App.Session = (() => {
     show();
   }
 
-  return { resumeInfo, resume, dropResume, start, ectsPlan, _queue: () => (current ? [...current.queue] : []), startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
+  return { resumeInfo, resumeList, resume, dropResume, start, ectsPlan, _queue: () => (current ? [...current.queue] : []), startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
   // matière de la série en cours (pour "Recommencer") : '' = toutes les cartes à réviser
   getCurrentCat: () => { const k = current && current.cat; return (k && App.Store.state.cards.some(c => c.cat === k)) ? k : ''; } };
 })();
