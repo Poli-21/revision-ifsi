@@ -246,7 +246,7 @@ App.Sync = (() => {
 
       App.Store.state.studyLog = mergedLog;
       if (remote.catOrder && remote.catOrder.length > 0)
-        App.Store.state.catOrder = remote.catOrder;
+        App.Store.state.catOrder = (App.Regroup && App.Regroup.remapOrder) ? App.Regroup.remapOrder(remote.catOrder) : remote.catOrder;
 
       // ── Merge Grand Oral ────────────────────────────────────────
       // Évaluations : union par date exacte (évite les doublons)

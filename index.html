@@ -53,6 +53,7 @@
   <button role="menuitem" onclick="moreDo('exportJSON')">💾 Exporter (JSON)</button>
   <button role="menuitem" onclick="moreDo('exportCSV')">📊 Exporter (CSV)</button>
   <button role="menuitem" onclick="moreDo('importJSON')">📂 Importer un fichier</button>
+  <button role="menuitem" onclick="moreDo('openRegroup')">🗂 Regrouper par CM / TD</button>
   <div class="more-menu-title">Autre</div>
   <button role="menuitem" onclick="moreDo('editDailyGoal')">🎯 Changer l'objectif du jour</button>
   <button role="menuitem" onclick="moreDo('openTryhardPicker')">🔥 Mode Tryhard (séries de 10)</button>
@@ -85,7 +86,10 @@
       <button id="tryhard-btn" onclick="openTryhardPicker()" title="Séries de 10 cartes : la suivante ne démarre que quand les 10 sont validées" style="margin-top:.5rem;width:100%;padding:9px 0;border-radius:8px;border:none;background:linear-gradient(135deg,#ef4444,#f97316);color:#fff;font-size:.82rem;font-weight:700;cursor:pointer">🔥 Mode Tryhard · séries de 10</button>
     </div>
     <div class="sidebar-section">
-      <h3>Matières</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h3 style="margin:0">Matières</h3>
+        <button class="btn btn-ghost btn-sm" id="regroup-btn" onclick="App.Regroup.open()" title="Regrouper les sous-matières en un paquet par CM ou par TD" style="font-size:.75rem;padding:3px 8px">🗂 Regrouper</button>
+      </div>
       <div class="cat-list" id="cat-list"></div>
     </div>
     <div class="sidebar-section">
@@ -832,6 +836,7 @@
 <script src="core/pharma.js"></script>
 <script src="data/english_s1.js"></script>
 <script src="core/english.js"></script>
+<script src="core/regroup.js"></script>
 <script src="core/partiels.js"></script>
 <script src="core/tuteur.js"></script>
 <script src="core/app.js"></script>
