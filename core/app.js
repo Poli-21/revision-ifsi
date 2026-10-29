@@ -650,10 +650,15 @@ function startTryhard(idx) {
 }
 
 // ── Objectif du jour ───────────────────────────────────────────
+// « Par séries de 10 » (comme Quizlet) : les cartes de l'objectif sont données par blocs de 10 ; les cartes ratées ou difficiles
+// reviennent dans le même bloc, et le bloc suivant ne démarre que quand les 10 sont sues. Choix mémorisé sur cet appareil (activé par défaut).
+const SERIES10_KEY = 'ifsi_series10';
+function getSeries10() { try { return localStorage.getItem(SERIES10_KEY) !== '0'; } catch (e) { return true; } }
+function setSeries10(on) { try { localStorage.setItem(SERIES10_KEY, on ? '1' : '0'); } catch (e) {} }
 function startDailyGoal() {
   const goal = App.Store.getDailyGoal();
   const left = Math.max(0, goal - App.Store.reviewedToday());
-  App.Session.start('', undefined, left > 0 ? left : 50);   // '' = toutes les matières
+  App.Session.start('', undefined, left > 0 ? left : 50, getSeries10());   // '' = toutes les matières ; 4e argument = séries de 10
 }
 function editDailyGoal() {
   const cur = App.Store.getDailyGoal();

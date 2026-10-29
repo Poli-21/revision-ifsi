@@ -2941,3 +2941,8 @@ body.dark .rg-box { --rg-bg:#1e293b; --rg-line:#334155; --rg-soft:#162032; --rg-
 .rg-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; position: sticky; bottom: -12px; background: var(--rg-bg, #fff); padding: 10px 0 4px; border-top: 1px solid var(--rg-line); }
 .rg-sp { flex: 1; }
 @media (max-width: 560px) { .rg-box { padding: 12px; } .rg-foot .btn { flex: 1 1 100%; } .rg-sp { display: none; } }
+
+/* Option « Par séries de 10 » sous le bouton Commencer */
+.series10-opt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; font-size: .82rem; font-weight: 600; color: rgba(255,255,255,.95); cursor: pointer; line-height: 1.35; }
+.series10-opt input { width: 18px; height: 18px; flex: none; accent-color: #fff; }
+.series10-opt small { font-weight: 400; opacity: .8; }

@@ -76,6 +76,7 @@ App.Render = (() => {
     if (goalLabel) goalLabel.textContent = remaining === 0
       ? `🎉 Objectif atteint !${doneToday > goal ? ' (+' + (doneToday - goal) + ' bonus)' : ''}${engNote}`
       : `cartes révisées aujourd'hui${engNote} · encore ${remaining} pour l'objectif`;
+    const s10 = document.getElementById('series10-chk'); if (s10 && typeof getSeries10 === 'function') s10.checked = getSeries10();
     const startBtn = document.getElementById('daily-start-btn');
     if (startBtn) {
       const n = Math.min(remaining > 0 ? remaining : 50, due.length);

@@ -351,6 +351,25 @@ App.Modal = (() => {
 
   function importJSON() { document.getElementById('import-input').click(); }
 
+  // Accepte le format de l'appli (id, cat, term, def, example…) ET le format français produit par l'extraction de cours
+  // (terme, definition, exemple, matiere, ue, type) : « B3 – Nom » devient « B3 > B3 - Nom », « B.3 S1 » devient l'UE B.3.
+  function _normImported(r, i) {
+    if (!r || typeof r !== 'object') return null;
+    if (r.term && r.def && r.cat) return Object.assign({}, r, { id: r.id || ('imp_' + Date.now().toString(36) + '_' + i + '_' + Math.random().toString(36).slice(2, 6)) });   // format de l'appli : tel quel
+    const str = v => (v == null ? '' : String(v)).trim();
+    const term = str(r.term != null ? r.term : r.terme), def = str(r.def != null ? r.def : r.definition);
+    let cat = App.Store.normCat(r.cat != null ? r.cat : (r.matiere != null ? r.matiere : r.categorie));
+    if (!term || !def || !cat) return null;
+    if (cat.indexOf(' > ') < 0) { const m = /^([A-E]\s?[1-4])\s*-\s*(.+)$/i.exec(cat); if (m) { const u = m[1].replace(/\s/g, '').toUpperCase(); cat = u + ' > ' + u + ' - ' + m[2].trim(); } }
+    let ue = null;
+    if (r.ue) { const m = /^\s*([A-E])\s*\.?\s*([1-4])(?!\d)/i.exec(String(r.ue)); if (m) { const code = m[1].toUpperCase() + '.' + m[2]; if (App.UE && App.UE.byCode && App.UE.byCode(code)) ue = code; } }
+    const type = ['CM', 'TD'].includes(str(r.type).toUpperCase()) ? str(r.type).toUpperCase() : (r.type || null);
+    const ex = str(r.example != null ? r.example : r.exemple);
+    const c = { id: r.id || ('imp_' + Date.now().toString(36) + '_' + i + '_' + Math.random().toString(36).slice(2, 6)), cat, term, def, example: ex || null, ue, type, suspended: !!r.suspended, progress: r.progress || null };
+    if (r.customImage) c.customImage = r.customImage; if (r.image) c.image = r.image;
+    return c;
+  }
+
   function handleImport(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -360,12 +379,21 @@ App.Modal = (() => {
         const imported = JSON.parse(ev.target.result);
         if (!Array.isArray(imported)) throw new Error();
         const existIds = new Set(App.Store.state.cards.map(c => c.id));
-        let added = 0;
+        const norm = App.Store.normCat;
+        const sig = c => norm(c.cat).toLowerCase() + '||' + String(c.term || '').trim().toLowerCase();
+        const existSig = new Set(App.Store.state.cards.map(sig));
+        let added = 0, dup = 0, bad = 0;
         const newIds = [];
-        imported.forEach(c => { if (!existIds.has(c.id)) { App.Store.state.cards.push(c); added++; newIds.push(c.id); } });
+        imported.forEach((raw, i) => {
+          const c = _normImported(raw, i);
+          if (!c) { bad++; return; }
+          if ((raw && raw.id && existIds.has(c.id)) || existSig.has(sig(c))) { dup++; return; }   // déjà là (même id, ou même terme dans la même matière)
+          existIds.add(c.id); existSig.add(sig(c));
+          App.Store.state.cards.push(c); added++; newIds.push(c.id);
+        });
         App.Store.save();
         App.Render.all();
-        alert(`✅ ${added} carte(s) importée(s) (${imported.length - added} déjà présente(s))`);
+        alert(`✅ ${added} carte(s) importée(s)` + (dup ? ` · ${dup} déjà présente(s)` : '') + (bad ? ` · ${bad} ignorée(s) (terme, définition ou matière manquant)` : ''));
         // Si des cartes importées n'ont pas d'UE (le fichier importé n'en précisait
         // pas), on ouvre directement la sélection multiple dessus pour pouvoir en
         // assigner une à tout le lot d'un coup, plutôt que carte par carte.
