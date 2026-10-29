@@ -1,8 +1,12 @@
 // Service Worker — cache offline + mises à jour automatiques
-const CACHE = 'ifsi-v32';
+const CACHE = 'ifsi-v33';
 const STATIC = [
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './icons/icon-maskable-192.png',
+  './icons/icon-maskable-512.png',
+  './icons/apple-touch-icon.png',
+  './icons/favicon-32.png',
   './manifest.json'
 ];
 

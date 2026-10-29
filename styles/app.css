@@ -2946,3 +2946,6 @@ body.dark .rg-box { --rg-bg:#1e293b; --rg-line:#334155; --rg-soft:#162032; --rg-
 .series10-opt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; font-size: .82rem; font-weight: 600; color: rgba(255,255,255,.95); cursor: pointer; line-height: 1.35; }
 .series10-opt input { width: 18px; height: 18px; flex: none; accent-color: #fff; }
 .series10-opt small { font-weight: 400; opacity: .8; }
+
+/* Logo de l'appli dans l'en-tête */
+.app-logo { width: 30px; height: 30px; vertical-align: middle; border-radius: 8px; margin-right: 4px; object-fit: contain; }
