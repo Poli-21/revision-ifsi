@@ -241,7 +241,7 @@ App.Pharma = (() => {
     }).join('');
     return `<div class="ph-top"><button class="btn btn-ghost btn-sm" onclick="App.Pharma.close()">← Entraînement</button></div>
       <h2 class="ph-title">💊 Pharmaco</h2>
-      <p class="ph-lead">Trois thèmes pour ne plus confondre <b>DCI</b>, <b>spécialité</b> et <b>générique</b>, reconnaître la <b>classe</b> d'un médicament avec son suffixe, et savoir ce qu'on <b>surveille</b>. Fiche d'abord si tu veux, puis séries de questions.</p>
+      <p class="ph-lead">Des thèmes pour ne plus confondre <b>DCI</b>, <b>spécialité</b> et <b>générique</b>, reconnaître la <b>classe</b> d'un médicament avec son suffixe, savoir ce qu'on <b>surveille</b>, connaître les <b>fiches médicaments</b> et les <b>antidotes</b>. Fiche d'abord si tu veux, puis séries de questions.</p>
       ${cards}
       <div class="ph-row ph-gap ph-wrapr">
         <button class="btn btn-primary" onclick="App.Pharma.startRun('mix')">🔀 Série mixte (${N_MIX})</button>
@@ -368,7 +368,7 @@ App.Pharma = (() => {
         <div class="ph-row" style="margin-top:10px"><button class="btn btn-primary ph-big" id="ph-next" onclick="App.Pharma.next()">${last ? 'Voir mon bilan →' : 'Question suivante →'}</button></div>
       </div>`;
   }
-  const SRC = { TD3: 'ton TD 3 (pharmacologie)', TD6: 'ton TD 6 (analyse d\'une prescription)', SCA: 'ton TD SCA', HTA: 'ton TD HTA', AOMI: 'ton TD AOMI', CM7: 'ton CM7 (HTA)', CM16: 'ton CM16 (insuffisance cardiaque)', 'Général': 'culture générale' };
+  const SRC = { TD3: 'ton TD 3 (pharmacologie)', TD6: 'ton TD 6 (analyse d\'une prescription)', SCA: 'ton TD SCA', HTA: 'ton TD HTA', AOMI: 'ton TD AOMI', CM7: 'ton CM7 (HTA)', CM16: 'ton CM16 (insuffisance cardiaque)', 'Général': 'culture générale', Notes: 'tes notes de pharmaco' };
   function _srcLabel(s) { return SRC[s] || s; }
 
   function _bilanHtml() {
