@@ -12,108 +12,270 @@
 
   // ══ Thèmes ═══════════════════════════════════════════════════════════════
   D.themes.push(
-    { id: 'fic', ico: '💊', name: 'Fiches médicaments', short: 'nom · molécule · sert à · effets',
-      blurb: "Pour chaque médicament : le nom de marque, la molécule, à quoi il sert et ses effets indésirables.",
+    { id: 'fic', ico: '💊', name: 'Fiches médicaments', short: 'nom · molécule · sert à · effets · où le croiser',
+      blurb: "Une carte mémo par médicament : nom, molécule, à quoi ça sert, effets, surveillance, antidote, où on le croise, astuce.",
       lesson: [
-        { h: 'Comment lire une fiche médicament', p: "**Nom (spécialité)** → **molécule (DCI)** → **classe / à quoi ça sert** → **effets indésirables** → **surveillance et antidote**. Toujours dans cet ordre : c'est celui des questions." },
-        { h: 'Douleur : les paliers de l\'OMS', ul: [
-          "**Palier I** : antalgiques non opioïdes (paracétamol, AINS) — douleur légère à modérée.",
-          "**Palier II** : opioïdes faibles (tramadol, codéine) — douleur modérée à forte. Le **néfopam (Acupan®)** est classé palier II mais **n'est pas un opioïde** (ton cours le place « entre 1 et 2 »).",
-          "**Palier III** : opioïdes forts (morphine : Skénan®, Actiskénan®…) — douleur intense. **Stupéfiant** : traçabilité stricte.",
-          "On monte ou on descend de palier selon l'**évaluation de la douleur** (EN, EVA) : c'est l'infirmier(e) qui évalue et transmet."
+        { h: 'Comment lire une carte', p: "**Nom (spécialité) → molécule (DCI) → sert à → effets → surveiller → antidote → où je le croise → règle / reco → astuce.** Les phrases sont volontairement courtes : c'est le minimum à savoir par cœur. Le détail exact (doses, seuils) se lit toujours dans la **prescription, le RCP (Vidal / base publique des médicaments) et le protocole du service**." },
+        { h: '⚡ 10 réflexes à connaître par cœur', ul: [
+          "**Paracétamol → foie → NAC.** Jamais de doublon (Doliprane® + Dafalgan®).",
+          "**Morphine → respiration → naloxone.** Je surveille sédation, respiration et douleur.",
+          "**AVK → INR → vitamine K.** Anticoagulant : je cherche du sang (nez, gencives, urines, selles noires).",
+          "**Héparine → TCA et plaquettes → protamine.**",
+          "**Bêtabloquant (-lol) → FC et TA avant la prise → glucagon.**",
+          "**IEC (-pril) → toux sèche, potassium.** Ce n'est pas un diurétique.",
+          "**AINS → estomac, reins.** Pas en cas d'infection (grippe, varicelle, angine, dent infectée).",
+          "**Acupan® → perfusion lente, patient allongé** (nausées, sueurs, tachycardie).",
+          "**Benzodiazépines → somnolence, chutes.** Durée courte : anxiolytique 12 semaines, hypnotique 4 semaines.",
+          "**Stupéfiant (morphine) → traçabilité** à chaque dose : je note qui, quoi, quand, signature."
         ] },
-        { h: 'Antalgiques et antiémétiques', tbl: { head: ['Nom (spécialité)', 'Molécule · classe', 'Sert à', 'Effets indésirables', 'Voie · remarques'], rows: [
-          ['Doliprane®, Dafalgan®, Efferalgan®, Perfalgan® (IV)', 'paracétamol · antalgique palier I, antipyrétique', 'Douleur légère à modérée, fièvre', '**Toxicité pour le foie (hépatotoxicité)** en cas de surdosage', 'Per os (Doliprane®…) ou IV · **marge thérapeutique étroite** : respecter dose et intervalle, jamais de doublon'],
-          ['Acupan®', 'néfopam · antalgique non opioïde (palier II)', 'Douleur modérée à forte', 'Nausées, vomissements, sueurs, tachycardie, vertiges, bouche sèche, rétention urinaire', 'IV **lente** (perfusion), patient allongé · plus de nausées à la 1re dose'],
-          ['Contramal®, Topalgic®', 'tramadol · opioïde faible (palier II)', 'Douleur modérée à forte', 'Nausées, vomissements, vertiges, **somnolence**, confusion, constipation, dépendance', 'Per os ou IV **lente** · antidote : naloxone (efficacité partielle)'],
-          ['Skénan® (LP), Actiskénan® (LI)', 'morphine · opioïde fort (palier III), stupéfiant', 'Douleur intense', '**Dépression respiratoire (FR ↓)**, somnolence, nausées, constipation, dépendance', 'FR, sédation, douleur · **antidote : naloxone (Narcan®)** · LP : ne pas écraser'],
-          ['Zophren®', 'ondansétron · antiémétique', 'Nausées, vomissements', 'Céphalées, constipation', 'Souvent associé aux opioïdes'],
-          ['Primpéran®', 'métoclopramide · antiémétique', 'Nausées, vomissements', 'Somnolence, troubles du mouvement (syndrome extrapyramidal)', 'Durée courte, selon prescription']
-        ] } },
-        { h: 'Anti-inflammatoires et antifibrinolytique', tbl: { head: ['Nom (spécialité)', 'Molécule · classe', 'Sert à', 'Effets indésirables', 'Remarques'], rows: [
-          ['Advil®, Nurofen®, Profénid®…', 'ibuprofène, kétoprofène · **AINS** (anti-inflammatoires non stéroïdiens)', 'Inflammation, douleur (ex. douleur dentaire), fièvre', '**Saignements et ulcère digestif**, insuffisance rénale, rétention d\'eau et de sel', 'Pendant le repas · **à éviter en cas d\'infection** (masquent fièvre et inflammation) · pas avec un anticoagulant · pas d\'antidote spécifique'],
-          ['Exacyl®', 'acide tranexamique · antifibrinolytique', 'Limiter ou arrêter un saignement (empêche le caillot de se dissoudre)', 'Nausées, risque de thrombose', 'À ne pas confondre avec un anticoagulant : effet **inverse**']
-        ] } },
-        { h: 'Anticoagulants', tbl: { head: ['Famille · nom', 'Molécule', 'Comment ça agit', 'Surveillance', 'Antidote'], rows: [
-          ['**AVK** (anti-vitamine K) : Coumadine®', 'warfarine', 'Bloque les facteurs de coagulation dépendants de la vitamine K', '**INR** (cible souvent 2 à 3)', '**Vitamine K** (± PPSB)'],
-          ['**AOD** (anticoagulants oraux directs) : Eliquis®, Xarelto®, Pradaxa®', 'apixaban, rivaroxaban, dabigatran', 'Agissent sur **un seul facteur** de la coagulation (Xa ou thrombine)', 'Pas d\'INR : signes de saignement, fonction rénale', 'PPSB ou antidote spécifique (idarucizumab pour dabigatran…) — décision médicale'],
-          ['**HNF** (héparine non fractionnée) : Calciparine®, héparine IV', 'héparine', 'Anticoagulant injectable (SC ou IV au pousse-seringue)', '**TCA**, plaquettes', '**Protamine**'],
-          ['**HBPM** (héparine de bas poids moléculaire) : Lovenox®', 'énoxaparine', 'Anticoagulant injectable sous-cutané', 'Plaquettes, créatinine (**élimination rénale** : prudence si insuffisance rénale)', 'Protamine (efficacité partielle)']
-        ] } },
-        { h: 'Anticoagulant : les signes à rechercher', ul: [
-          "**Saignement visible** : nez, gencives, hématomes, urines rouges, selles noires, saignement au point d'injection.",
-          "**Saignement caché** : fatigue, pâleur, tachycardie, baisse de la TA, douleur abdominale.",
-          "**Traumatisme crânien sous anticoagulant** : même **sans signe**, il peut y avoir un saignement **à l'intérieur de la tête** (parfois retardé) → on prévient le médecin, scanner.",
-          "**Thrombopénie** (baisse des plaquettes) : possible sous héparine → on surveille les plaquettes (NFS)."
-        ] },
-        { h: 'Cœur, tension, diurèse', tbl: { head: ['Nom (spécialité)', 'Molécule · classe', 'Sert à', 'Effets indésirables', 'Surveillance'], rows: [
-          ['Cardensiel®, Détensiel®', 'bisoprolol · bêtabloquant (**-lol**)', 'Ralentit la **FC** et baisse la **TA** : HTA, insuffisance cardiaque, après infarctus', 'Bradycardie, hypotension, fatigue, bronchospasme', '**FC et TA avant la prise** · ne jamais arrêter brutalement · masque une hypoglycémie · antidote : glucagon'],
-          ['Triatec®', 'ramipril · **IEC** (-pril)', 'HTA, insuffisance cardiaque', 'Toux sèche, angio-œdème, hyperkaliémie', 'Kaliémie, créatinine, TA'],
-          ['Amlor®…', 'amlodipine · inhibiteur calcique (-dipine)', 'HTA, angor', 'Œdèmes des chevilles, céphalées', 'TA, œdèmes'],
-          ['Lasilix®', 'furosémide · diurétique de l\'anse', 'Faire uriner : œdèmes, insuffisance cardiaque', 'Hypokaliémie, déshydratation, hypotension', 'Poids, diurèse, ionogramme'],
-          ['Esidrex®', 'hydrochlorothiazide · diurétique thiazidique', 'Faire uriner : HTA', 'Hypokaliémie, hyponatrémie', 'Ionogramme, TA']
-        ] } },
-        { h: 'Anxiolytiques et hypnotiques', tbl: { head: ['Nom (spécialité)', 'Molécule · classe', 'Sert à', 'Effets indésirables', 'Antidote'], rows: [
-          ['Xanax®, Lexomil®, Témesta®', 'alprazolam, bromazépam, lorazépam · benzodiazépines (-azépam, -azolam)', 'Anxiété (anxiolytique)', 'Somnolence, chutes (surtout chez la personne âgée), confusion, dépendance, dépression respiratoire (avec opioïdes ou alcool)', '**Flumazénil (Anexate®)** — décision médicale'],
-          ['Imovane®', 'zopiclone · hypnotique', 'Troubles du sommeil', 'Somnolence le lendemain, chutes', '—']
-        ] } },
-        { h: 'Surveillance infirmière par médicament', tbl: { head: ['Médicament', 'Avant / pendant l\'administration', 'Je surveille', 'J\'alerte si…'], rows: [
-          ['**Paracétamol**', 'Dose déjà reçue sur 24 h, intervalle ≥ 4 à 6 h', 'Douleur (EN), température, doublons de prescription', 'Dose max dépassée, doublon, douleur non calmée'],
-          ['**Acupan® (néfopam)**', 'Perfusion **lente**, patient allongé', 'Nausées, sueurs, TA, FC, rétention urinaire', 'Malaise, tachycardie importante, globe urinaire'],
-          ['**Tramadol**', 'IV **lente**', 'Douleur, vigilance, nausées, transit', 'Somnolence, confusion, vomissements'],
-          ['**Morphine (Skénan®…)**', 'Évaluer la douleur et la vigilance **avant** la dose', '**FR**, sédation, douleur, transit, nausées', '**FR < 12/min** ou somnolence importante → naloxone prête, avis médical'],
-          ['**AINS**', 'Pendant le repas · pas d\'anticoagulant associé', 'Douleur gastrique, selles noires, diurèse, signes d\'infection masqués', 'Douleur épigastrique, méléna, baisse de la diurèse'],
-          ['**AVK**', 'Dernier **INR** connu', '**INR**, saignements, chutes', 'INR hors cible, saignement, choc à la tête'],
-          ['**HNF**', 'Pousse-seringue : vitesse conforme à la prescription', '**TCA**, plaquettes, saignements', 'TCA hors cible, plaquettes qui chutent'],
-          ['**HBPM (Lovenox®)**', 'Injection SC, alterner les sites', 'Plaquettes, créatinine, saignements, hématome au point d\'injection', 'Insuffisance rénale, saignement'],
-          ['**AOD**', 'Heure de prise régulière, fonction rénale connue', 'Saignements, fonction rénale', 'Saignement, chute avec choc à la tête'],
-          ['**Bêtabloquant**', '**FC et TA avant la prise**', 'FC, TA, fatigue, glycémie chez le diabétique', 'FC basse (ex. 46/min), hypotension'],
-          ['**IEC (ramipril)**', 'TA', 'Kaliémie, créatininémie, toux, gonflement du visage', 'Hyperkaliémie, œdème de la face ou de la langue'],
-          ['**Diurétique**', 'Poids, TA', 'Diurèse, poids, ionogramme, hydratation', 'Chute de poids rapide, hypotension, crampes, hypokaliémie'],
-          ['**Benzodiazépine**', 'Vigilance, risque de chute', 'Somnolence, confusion, FR si associée à un opioïde', 'Somnolence excessive, chute']
-        ] } },
-        { h: 'HTA : deux leviers', p: "Pour baisser la tension on agit soit sur le **cœur et les vaisseaux** (fréquence cardiaque : bêtabloquants ; dilatation : IEC, inhibiteurs calciques), soit sur le **volume de liquide** dans le corps (diurétiques)." },
-        { h: 'Points de tes notes à vérifier', ul: [
-          "**Ramipril** (Triatec®) est un **IEC**, pas un diurétique. Les diurétiques sont le furosémide, l'hydrochlorothiazide (Esidrex®), la spironolactone.",
-          "**Élimination des héparines** : tes notes associent le Lovenox® à l'élimination hépatique et la Calciparine® à l'élimination rénale. En général c'est l'inverse : **HBPM (Lovenox®) = élimination rénale** (prudence en insuffisance rénale), **HNF = pas d'accumulation rénale**. À confirmer avec ton cours.",
-          "**« BBPCB »** dans tes notes : le sigle habituel est **PPSB** (concentré de complexes prothrombiniques). À confirmer.",
-          "**Acupan®** : on retient plutôt une **rétention urinaire** (et non de sel) ; on le classe palier II (« 1,5 » dans tes notes).",
-          "**TP / TCA « 1 2 ou 3 »** : les AVK se surveillent à l'**INR** (cible souvent 2 à 3), l'héparine non fractionnée au **TCA** (rapport à un témoin). Les valeurs cibles dépendent de l'indication : toujours celles de la prescription."
-        ] }
-      ],
-      src: "Tes notes de pharmacologie (antalgiques, anticoagulants, bêtabloquants, diurétiques, psychotropes), complétées par des repères de culture générale à vérifier dans ton cours." },
 
-    { id: 'ant', ico: '🧯', name: 'Antidotes et surveillance', short: 'antidotes · surveillance · risques',
-      blurb: "Quel antidote, quelle surveillance, quelle alerte selon le traitement.",
-      lesson: [
-        { h: 'Les antidotes à connaître', tbl: { head: ['Traitement', 'Risque en cas de surdosage', 'Antidote'], rows: [
-          ['**Paracétamol**', 'Atteinte du **foie** (marge thérapeutique étroite)', '**N-acétylcystéine (NAC)**'],
-          ['**Opioïdes** (morphine, tramadol)', 'Somnolence, **dépression respiratoire** (FR ↓)', '**Naloxone (Narcan®)**'],
-          ['**Benzodiazépines**', 'Somnolence, dépression respiratoire', '**Flumazénil (Anexate®)**'],
-          ['**Héparine non fractionnée**', 'Hémorragie', '**Protamine**'],
-          ['**AVK** (warfarine)', 'Hémorragie, INR trop haut', '**Vitamine K** (± PPSB)'],
-          ['**AOD** (apixaban, rivaroxaban, dabigatran)', 'Hémorragie', 'PPSB ou antidote spécifique (idarucizumab pour dabigatran) — décision médicale'],
-          ['**Bêtabloquants**', 'Bradycardie, hypotension', '**Glucagon**'],
-          ['**AINS**', 'Saignement digestif, insuffisance rénale', 'Pas d\'antidote spécifique : arrêt et avis médical']
+        { h: '1 · Antalgiques : les paliers de l\'OMS', tbl: { head: ['Palier', 'Exemple', 'Pour quelle douleur', 'Astuce'], rows: [
+          ['**I**', 'Paracétamol, AINS', 'Légère à modérée', '**1 = Para** (le plus léger)'],
+          ['**II**', 'Tramadol, codéine ; néfopam (Acupan®, non opioïde)', 'Modérée à forte', '**2 = Tram**'],
+          ['**III**', 'Morphine (Skénan®, Actiskénan®)', 'Intense', '**3 = Morph** (le plus fort)']
         ] } },
-        { h: 'Surveillance selon le traitement', tbl: { head: ['Traitement', 'Ce qu\'on surveille', 'Quand on alerte'], rows: [
-          ['**AVK**', '**INR** (cible souvent 2 à 3)', 'INR hors cible, saignement, chute avec choc à la tête'],
-          ['**Héparine non fractionnée**', '**TCA**, plaquettes', 'TCA hors cible, saignement, plaquettes qui baissent'],
-          ['**HBPM** (Lovenox®)', 'Plaquettes, créatinine', 'Insuffisance rénale, saignement'],
-          ['**Opioïdes**', '**FR**, sédation, douleur (EN)', 'FR < 12/min ou somnolence importante'],
-          ['**Bêtabloquants**', '**FC et TA avant la prise**', 'FC basse (ex. 46/min) : on diffère et on alerte'],
-          ['**Paracétamol**', 'Dose totale sur 24 h, intervalle', 'Doublon de paracétamol, dose dépassée'],
-          ['**Benzodiazépines**', 'Vigilance, risque de chute', 'Somnolence, confusion']
+        { p: "Je monte ou je descends de palier selon l'**évaluation de la douleur** (EN, EVA) que j'ai faite et transmise. Astuce : « **P-T-M** » = **P**ara, **T**ram, **M**orph." },
+
+        { cards: [
+          { n: 'Doliprane® · Dafalgan® · Efferalgan® · Perfalgan® (IV)', m: 'paracétamol — palier I, antipyrétique',
+            s: 'Douleur légère à modérée, fièvre.',
+            e: '**Foie** en cas de surdosage (hépatotoxicité). Marge thérapeutique étroite.',
+            v: 'Dose reçue sur 24 h, intervalle, douleur (EN), température. Je cherche un doublon de paracétamol.',
+            a: '**N-acétylcystéine (NAC)**, le plus tôt possible (idéalement avant la 10e heure).',
+            w: 'Partout : tous les services, urgences, post-op, domicile, EHPAD.',
+            r: 'RCP (ANSM) : 1 g par prise, au moins 4 h entre deux prises, en général pas plus de **3 g par 24 h** (jusqu\'à 4 g si douleur plus forte, sur prescription). Contre-indiqué si insuffisance hépatocellulaire. Insuffisance rénale sévère : 8 h entre deux prises.',
+            t: '**Para = foie, NAC le sauve.** « 1 g, 4 h, 3 g » : 1 gramme, toutes les 4 heures, 3 grammes maximum.' },
+          { n: 'Acupan®', m: 'néfopam — antalgique non opioïde, classé palier II',
+            s: 'Douleur aiguë, surtout post-opératoire.',
+            e: 'Très fréquents : somnolence, nausées, sueurs. Fréquents : vertiges, tachycardie, bouche sèche, **rétention urinaire**.',
+            v: 'Nausées, sueurs, FC et TA, globe urinaire, somnolence.',
+            a: 'Pas d\'antidote spécifique : traitement des symptômes, surveillance cardiaque et respiratoire.',
+            w: 'Chirurgie, salle de réveil, urgences (douleur aiguë).',
+            r: 'RCP (ANSM) : IV en **perfusion lente (plus de 15 min), patient allongé** ; 20 mg répétables toutes les 4 h, maximum 120 mg par 24 h. **Contre-indiqué** : convulsions, rétention urinaire d\'origine prostatique, glaucome à angle fermé, enfant de moins de 15 ans. Déconseillé chez la personne âgée. Liste I.',
+            t: '**Acupan = lent, allongé.** Les 3 « S » : **S**ommeil, **S**ueurs, **S**ickness (nausées).' },
+          { n: 'Contramal® · Topalgic®', m: 'tramadol — opioïde faible, palier II',
+            s: 'Douleur modérée à forte.',
+            e: 'Nausées, vertiges, **somnolence**, constipation, confusion, dépendance.',
+            v: 'Vigilance, nausées, transit, douleur (EN). Perfusion IV lente.',
+            a: 'Naloxone (efficacité partielle).',
+            w: 'Médecine, chirurgie / orthopédie, rhumatologie, urgences, domicile.',
+            r: 'Ordonnance **sécurisée** depuis le 1er mars 2025 (tramadol, codéine). Durée maximale de 12 semaines pour la codéine.',
+            t: '**Tram = palier 2.** Il endort et il constipe.' },
+          { n: 'Skénan® (LP) · Actiskénan® (LI)', m: 'morphine — opioïde fort, palier III, **stupéfiant**',
+            s: 'Douleur intense (cancer, post-op, palliatif).',
+            e: '**Dépression respiratoire (FR ↓)**, somnolence, nausées, constipation, dépendance.',
+            v: '**Sédation, respiration, douleur (S-R-D).** Surveillance renforcée les 24 premières heures et à chaque changement de dose.',
+            a: '**Naloxone (Narcan®)**, par titration. Surveiller longtemps : la morphine dure plus que la naloxone (risque de re-endormissement).',
+            w: 'Soins palliatifs, oncologie, post-op / salle de réveil, urgences, réanimation, EHPAD.',
+            r: 'Règle des 5B, double contrôle conseillé. Stupéfiant : chaque dose inscrite sur l\'**état récapitulatif d\'administration** (patient, prescripteur, date et heure, signature). Alerte : somnolence inhabituelle + respiration lente. **Urgence : FR < 8/min avec baisse de la vigilance** (ARS). Un myosis isolé n\'est pas un signe de surdosage. LP : ne pas écraser.',
+            t: '**Morphine → je regarde S-R-D :** **S**édation, **R**espiration, **D**ouleur. Naloxone = « **NA** » comme **N**on **A**ux opioïdes.' }
+        ] },
+
+        { h: '2 · Antiémétiques', cards: [
+          { n: 'Zophren®', m: 'ondansétron — antiémétique',
+            s: 'Nausées, vomissements (chimiothérapie, post-op).',
+            e: 'Céphalées, constipation.',
+            v: 'Efficacité sur les vomissements, transit.',
+            a: '—',
+            w: 'Oncologie (chimio), chirurgie / salle de réveil, urgences.',
+            t: '**Zophren = Z**é**ro** vomissement.' },
+          { n: 'Primpéran®', m: 'métoclopramide — antiémétique',
+            s: 'Nausées, vomissements.',
+            e: 'Somnolence, mouvements anormaux (syndrome extrapyramidal).',
+            v: 'Somnolence, mouvements involontaires, durée courte.',
+            a: '—',
+            w: 'Urgences, médecine, gastro-entérologie.',
+            t: '**Primpéran : traitement court.**' }
+        ] },
+
+        { h: '3 · Anti-inflammatoire et antifibrinolytique', cards: [
+          { n: 'Advil® · Nurofen® · Profénid®…', m: 'ibuprofène, kétoprofène — **AINS** (anti-inflammatoire non stéroïdien)',
+            s: 'Inflammation, douleur (rhumatologie, traumatologie, douleur dentaire sans infection), fièvre.',
+            e: '**Estomac** (ulcère, saignement), **reins**, rétention d\'eau et de sel, allergie.',
+            v: 'Douleur d\'estomac, selles noires, diurèse, signes d\'infection.',
+            a: 'Pas d\'antidote spécifique : arrêt et avis médical.',
+            w: 'Rhumatologie, orthopédie / traumatologie, urgences, médecine générale, domicile.',
+            r: 'ANSM : **éviter** en cas de syndrome grippal, varicelle, infection ORL (angine), infection dentaire ou cutanée ; **paracétamol en 1re intention** pour fièvre et douleur d\'une infection. Les AINS peuvent masquer et aggraver une infection. Pas avec un anticoagulant. À prendre pendant un repas.',
+            t: '**AINS = estomac + reins, et jamais en cas d\'infection.**' },
+          { n: 'Exacyl®', m: 'acide tranexamique — antifibrinolytique',
+            s: 'Limiter ou arrêter un saignement.',
+            e: 'Nausées, risque de thrombose.',
+            v: 'Saignement, signes de phlébite.',
+            a: '—',
+            w: 'Urgences, bloc, chirurgie, gynéco-obstétrique.',
+            t: '**Exacyl freine le saignement** : effet **inverse** d\'un anticoagulant.' }
+        ] },
+
+        { h: '4 · Anticoagulants', cards: [
+          { n: 'Coumadine®', m: 'warfarine — **AVK** (anti-vitamine K)',
+            s: 'Prévenir les caillots (fibrillation atriale, valve mécanique, phlébite).',
+            e: '**Hémorragie.**',
+            v: '**INR** (cible souvent 2 à 3), saignements, chutes. Aliments riches en vitamine K à rester réguliers.',
+            a: '**Vitamine K** (± PPSB si hémorragie grave).',
+            w: 'Cardiologie, médecine générale, gériatrie, EHPAD, domicile.',
+            r: 'HAS (2008, à vérifier avec les recommandations actuelles) : cible INR 2,5 (2 à 3) ou 3 (2,5 à 3,5). Cible 2,5 et INR 6 à 10 : arrêt + vitamine K orale 1 à 2 mg ; INR ≥ 10 : vitamine K orale 5 mg. **Traumatisme crânien : hospitalisation 24 h + scanner.** Contrôle de l\'INR le lendemain d\'un surdosage.',
+            t: '**AVK → INR.** **Antidote = vitamine K : le nom l\'annonce** (anti-vitamine K).' },
+          { n: 'Eliquis® · Xarelto® · Pradaxa®', m: 'apixaban, rivaroxaban (anti-Xa), dabigatran (anti-thrombine) — **AOD**',
+            s: 'Fibrillation atriale, phlébite, embolie pulmonaire.',
+            e: '**Hémorragie.**',
+            v: 'Saignements, fonction rénale, horaire de prise régulier. Pas d\'INR.',
+            a: 'Dabigatran : idarucizumab. Apixaban et rivaroxaban : andexanet alfa (selon disponibilité) ou PPSB. Décision médicale.',
+            w: 'Cardiologie, neurologie, médecine vasculaire, gériatrie, domicile.',
+            t: '**-xaban = anti-Xa** (Eliquis, Xarelto) ; **-gatran = anti-thrombine.** Un AOD agit sur **un seul facteur**.' },
+          { n: 'Calciparine® · héparine IV', m: 'héparine non fractionnée — **HNF**',
+            s: 'Anticoagulation immédiate (SCA, embolie, dialyse, bloc).',
+            e: '**Hémorragie**, **thrombopénie** (plaquettes qui chutent).',
+            v: '**TCA**, plaquettes, saignements, vitesse du pousse-seringue.',
+            a: '**Protamine**.',
+            w: 'Réanimation, USIC / cardiologie, urgences, dialyse, bloc opératoire.',
+            t: '**H → TCA :** « **H**éparine, **T**CA ». **Protamine = PROTège de l\'héparine.**' },
+          { n: 'Lovenox®', m: 'énoxaparine — **HBPM** (héparine de bas poids moléculaire)',
+            s: 'Prévenir les phlébites après chirurgie ou alitement ; traiter une phlébite.',
+            e: '**Hémorragie**, hématome au point d\'injection, **thrombopénie induite (TIH)**.',
+            v: 'Plaquettes, **créatinine** (élimination surtout par les reins), saignements.',
+            a: 'Protamine, **efficacité partielle** seulement.',
+            w: 'Chirurgie / orthopédie (post-op), médecine, oncologie, gériatrie, SSR, domicile (infirmière libérale).',
+            r: 'RCP (ANSM) : sous-cutané **uniquement** (jamais en IM), à l\'abdomen, en alternant droite et gauche, seringue prête à l\'emploi : **ne pas purger**. Clairance de la créatinine < 30 mL/min : contre-indiqué aux doses curatives. Numération des plaquettes avant ou dans les 24 h, puis 2 fois par semaine le premier mois (contexte chirurgical). Suspecter une TIH entre J5 et J21 si plaquettes < 150 000 ou chute de 30 à 50 %. Au moins 12 h avant une rachianesthésie.',
+            t: '**Lovenox = reins à surveiller.** Je pique le ventre, côté droit puis côté gauche.' }
+        ] },
+        { h: 'Sous anticoagulant : les signes à chercher', ul: [
+          "**Saignement visible** : nez, gencives, hématomes, urines rouges, selles noires, point d'injection.",
+          "**Saignement caché** : fatigue, pâleur, tachycardie, TA qui baisse, douleur abdominale.",
+          "**Choc à la tête** : même **sans symptôme**, je préviens le médecin (saignement possible dans la tête, parfois retardé).",
+          "**Plaquettes qui baissent** sous héparine : je surveille la NFS."
+        ] },
+
+        { h: '5 · Cœur, tension, diurèse', cards: [
+          { n: 'Cardensiel® · Détensiel®', m: 'bisoprolol — **bêtabloquant** (-lol)',
+            s: 'HTA, insuffisance cardiaque, après un infarctus : ralentit la FC et baisse la TA.',
+            e: 'Bradycardie, hypotension, fatigue, bronchospasme (asthme).',
+            v: '**FC et TA avant la prise**, glycémie chez le diabétique (masque l\'hypoglycémie).',
+            a: '**Glucagon.**',
+            w: 'Cardiologie, médecine, gériatrie, domicile.',
+            r: 'Ne jamais arrêter brutalement. Le seuil de FC en dessous duquel on diffère la prise est fixé par la prescription ou le protocole du service.',
+            t: '**-LOL :** « lol, mon cœur ralentit ». Cœur freiné → glucagon le **relance**.' },
+          { n: 'Triatec®', m: 'ramipril — **IEC** (-pril)',
+            s: 'HTA, insuffisance cardiaque.',
+            e: '**Toux sèche**, hyperkaliémie, gonflement du visage (angio-œdème).',
+            v: 'Kaliémie, créatinine, TA.',
+            a: '—',
+            w: 'Cardiologie, néphrologie, médecine, gériatrie.',
+            t: '**-PRIL → toux sèche.** Ce n\'est pas un diurétique.' },
+          { n: 'Amlor®…', m: 'amlodipine — inhibiteur calcique (-dipine)',
+            s: 'HTA, angor.',
+            e: '**Œdèmes des chevilles**, céphalées.',
+            v: 'TA, œdèmes des chevilles.',
+            a: '—',
+            w: 'Médecine générale, cardiologie, gériatrie.',
+            t: '**-DIPINE → chevilles qui gonflent.**' },
+          { n: 'Lasilix® · Esidrex®', m: 'furosémide (diurétique de l\'anse) · hydrochlorothiazide (thiazidique)',
+            s: 'Faire uriner : œdèmes, insuffisance cardiaque, HTA.',
+            e: 'Hypokaliémie, déshydratation, hypotension, crampes.',
+            v: 'Poids, diurèse, TA, ionogramme.',
+            a: '—',
+            w: 'Cardiologie, néphrologie, médecine, gériatrie, EHPAD.',
+            t: '**Diurétique = fait uriner.** Je pèse, je note la diurèse.' }
+        ] },
+        { p: "**HTA : 2 leviers.** Agir sur le **cœur et les vaisseaux** (bêtabloquants, IEC, inhibiteurs calciques) ou sur le **volume de liquide** (diurétiques)." },
+
+        { h: '6 · Anxiolytiques et hypnotiques', cards: [
+          { n: 'Xanax® · Lexomil® · Témesta®', m: 'alprazolam, bromazépam, lorazépam — **benzodiazépines** (-azépam, -azolam)',
+            s: 'Anxiété (anxiolytique).',
+            e: 'Somnolence, **chutes**, confusion, troubles de la mémoire, dépendance. Avec opioïdes ou alcool : respiration ralentie.',
+            v: 'Vigilance, risque de chute, FR si associé à un opioïde.',
+            a: '**Flumazénil (Anexate®)**, décision médicale.',
+            w: 'Psychiatrie, médecine, gériatrie, EHPAD, urgences, soins palliatifs, avant un geste (bloc).',
+            r: 'Durée courte recommandée (ANSM) : **anxiolytique 12 semaines maximum, hypnotique 4 semaines maximum**, arrêt progressif compris. Risques : dépendance, chutes, troubles cognitifs, accidents de la route.',
+            t: '**Anxio = 12 · Hypno = 4.** « FLU-mazénil » contre les benzo-« mazépam ».' },
+          { n: 'Imovane®', m: 'zopiclone — hypnotique',
+            s: 'Insomnie occasionnelle.',
+            e: 'Somnolence le lendemain, chutes.',
+            v: 'Vigilance au réveil, chutes la nuit.',
+            a: '—',
+            w: 'Gériatrie, médecine, psychiatrie, EHPAD (la nuit).',
+            r: 'Durée courte (4 semaines maximum pour un hypnotique, ANSM).',
+            t: '**Hypnotique = 4 semaines maximum.** Se lever la nuit = risque de chute.' }
+        ] },
+
+        { h: '7 · Surveillance infirmière par médicament (récap)', tbl: { head: ['Médicament', 'Avant / pendant', 'Je surveille', 'J\'alerte si…'], rows: [
+          ['**Paracétamol**', 'Dose sur 24 h, intervalle', 'Douleur, température, doublons', 'Dose max dépassée, doublon'],
+          ['**Acupan®**', 'Perfusion lente, allongé', 'Nausées, sueurs, FC, TA, rétention urinaire', 'Malaise, tachycardie, globe urinaire'],
+          ['**Tramadol**', 'IV lente', 'Vigilance, nausées, transit', 'Somnolence, confusion'],
+          ['**Morphine**', 'Douleur et vigilance avant la dose', '**Sédation, respiration, douleur**', 'Somnolence + respiration lente ; FR < 8 = urgence'],
+          ['**AINS**', 'Pendant le repas', 'Estomac, selles, diurèse, infection', 'Douleur épigastrique, selles noires'],
+          ['**AVK**', 'Dernier INR', '**INR**, saignements, chutes', 'INR hors cible, saignement, choc à la tête'],
+          ['**HNF**', 'Pousse-seringue conforme', '**TCA**, plaquettes', 'TCA hors cible, plaquettes qui chutent'],
+          ['**HBPM**', 'SC, sites alternés', 'Plaquettes, créatinine, saignements', 'Insuffisance rénale, saignement'],
+          ['**AOD**', 'Prise à heure fixe', 'Saignements, fonction rénale', 'Saignement, choc à la tête'],
+          ['**Bêtabloquant**', '**FC et TA**', 'FC, TA, glycémie', 'FC basse selon seuil prescrit, hypotension'],
+          ['**IEC**', 'TA', 'Kaliémie, créatinine, toux, visage', 'Hyperkaliémie, gonflement face ou langue'],
+          ['**Diurétique**', 'Poids, TA', 'Diurèse, poids, ionogramme', 'Perte de poids rapide, hypotension, crampes'],
+          ['**Benzodiazépine**', 'Vigilance, chutes', 'Somnolence, confusion', 'Somnolence excessive, chute']
         ] } },
-        { h: 'Pièges de sécurité', ul: [
-          "**Marge thérapeutique étroite** = la dose qui soigne est proche de la dose qui intoxique : on respecte **dose, intervalle et voie**, et on évite les doublons (Doliprane® + Dafalgan®).",
-          "**Opioïdes + benzodiazépines** (ou alcool) : les effets sur la respiration s'additionnent.",
-          "**Bêtabloquant et diabète** : le médicament peut masquer les signes d'hypoglycémie (tremblements, palpitations).",
-          "**Traumatisme crânien sous anticoagulant** : on prévient le médecin même sans symptôme.",
-          "**IV lente** pour l'Acupan® et le tramadol : plus de nausées et de malaise quand c'est rapide, surtout à la première dose."
-        ] }
+
+        { h: 'Points de tes notes à vérifier', ul: [
+          "**Ramipril** (Triatec®) est un **IEC**, pas un diurétique.",
+          "**Lovenox®** : d'après le RCP, il est **métabolisé par le foie mais éliminé surtout par les reins** (environ 40 % de la dose). Il faut donc surveiller la créatinine : c'est la même idée que « faire attention à l'insuffisance » de tes notes. **La Calciparine® (HNF)** n'est pas celle qu'on surveille pour les reins : c'est l'HBPM. À confirmer avec ton cours.",
+          "**« BBPCB »** : le sigle habituel est **PPSB** (concentré de complexes prothrombiniques).",
+          "**Acupan®** : l'effet à retenir est la **rétention urinaire** (et non « de sel »). Il est classé palier II (« niveau 2 » dans tes notes) mais n'est pas un opioïde.",
+          "**TP / TCA « 1, 2 ou 3 »** : AVK → **INR** (cible souvent 2 à 3) ; héparine non fractionnée → **TCA**. Les valeurs exactes dépendent de la prescription.",
+          "**Douleur dentaire** : les AINS sont possibles si la dent n'est **pas infectée** ; en cas d'infection, l'ANSM recommande d'éviter les AINS."
+        ] },
+        { p: "**Sources :** RCP ANSM (Acupan®, paracétamol, Lovenox®), ANSM / Vidal (AINS et infections, benzodiazépines, tramadol et codéine), HAS (AVK, 2008), ARS Auvergne-Rhône-Alpes (morphine), arrêté du 12 mars 2013 (stupéfiants). Les repères sur les bêtabloquants, IEC, diurétiques et les astuces mémo sont de la culture générale ou des idées perso : à vérifier dans ton cours." }
       ],
-      src: "Tes notes de pharmacologie (antidotes, anticoagulants, bêtabloquants, opioïdes) + repères de culture générale à vérifier. Les antidotes sont toujours prescrits et décidés par le médecin." }
+      src: "Tes notes de pharmacologie + RCP (ANSM), HAS, ANSM / Vidal, ARS (voir la fin de la fiche). Les astuces mémo sont des idées perso, pas officielles." },
+
+    { id: 'ant', ico: '🧯', name: 'Antidotes et surveillance', short: 'antidotes · surveillance · règles',
+      blurb: "Quel antidote, quelle surveillance, quelle règle selon le traitement. Et où on les croise.",
+      lesson: [
+        { h: '🧯 Les antidotes à connaître', tbl: { head: ['Traitement', 'Risque', 'Antidote', 'Astuce', 'Où je le croise'], rows: [
+          ['**Paracétamol**', 'Foie', '**N-acétylcystéine (NAC)**', 'NAC protège le foie', 'Urgences, réanimation'],
+          ['**Opioïdes** (morphine, tramadol)', 'Respiration ↓, somnolence', '**Naloxone (Narcan®)**', '**NA** = Non Aux opioïdes', 'Urgences, salle de réveil, réanimation, soins palliatifs'],
+          ['**Benzodiazépines**', 'Somnolence, respiration ↓', '**Flumazénil (Anexate®)**', '**FLU-mazénil** contre les benzo-**mazépam**', 'Urgences, réanimation'],
+          ['**Héparine non fractionnée**', 'Hémorragie', '**Protamine**', '**PROT**amine **prot**ège de l\'héparine', 'Bloc, cardiologie, réanimation'],
+          ['**HBPM** (Lovenox®)', 'Hémorragie', 'Protamine (partielle)', 'Même antidote, moins efficace', 'Chirurgie, médecine'],
+          ['**AVK**', 'Hémorragie, INR élevé', '**Vitamine K** (± PPSB)', 'AVK = anti-vitamine K → vitamine K', 'Urgences, cardiologie, médecine'],
+          ['**AOD**', 'Hémorragie', 'Dabigatran : idarucizumab · anti-Xa : andexanet alfa ou PPSB', 'Décision médicale', 'Urgences, cardiologie'],
+          ['**Bêtabloquants**', 'FC et TA ↓', '**Glucagon**', 'Cœur freiné → glucagon le relance', 'Urgences, cardiologie'],
+          ['**AINS**', 'Estomac, reins', 'Aucun spécifique', 'Arrêt + avis médical', 'Rhumatologie, urgences'],
+          ['**Acupan®**', 'Tachycardie, convulsions', 'Aucun spécifique', 'Traitement des symptômes', 'Chirurgie, salle de réveil']
+        ] } },
+        { p: "Un antidote est **toujours prescrit ou décidé par le médecin** (ou un protocole du service). Mon rôle : **reconnaître les signes, arrêter si prescrit, alerter vite, surveiller** (par exemple après la naloxone : le patient peut se rendormir)." },
+
+        { h: '👁 Surveillance selon le traitement', tbl: { head: ['Traitement', 'Ce que je surveille', 'J\'alerte si…', 'Où je le croise'], rows: [
+          ['**AVK**', '**INR** (cible souvent 2 à 3)', 'INR hors cible, saignement, choc à la tête', 'Cardiologie, médecine générale, gériatrie'],
+          ['**Héparine non fractionnée**', '**TCA**, plaquettes', 'TCA hors cible, saignement, plaquettes qui baissent', 'Réanimation, USIC, dialyse'],
+          ['**HBPM** (Lovenox®)', 'Plaquettes, créatinine', 'Insuffisance rénale, saignement', 'Chirurgie, médecine, domicile'],
+          ['**AOD**', 'Saignements, fonction rénale', 'Saignement, choc à la tête', 'Cardiologie, gériatrie, domicile'],
+          ['**Opioïdes**', '**Sédation, respiration, douleur**', 'Somnolence + respiration lente ; FR < 8/min avec baisse de vigilance = urgence', 'Palliatif, oncologie, post-op'],
+          ['**Bêtabloquants**', '**FC et TA avant la prise**', 'FC basse (seuil de la prescription)', 'Cardiologie, médecine'],
+          ['**IEC**', 'Kaliémie, créatinine, TA', 'Hyperkaliémie, gonflement du visage', 'Cardiologie, néphrologie'],
+          ['**Diurétiques**', 'Poids, diurèse, ionogramme', 'Chute de poids rapide, hypotension, crampes', 'Cardiologie, gériatrie, EHPAD'],
+          ['**Paracétamol**', 'Dose sur 24 h, intervalle', 'Doublon, dose dépassée', 'Tous les services'],
+          ['**Benzodiazépines**', 'Vigilance, risque de chute', 'Somnolence, confusion', 'Psychiatrie, gériatrie, EHPAD']
+        ] } },
+
+        { h: '📜 Règles et législation à connaître', ul: [
+          "**Stupéfiants (morphine…)** : conservés fermés à clé ; **chaque administration est inscrite** sur l'état récapitulatif d'administration (patient, prescripteur, date et heure, signature de la personne qui administre). Les états sont conservés 3 ans par la pharmacie (arrêté du 12 mars 2013). Les modalités du service s'appliquent.",
+          "**Tramadol et codéine** : ordonnance **sécurisée** depuis le 1er mars 2025 ; durée maximale 12 semaines pour la codéine (ANSM).",
+          "**Benzodiazépines** : anxiolytique **12 semaines maximum**, hypnotique **4 semaines maximum**, arrêt progressif compris (ANSM).",
+          "**AINS (ibuprofène, kétoprofène)** : à éviter en cas de grippe, varicelle, infection ORL, dentaire ou cutanée ; **paracétamol d'abord** (ANSM).",
+          "**AVK (HAS, 2008)** : cible INR 2,5 (2 à 3) ou 3 ; INR de 6 à 10 avec cible 2,5 → arrêt + vitamine K 1 à 2 mg par la bouche ; ≥ 10 → vitamine K 5 mg ; hémorragie grave → PPSB à l'hôpital ; **traumatisme crânien → hospitalisation 24 h + scanner**. Recommandation ancienne : vérifier la version actuelle.",
+          "**Morphine (ARS)** : 5B (bon patient, bon médicament, bonne dose, bonne voie, bon moment), traçabilité en temps réel, surveillance **renforcée les 24 premières heures**, naloxone toujours disponible.",
+          "**Lovenox® (RCP)** : SC uniquement, jamais en IM ; ne pas purger la seringue prête à l'emploi ; alterner les côtés ; plaquettes surveillées ; au moins 12 h avant une rachianesthésie."
+        ] },
+
+        { h: '⚠ Pièges de sécurité', ul: [
+          "**Marge thérapeutique étroite** : la dose qui soigne est proche de la dose toxique (paracétamol). Je respecte dose, intervalle, voie.",
+          "**Opioïde + benzodiazépine ou alcool** : les effets sur la respiration s'additionnent.",
+          "**Bêtabloquant et diabète** : le médicament peut masquer une hypoglycémie.",
+          "**Choc à la tête sous anticoagulant** : j'appelle le médecin même sans signe.",
+          "**Naloxone** : elle dure moins longtemps que la morphine. Le patient peut se rendormir : je continue de surveiller.",
+          "**Un myosis isolé** (pupilles serrées) **n'est pas à lui seul un signe de surdosage** en morphine."
+        ] },
+        { p: "**Sources :** RCP ANSM, HAS (AVK 2008), ANSM / Vidal, ARS Auvergne-Rhône-Alpes (morphine), arrêté du 12 mars 2013. Astuces mémo : idées perso." }
+      ],
+      src: "Tes notes + RCP (ANSM), HAS, ANSM / Vidal, ARS. Les antidotes sont toujours prescrits et décidés par le médecin ; ton service a son protocole." }
   );
 
   // ══ Répertoire DCI ↔ spécialités : lignes ajoutées ═════════════════════════
@@ -172,7 +334,7 @@
       why: "Skénan® = morphine LP, opioïde fort de palier III, stupéfiant. Le comprimé ou la gélule LP ne s'écrase pas." },
     { id: 'fic09', th: 'fic', t: 'qcm', src: N, q: 'Quel effet indésirable des opioïdes surveille-t-on avec la fréquence respiratoire ?',
       opts: ['La dépression respiratoire (avec somnolence)', 'L\'hypertension', 'Les œdèmes des chevilles', 'La toux sèche'], a: 0,
-      why: "Les opioïdes ralentissent la respiration et endorment : on surveille la FR (alerte si < 12/min) et la vigilance. Antidote : naloxone." },
+      why: "Les opioïdes ralentissent la respiration et endorment : on surveille sédation, respiration et douleur. Alerte : somnolence inhabituelle + respiration lente ; urgence si FR < 8/min avec baisse de la vigilance. Antidote : naloxone." },
     { id: 'fic10', th: 'fic', t: 'qcm', src: N, q: 'Zophren® et Primpéran® sont…',
       opts: ['des antiémétiques (contre nausées et vomissements)', 'des anticoagulants', 'des antalgiques palier III', 'des diurétiques'], a: 0,
       why: "Zophren® = ondansétron, Primpéran® = métoclopramide : deux antiémétiques, souvent associés aux opioïdes." },
@@ -299,7 +461,7 @@
       why: "Sous anticoagulant, un saignement intracrânien peut être retardé et silencieux : avis médical et scanner." },
     { id: 'ant12', th: 'ant', t: 'qcm', src: N, q: 'Patient sous morphine : somnolent, FR 8/min. Quelle est la conduite ?',
       opts: ['Stimuler, alerter le médecin sans attendre (naloxone sur prescription), surveiller', 'Donner la dose suivante', 'Le laisser dormir', 'Lui donner un anxiolytique'], a: 0,
-      why: "FR < 12/min et somnolence = dépression respiratoire : urgence, alerte immédiate, naloxone sur prescription, oxygène selon protocole." },
+      why: "Respiration très lente (FR < 8/min) + baisse de vigilance = urgence : j'arrête l'administration, j'alerte sans attendre, je stimule, naloxone sur prescription, oxygène selon protocole, surveillance prolongée." },
     { id: 'ant13', th: 'ant', t: 'qcm', src: N, q: 'Un patient a pris une dose très excessive de paracétamol. Quel antidote est prévu ?',
       opts: ['La N-acétylcystéine', 'La naloxone', 'Le flumazénil', 'La vitamine K'], a: 0,
       why: "Intoxication au paracétamol : NAC, le plus tôt possible, sur prescription (avec dosage sanguin du paracétamol)." },
@@ -377,6 +539,61 @@
       ok: ['fr', 'frequence respiratoire', 'respiration'], show: 'la fréquence respiratoire (FR)', why: "Dépression respiratoire : FR < 12/min = alerte." },
     { id: 'ant41', th: 'ant', t: 'asc', src: N, q: 'Associe chaque médicament à sa surveillance',
       pairs: [['IEC', 'kaliémie, créatininémie'], ['diurétique', 'poids, diurèse, ionogramme'], ['HBPM', 'plaquettes, créatinine'], ['AINS', 'douleur gastrique, selles noires']],
-      why: "IEC : kaliémie et créatininémie · diurétique : poids, diurèse, ionogramme · HBPM : plaquettes et créatinine · AINS : signes digestifs." }
+      why: "IEC : kaliémie et créatininémie · diurétique : poids, diurèse, ionogramme · HBPM : plaquettes et créatinine · AINS : signes digestifs." },
+    // ─── Ajouts : où on les croise, règles, recommandations ───
+    { id: 'fic44', th: 'fic', t: 'asc', src: N, chk: true, q: 'Associe chaque médicament au service où on le croise le plus',
+      pairs: [['morphine', 'soins palliatifs, post-op'], ['AVK (Coumadine®)', 'cardiologie, médecine générale'], ['Lovenox®', 'chirurgie (prévention post-op)'], ['Zophren®', 'oncologie (chimiothérapie)']],
+      why: "Morphine : palliatif, oncologie, post-op · AVK : cardiologie, médecine générale, gériatrie · Lovenox® : chirurgie, orthopédie · Zophren® : oncologie. Ce sont des repères d'entraînement : tous les services peuvent en rencontrer." },
+    { id: 'fic45', th: 'fic', t: 'asc', src: N, chk: true, q: 'Associe chaque médicament au service où on le croise le plus',
+      pairs: [['héparine au pousse-seringue', 'réanimation, USIC'], ['bêtabloquant, IEC', 'cardiologie'], ['Acupan®', 'chirurgie, salle de réveil'], ['benzodiazépine, zopiclone', 'psychiatrie, gériatrie, EHPAD']],
+      why: "HNF : réanimation, USIC, dialyse · bêtabloquant et IEC : cardiologie · Acupan® : douleur post-opératoire · benzodiazépines et hypnotiques : psychiatrie, gériatrie, EHPAD." },
+    { id: 'fic46', th: 'fic', t: 'qcm', src: 'ANSM', q: 'Selon l\'ANSM, dans quelle situation évite-t-on l\'ibuprofène et le kétoprofène ?',
+      opts: ['Varicelle, grippe, angine ou infection dentaire', 'Entorse sans infection', 'Douleur de règles', 'Courbature après le sport'], a: 0,
+      why: "Les AINS peuvent masquer et aggraver certaines infections : on privilégie le paracétamol en première intention pour la fièvre et la douleur d'une infection." },
+    { id: 'fic47', th: 'fic', t: 'qcm', src: 'ANSM', q: 'Acupan® : quelle est une contre-indication du RCP ?',
+      opts: ['Antécédent de convulsions', 'Fièvre', 'Hypertension', 'Anémie'], a: 0,
+      why: "Contre-indications : convulsions, rétention urinaire d'origine prostatique, glaucome à angle fermé, enfant de moins de 15 ans." },
+    { id: 'fic48', th: 'fic', t: 'qcm', src: 'ANSM', q: 'Comment passe-t-on l\'Acupan® en IV ?',
+      opts: ['En perfusion lente (plus de 15 min), patient allongé', 'En bolus rapide, patient debout', 'En IM profond uniquement', 'Avec un autre injectable dans la même seringue'], a: 0,
+      why: "Perfusion lente et décubitus pour limiter nausées, vertiges et sueurs. Éviter de mélanger avec d'autres injectables dans la même seringue." },
+    { id: 'fic49', th: 'fic', t: 'qcm', src: 'ANSM', q: 'Paracétamol : quel intervalle minimum entre deux prises de 1 g chez l\'adulte ?',
+      opts: ['4 heures', '1 heure', '2 heures', '30 minutes'], a: 0,
+      why: "RCP : au moins 4 heures entre deux prises, en général pas plus de 3 g par 24 h (jusqu'à 4 g sur prescription si douleur plus forte)." },
+    { id: 'fic50', th: 'fic', t: 'qcm', src: 'ANSM', q: 'Depuis le 1er mars 2025, tramadol et codéine se prescrivent sur…',
+      opts: ['une ordonnance sécurisée', 'une ordonnance simple', 'une ordonnance orale', 'aucune ordonnance'], a: 0,
+      why: "Ordonnance sécurisée pour le tramadol, la codéine et la dihydrocodéine (ANSM). Durée maximale de 12 semaines pour la codéine." },
+    { id: 'fic51', th: 'fic', t: 'qcm', src: N, q: 'Bisoprolol : l\'astuce « -lol » veut dire…',
+      opts: ['bêtabloquant : cœur plus lent et tension plus basse', 'diurétique : il fait uriner', 'anticoagulant : il fluidifie', 'antalgique palier II'], a: 0,
+      why: "Les médicaments en -lol sont des bêtabloquants. Antidote : glucagon." },
+    { id: 'fic52', th: 'fic', t: 'qcm', src: 'ANSM', q: 'Lovenox® (énoxaparine) est éliminé surtout par…',
+      opts: ['les reins', 'les poumons', 'la peau', 'la bile exclusivement'], a: 0,
+      why: "RCP : élimination surtout rénale (environ 40 % de la dose). Insuffisance rénale : risque de surdosage, d'où la surveillance de la créatinine." },
+    { id: 'ant42', th: 'ant', t: 'qcm', src: 'ANSM', q: 'Durée maximale recommandée d\'un hypnotique (benzodiazépine ou apparenté) ?',
+      opts: ['4 semaines', '12 semaines', '1 an', '6 mois'], a: 0,
+      why: "ANSM : hypnotique 4 semaines maximum, anxiolytique 12 semaines maximum, arrêt progressif compris." },
+    { id: 'ant43', th: 'ant', t: 'qcm', src: 'ANSM', q: 'Durée maximale recommandée d\'un anxiolytique (benzodiazépine) ?',
+      opts: ['12 semaines', '4 semaines', '2 ans', 'Aucune limite'], a: 0,
+      why: "ANSM : 12 semaines maximum, arrêt progressif compris. Risques d'un traitement prolongé : dépendance, chutes, troubles cognitifs." },
+    { id: 'ant44', th: 'ant', t: 'qcm', src: 'Loi', q: 'Pour un stupéfiant en établissement de santé, que doit-on faire à chaque administration ?',
+      opts: ['L\'inscrire sur l\'état récapitulatif d\'administration (date, heure, signature)', 'Rien : la prescription suffit', 'L\'écrire seulement en fin de service', 'La noter à l\'oral'], a: 0,
+      why: "L'état d'administration des stupéfiants comporte patient, prescripteur, date et heure, identité et signature de la personne qui administre. Il est conservé 3 ans par la pharmacie (arrêté du 12 mars 2013)." },
+    { id: 'ant45', th: 'ant', t: 'qcm', src: 'ARS', q: 'Sous morphine, quelle situation est une urgence ?',
+      opts: ['Respiration très lente (FR < 8/min) avec baisse de la vigilance', 'Une constipation', 'Une nausée isolée', 'Une douleur à 3/10'], a: 0,
+      why: "Urgence : FR < 8/min avec altération de la vigilance. J'arrête l'administration, j'alerte, naloxone sur prescription." },
+    { id: 'ant46', th: 'ant', t: 'qcm', src: 'ARS', q: 'Après la naloxone, pourquoi surveille-t-on longtemps le patient ?',
+      opts: ['La morphine dure plus longtemps : il peut se rendormir', 'La naloxone est toxique pour le foie', 'La naloxone fait monter la tension à coup sûr', 'Ce n\'est pas nécessaire'], a: 0,
+      why: "Risque de remorphinisation : l'effet de la naloxone s'arrête avant celui de la morphine." },
+    { id: 'ant47', th: 'ant', t: 'qcm', src: 'ARS', q: 'Un myosis isolé (pupilles serrées) sous morphine signifie…',
+      opts: ['pas à lui seul un surdosage : j\'évalue sédation et respiration', 'un surdosage certain', 'une allergie', 'une hypoglycémie'], a: 0,
+      why: "Selon l'ARS, un myosis isolé n'est pas un signe de surdosage : on regarde sédation, respiration et douleur." },
+    { id: 'ant48', th: 'ant', t: 'qcm', src: 'HAS', q: 'Traumatisme crânien chez un patient sous AVK : quelle conduite recommande la HAS (2008) ?',
+      opts: ['Hospitalisation d\'au moins 24 h et scanner', 'Retour à domicile sans contrôle', 'Aucune surveillance', 'Un AINS'], a: 0,
+      why: "HAS (2008, à vérifier avec la version actuelle) : hospitalisation systématique d'au moins 24 h et scanner (immédiat si symptômes neurologiques)." },
+    { id: 'ant49', th: 'ant', t: 'qcm', src: 'ANSM', q: 'Lovenox® : quelle est la bonne technique d\'injection ?',
+      opts: ['Sous-cutanée à l\'abdomen, côtés alternés, sans purger la seringue', 'Intramusculaire dans la fesse', 'IV en bolus', 'Sous-cutanée avec purge de la bulle d\'air'], a: 0,
+      why: "RCP : voie sous-cutanée uniquement, jamais en IM ; la seringue préremplie est prête à l'emploi : ne pas la purger ; alterner droite et gauche." },
+    { id: 'ant50', th: 'ant', t: 'asc', src: N, chk: true, q: 'Associe chaque antidote au service où on le rencontre souvent',
+      pairs: [['naloxone', 'urgences, salle de réveil'], ['protamine', 'bloc, cardiologie'], ['NAC', 'urgences, réanimation'], ['vitamine K', 'cardiologie, médecine']],
+      why: "Repères d'entraînement : naloxone (urgences, salle de réveil, palliatif), protamine (bloc, cardiologie), NAC (urgences, réanimation), vitamine K (cardiologie, médecine, urgences)." }
   );
 })();

@@ -255,6 +255,13 @@ App.Pharma = (() => {
   function _tblHtml(t) {
     return `<div class="ph-tblw"><table class="ph-tbl"><thead><tr>${t.head.map(x => `<th>${_esc(x)}</th>`).join('')}</tr></thead><tbody>${t.rows.map(r => `<tr>${r.map((c, i) => `<td${i === 0 ? ' class="ph-td-k"' : ''} data-l="${_esc(t.head[i])}">${_fmt(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
+  const MC_ROWS = [['s', '🎯', 'Sert à'], ['e', '⚠️', 'Effets à retenir'], ['v', '👁', 'Je surveille'], ['a', '🧯', 'Antidote'], ['w', '📍', 'Où je le croise'], ['r', '📜', 'Règle / reco'], ['t', '🧠', 'Astuce']];
+  function _cardsHtml(list) {
+    return `<div class="ph-mcs">${list.map(c => `<div class="ph-mc">
+      <div class="ph-mc-h"><div class="ph-mc-n">${_fmt(c.n)}</div><div class="ph-mc-m">${_fmt(c.m)}</div></div>
+      ${MC_ROWS.filter(r => c[r[0]] && c[r[0]] !== '—').map(r => `<div class="ph-mc-r ph-mc-${r[0]}"><span class="ph-mc-l">${r[1]} ${r[2]}</span><span class="ph-mc-v">${_fmt(c[r[0]])}</span></div>`).join('')}
+    </div>`).join('')}</div>`;
+  }
   function _ficheHtml() {
     const t = _theme(ficheTh); if (!t) return '';
     const blocks = t.lesson.map(b => {
@@ -263,6 +270,7 @@ App.Pharma = (() => {
       if (b.p) s += `<p class="ph-p">${_fmt(b.p)}</p>`;
       if (b.ul) s += `<ul class="ph-ul">${b.ul.map(x => `<li>${_fmt(x)}</li>`).join('')}</ul>`;
       if (b.tbl) s += _tblHtml(b.tbl);
+      if (b.cards) s += _cardsHtml(b.cards);
       return s;
     }).join('');
     return `<div class="ph-top"><button class="btn btn-ghost btn-sm" onclick="App.Pharma.toMenu()">← Pharmaco</button></div>
@@ -368,7 +376,7 @@ App.Pharma = (() => {
         <div class="ph-row" style="margin-top:10px"><button class="btn btn-primary ph-big" id="ph-next" onclick="App.Pharma.next()">${last ? 'Voir mon bilan →' : 'Question suivante →'}</button></div>
       </div>`;
   }
-  const SRC = { TD3: 'ton TD 3 (pharmacologie)', TD6: 'ton TD 6 (analyse d\'une prescription)', SCA: 'ton TD SCA', HTA: 'ton TD HTA', AOMI: 'ton TD AOMI', CM7: 'ton CM7 (HTA)', CM16: 'ton CM16 (insuffisance cardiaque)', 'Général': 'culture générale', Notes: 'tes notes de pharmaco' };
+  const SRC = { TD3: 'ton TD 3 (pharmacologie)', TD6: 'ton TD 6 (analyse d\'une prescription)', SCA: 'ton TD SCA', HTA: 'ton TD HTA', AOMI: 'ton TD AOMI', CM7: 'ton CM7 (HTA)', CM16: 'ton CM16 (insuffisance cardiaque)', 'Général': 'culture générale', Notes: 'tes notes de pharmaco', ANSM: 'RCP / ANSM', HAS: 'recommandation HAS (2008)', ARS: 'ARS (morphine)', Loi: 'réglementation' };
   function _srcLabel(s) { return SRC[s] || s; }
 
   function _bilanHtml() {

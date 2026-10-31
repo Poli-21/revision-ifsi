@@ -2949,3 +2949,18 @@ body.dark .rg-box { --rg-bg:#1e293b; --rg-line:#334155; --rg-soft:#162032; --rg-
 
 /* Logo de l'appli dans l'en-tête */
 .app-logo { width: 30px; height: 30px; vertical-align: middle; border-radius: 8px; margin-right: 4px; object-fit: contain; }
+
+/* Fiches médicaments : cartes mémo */
+.ph-mcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.ph-mc { background: var(--ph-card); border: 1px solid var(--ph-line); border-left: 4px solid var(--primary); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.ph-mc-h { margin-bottom: 6px; }
+.ph-mc-n { font-weight: 800; font-size: .98rem; line-height: 1.3; overflow-wrap: anywhere; }
+.ph-mc-m { font-size: .8rem; color: var(--gray-600); margin-top: 2px; line-height: 1.4; }
+.ph-mc-r { display: block; padding: 5px 0; border-top: 1px dashed var(--ph-line); font-size: .86rem; line-height: 1.5; }
+.ph-mc-l { display: block; font-size: .66rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 1px; }
+.ph-mc-v { display: block; overflow-wrap: anywhere; }
+.ph-mc-a { background: var(--ph-okbg); border-radius: 8px; padding: 5px 8px; margin: 4px 0; border-top: none; }
+.ph-mc-e .ph-mc-l { color: var(--ph-warn); }
+.ph-mc-t { background: var(--ph-soft); border-radius: 8px; padding: 5px 8px; margin-top: 4px; border-top: none; }
+.ph-mc-r:first-of-type { border-top: none; }
+@media (max-width: 480px) { .ph-mcs { grid-template-columns: 1fr; } }
