@@ -122,7 +122,7 @@ App.Render = (() => {
     const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const ago = at => { const m = Math.max(0, Math.round((Date.now() - (at || 0)) / 60000)); return m < 2 ? 'à l\'instant' : m < 60 ? 'il y a ' + m + ' min' : m < 1440 ? 'il y a ' + Math.round(m / 60) + ' h' : 'il y a ' + Math.round(m / 1440) + ' j'; };
     el.innerHTML = list.map((ri, i) => `<div class="resume-row" data-sid="${esc(ri.sid)}"><div class="resume-txt"><b>▶ Série en cours${list.length > 1 ? ' ' + (i + 1) : ''}</b><span>${esc(ri.label)} · ${ri.done} faite${ri.done > 1 ? 's' : ''}, ${ri.left} restante${ri.left > 1 ? 's' : ''}${ri.tryhard ? ' · 🔥 série ' + ri.serie : ''} · ${ago(ri.at)}</span></div>
-      <div class="resume-act"><button type="button" class="btn btn-primary" onclick="App.Session.resume('${esc(ri.sid)}')">Reprendre →</button><button type="button" class="btn btn-ghost btn-sm" onclick="if(confirm('Abandonner cette série ? Les cartes déjà répondues restent enregistrées.')) App.Session.dropResume('${esc(ri.sid)}')">Abandonner</button></div></div>`).join('')
+      <div class="resume-act"><button type="button" class="btn btn-primary" onclick="App.Session.askResume('${esc(ri.sid)}')">Reprendre →</button><button type="button" class="btn btn-ghost btn-sm" onclick="if(confirm('Abandonner cette série ? Les cartes déjà répondues restent enregistrées.')) App.Session.dropResume('${esc(ri.sid)}')">Abandonner</button></div></div>`).join('')
       + (list.length === 1 ? '<div class="resume-hint">Tu peux commencer une autre série : celle-ci reste en pause (2 séries maximum en même temps).</div>' : '');
     el.style.display = 'flex';
   }

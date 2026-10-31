@@ -241,7 +241,7 @@ App.Session = (() => {
   }
   // Compatibilité : la plus récente (ou null)
   function resumeInfo() { const l = resumeList(); return l.length ? l[0] : null; }
-  function resume(sid) {
+  function resume(sid, asMode) {
     const list = _readSlots(); const r = sid ? list.find(x => x.sid === sid) : list.sort((x, y) => (y.at || 0) - (x.at || 0))[0]; if (!r) return;
     const byId = new Map(App.Store.state.cards.map(c => [c.id, c]));
     let idx = 0; const queue = [];
@@ -250,12 +250,41 @@ App.Session = (() => {
     if (!queue.length && !pool.length) { _removeSlot(r.sid); alert('Cette série n\'existe plus (les cartes ont été supprimées).'); App.Render.all(); return; }
     current = { queue, idx, stats: Object.assign({ ok: 0, hard: 0, nope: 0, again: 0 }, r.stats || {}), startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: r.cat || '', sid: r.sid };
     if (r.tryhard) current.tryhard = Object.assign({}, r.tryhard, { pool });
+    // Choix de la façon de reprendre : « tryhard » = 10 par 10, « classic » = série classique
+    if (asMode === 'classic' && current.tryhard) {
+      current.queue = [...current.queue, ...pool];          // toutes les cartes restantes, dans l'ordre
+      delete current.tryhard;
+    } else if (asMode === 'tryhard' && !current.tryhard) {
+      const rest = current.queue.slice(current.idx), SIZE = 10;
+      const first = rest.splice(0, SIZE);
+      current.queue = first; current.idx = 0;
+      current.tryhard = { pool: rest, size: SIZE, batchSize: first.length, serie: 1, validated: 0, fails: 0, seriesDone: 0, validatedTotal: 0 };
+    }
+    if (asMode) _saveResume();
     if (['flip', 'write', 'qcm'].includes(r.mode)) { mode = r.mode; ['flip','write','qcm'].forEach(id => { const b = document.getElementById('mode-' + id); if (b) b.classList.toggle('active', id === mode); }); }
     App.UI.showView('session');
     _initAfkListeners();
     _resetAfkTimer();
     _startTicker();
     show();
+  }
+  // Fenêtre « Reprendre comment ? » : 10 par 10 (tryhard) ou classique
+  function askResume(sid) {
+    const l = resumeList(); const ri = sid ? l.find(x => x.sid === sid) : l[0]; if (!ri) return;
+    const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const nSeries = Math.ceil(ri.left / 10);
+    const cur = ri.tryhard ? 'tryhard' : 'classic';
+    const tag = k => (cur === k ? ' <small>(comme avant)</small>' : '');
+    document.getElementById('th-picker')?.remove();
+    const ov = document.createElement('div'); ov.id = 'th-picker';
+    ov.onclick = e => { if (e.target === ov) ov.remove(); };
+    ov.innerHTML = `<div class="th-panel" role="dialog" aria-label="Reprendre la série">
+      <div class="th-head"><div><div class="th-title">▶ Reprendre : ${esc(ri.label)}</div><div class="th-sub">${ri.left} carte${ri.left > 1 ? 's' : ''} restante${ri.left > 1 ? 's' : ''}. Comment veux-tu continuer ?</div></div>
+        <button class="th-x" onclick="document.getElementById('th-picker')?.remove()" aria-label="Fermer">✕</button></div>
+      <button class="th-row th-main" onclick="document.getElementById('th-picker')?.remove();App.Session.resume('${esc(ri.sid)}','tryhard')"><span>🔥 10 par 10${tag('tryhard')} <small>(la suite ne démarre que quand les 10 sont sues · ${nSeries} série${nSeries > 1 ? 's' : ''})</small></span><b>${ri.left}</b></button>
+      <button class="th-row" onclick="document.getElementById('th-picker')?.remove();App.Session.resume('${esc(ri.sid)}','classic')"><span>📚 Classique${tag('classic')} <small>(toutes les cartes à la suite, sans blocs de 10)</small></span><b>${ri.left}</b></button>
+    </div>`;
+    document.body.appendChild(ov);
   }
   function dropResume(sid) {
     if (sid) _removeSlot(sid); else { const l = resumeList(); if (l.length) _removeSlot(l[0].sid); }
@@ -814,7 +843,7 @@ App.Session = (() => {
     show();
   }
 
-  return { resumeInfo, resumeList, resume, dropResume, start, ectsPlan, _queue: () => (current ? [...current.queue] : []), startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
+  return { resumeInfo, resumeList, resume, askResume, dropResume, start, ectsPlan, _queue: () => (current ? [...current.queue] : []), startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
   // matière de la série en cours (pour "Recommencer") : '' = toutes les cartes à réviser
   getCurrentCat: () => { const k = current && current.cat; return (k && App.Store.state.cards.some(c => c.cat === k)) ? k : ''; } };
 })();
