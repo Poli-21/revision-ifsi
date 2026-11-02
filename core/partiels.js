@@ -206,6 +206,8 @@ App.Partiels = (() => {
       </div>
       ${comps.length ? `<div class="partiel-comp-list">${comps.map(c => `<span class="partiel-comp-chip" title="${_esc(c.name)}">${c.code}${c.nouvelle ? ' 🆕' : ''}</span>`).join('')}</div>` : ''}
 
+      ${App.PartielBlanc ? App.PartielBlanc.blockHTML(_curUE) : ''}
+
       <div class="partiel-block">
         <h3>🧪 Quiz chronométré</h3>
         <p>${n} fiche${n>1?'s':''} taguée${n>1?'s':''} à cette UE.</p>
