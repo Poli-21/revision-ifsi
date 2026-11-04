@@ -90,5 +90,9 @@ App.Activity = (() => {
   register('patho', () => _shown('games-view') && _shown('patho-root')
                        && !!(App.Patho && App.Patho.isTraining && App.Patho.isTraining()));
 
+  // Questions à deux : pendant les questions (pas le menu, le réglage ni le bilan).
+  register('duo', () => _shown('games-view') && _shown('duo-root')
+                      && !!(App.Duo && App.Duo.isTraining && App.Duo.isTraining()));
+
   return { register, markActivity: _mark, _t: { tick: _tick, kinds: () => Object.keys(kinds) } };
 })();

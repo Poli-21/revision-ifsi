@@ -355,7 +355,7 @@ App.Render = (() => {
     const dayAt = off => {            // off = décalage en jours par rapport à aujourd'hui
       const d = new Date(base); d.setUTCDate(d.getUTCDate() + off);
       const key = d.toISOString().slice(0, 10), e = log[key] || {};
-      return { key, secs: (e.seconds || 0) + (key === todayKey ? pending : 0), cards: e.reviewed || 0, eng: e.english || 0, engSecs: e.englishSecs || 0, simSecs: e.simSecs || 0, trainSecs: e.trainSecs || 0, pharmaSecs: e.pharmaSecs || 0, gazoSecs: e.gazoSecs || 0, secoursSecs: e.secoursSecs || 0, tpSecs: e.tpSecs || 0, doseSecs: e.doseSecs || 0, pathoSecs: e.pathoSecs || 0 };
+      return { key, secs: (e.seconds || 0) + (key === todayKey ? pending : 0), cards: e.reviewed || 0, eng: e.english || 0, engSecs: e.englishSecs || 0, simSecs: e.simSecs || 0, trainSecs: e.trainSecs || 0, pharmaSecs: e.pharmaSecs || 0, gazoSecs: e.gazoSecs || 0, secoursSecs: e.secoursSecs || 0, tpSecs: e.tpSecs || 0, doseSecs: e.doseSecs || 0, pathoSecs: e.pathoSecs || 0, duoSecs: e.duoSecs || 0 };
     };
     const week = NAMES.map((name, i) => ({ name, i, ...dayAt(i - dowIdx), future: i > dowIdx, today: i === dowIdx }));
     const totSecs  = week.reduce((a, d) => a + d.secs, 0);
@@ -363,7 +363,7 @@ App.Render = (() => {
     const active   = week.filter(d => d.secs > 0 || d.cards > 0).length;
     const totEng   = week.reduce((a, d) => a + d.eng, 0), totEngSecs = week.reduce((a, d) => a + d.engSecs, 0);
     const totSimSecs = week.reduce((a, d) => a + d.simSecs, 0);
-    const totTrainSecs = week.reduce((a, d) => a + d.trainSecs, 0), totPharmaSecs = week.reduce((a, d) => a + d.pharmaSecs, 0), totGazoSecs = week.reduce((a, d) => a + d.gazoSecs, 0), totSecoursSecs = week.reduce((a, d) => a + d.secoursSecs, 0), totTpSecs = week.reduce((a, d) => a + d.tpSecs, 0), totDoseSecs = week.reduce((a, d) => a + d.doseSecs, 0), totPathoSecs = week.reduce((a, d) => a + d.pathoSecs, 0);
+    const totTrainSecs = week.reduce((a, d) => a + d.trainSecs, 0), totPharmaSecs = week.reduce((a, d) => a + d.pharmaSecs, 0), totGazoSecs = week.reduce((a, d) => a + d.gazoSecs, 0), totSecoursSecs = week.reduce((a, d) => a + d.secoursSecs, 0), totTpSecs = week.reduce((a, d) => a + d.tpSecs, 0), totDoseSecs = week.reduce((a, d) => a + d.doseSecs, 0), totPathoSecs = week.reduce((a, d) => a + d.pathoSecs, 0), totDuoSecs = week.reduce((a, d) => a + d.duoSecs, 0);
     let roll = 0; for (let k = 0; k < 7; k++) roll += dayAt(-k).secs;   // 7 jours glissants
     const maxS = Math.max(...week.map(d => d.secs), 1);
 
@@ -381,7 +381,7 @@ App.Render = (() => {
       <div style="font-size:.85rem;color:#9ca3af;margin:6px 0 14px">${totCards} carte${totCards > 1 ? 's' : ''} révisée${totCards > 1 ? 's' : ''} · ${active} jour${active > 1 ? 's' : ''} actif${active > 1 ? 's' : ''} sur 7 · 7 derniers jours glissants : ${hms(roll)}</div>
       ${totEng || totEngSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">dont anglais : ${totEng} mot${totEng > 1 ? 's' : ''} · ${hms(totEngSecs)}</div>` : ''}
       ${totSimSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">dont simulation clinique : ${hms(totSimSecs)}</div>` : ''}
-      ${totTrainSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">dont entraînements : ${hms(totTrainSecs)}${(totPharmaSecs || totGazoSecs || totSecoursSecs || totTpSecs || totDoseSecs || totPathoSecs) ? ` (${[totPharmaSecs ? 'pharmaco : ' + hms(totPharmaSecs) : '', totGazoSecs ? 'gaz du sang : ' + hms(totGazoSecs) : '', totSecoursSecs ? 'secourisme : ' + hms(totSecoursSecs) : '', totTpSecs ? 'TP : ' + hms(totTpSecs) : '', totDoseSecs ? 'calcul de doses : ' + hms(totDoseSecs) : '', totPathoSecs ? 'pathologies : ' + hms(totPathoSecs) : ''].filter(Boolean).join(' · ')})` : ''}</div>` : ''}
+      ${totTrainSecs ? `<div style="font-size:.85rem;color:#9ca3af;margin:-8px 0 14px">dont entraînements : ${hms(totTrainSecs)}${(totPharmaSecs || totGazoSecs || totSecoursSecs || totTpSecs || totDoseSecs || totPathoSecs || totDuoSecs) ? ` (${[totPharmaSecs ? 'pharmaco : ' + hms(totPharmaSecs) : '', totGazoSecs ? 'gaz du sang : ' + hms(totGazoSecs) : '', totSecoursSecs ? 'secourisme : ' + hms(totSecoursSecs) : '', totTpSecs ? 'TP : ' + hms(totTpSecs) : '', totDoseSecs ? 'calcul de doses : ' + hms(totDoseSecs) : '', totPathoSecs ? 'pathologies : ' + hms(totPathoSecs) : '', totDuoSecs ? 'questions à deux : ' + hms(totDuoSecs) : ''].filter(Boolean).join(' · ')})` : ''}</div>` : ''}
       ${rows}
       <div style="font-size:.7rem;color:#6b7280;margin-top:10px">Le temps d'une série est enregistré à sa fin (la série en cours est incluse ici). Les périodes d'inactivité de plus de 10 min ne sont pas comptées. Le jour change vers 1 h–2 h du matin (heure française).</div>`;
   }

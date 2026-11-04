@@ -268,6 +268,15 @@
           <span class="sim-entry-go">S'entraîner →</span>
         </button>
 
+        <button class="sim-entry-card" id="gm-duo" onclick="App.Duo.open()">
+          <span class="sim-entry-ico">🗣️</span>
+          <span class="sim-entry-txt">
+            <span class="sim-entry-name">Questions à deux <em class="sim-new">Nouveau</em></span>
+            <span class="sim-entry-desc">Tu poses les questions à ton pote, avec la question ET la réponse attendue sous les yeux (points à vérifier, relances). Chacun son tour, un score pour chacun, ou tout seul avec la réponse cachée. B.1, A.2 et E.1, tirés de tes notes. Fonctionne hors ligne.</span>
+          </span>
+          <span class="sim-entry-go">S'entraîner →</span>
+        </button>
+
         <div class="games-mode-grid">
           <button class="game-mode-card selected" id="gm-tf" onclick="App.Games.selectMode('tf')">
             <span class="gm-icon">⚡</span>
@@ -352,6 +361,9 @@
 
       <!-- Pathologies aux urgences (rendu par core/patho.js) -->
       <div id="patho-root" style="display:none"></div>
+
+      <!-- Questions à deux (rendu par core/duo.js) -->
+      <div id="duo-root" style="display:none"></div>
 
     </div>
 
@@ -838,6 +850,8 @@
 <script src="data/pharma.js"></script>
 <script src="data/pharma_fiches.js"></script>
 <script src="core/pharma.js"></script>
+<script src="data/duo_s1.js"></script>
+<script src="core/duo.js"></script>
 <script src="data/english_s1.js"></script>
 <script src="core/english.js"></script>
 <script src="core/regroup.js"></script>

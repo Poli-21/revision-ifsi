@@ -234,12 +234,13 @@ App.Sync = (() => {
           tpSecs: Math.max(mergedLog[date].tpSecs||0, entry.tpSecs||0),
           doseSecs: Math.max(mergedLog[date].doseSecs||0, entry.doseSecs||0),
           pathoSecs: Math.max(mergedLog[date].pathoSecs||0, entry.pathoSecs||0),
+          duoSecs: Math.max(mergedLog[date].duoSecs||0, entry.duoSecs||0),
         };
         // Correction manuelle du temps (fixAt) : la plus récente gagne sur le « max » (sinon l'ancienne valeur reviendrait)
         const rem = remote.studyLog[date] || {}, la = rem.fixAt || 0, lb = entry.fixAt || 0;
         if (la || lb) {
           const win = la >= lb ? rem : entry, m = mergedLog[date];
-          ['seconds','englishSecs','simSecs','trainSecs','gameSecs','orthoSecs','pharmaSecs','gazoSecs','secoursSecs','tpSecs','doseSecs','pathoSecs'].forEach(f => { m[f] = win[f] || 0; });
+          ['seconds','englishSecs','simSecs','trainSecs','gameSecs','orthoSecs','pharmaSecs','gazoSecs','secoursSecs','tpSecs','doseSecs','pathoSecs','duoSecs'].forEach(f => { m[f] = win[f] || 0; });
           m.fixAt = Math.max(la, lb);
         }
       });
