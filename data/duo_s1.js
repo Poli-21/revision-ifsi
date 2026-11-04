@@ -432,5 +432,50 @@ App.DuoBank = (() => {
   // Identifiants stables : id du set + rang (2 chiffres, ou 3 au-delà de 99).
   sets.forEach(s => s.items.forEach((it, i) => { it.id = s.id + '-' + String(i + 1).padStart(2, '0'); it.set = s.id; }));
 
-  return { v: 1, sets, get: id => sets.find(s => s.id === id) };
+  // Sigles : affichés en petit sous la question (ceux de la question) ou dans le bloc réponse (ceux de la réponse).
+  // Détection automatique dans le texte (majuscules respectées, mot entier). Pas de « IV / IM / SC » : trop courants et ambigus.
+  const glossary = {
+    'ATP': `adénosine triphosphate`, 'VES': `volume d’éjection systolique`, 'FC': `fréquence cardiaque`, 'Qc': `débit cardiaque`,
+    'FE': `fraction d’éjection`, 'VTD': `volume télédiastolique`, 'VTS': `volume télésystolique`, 'PA': `pression artérielle`,
+    'HTA': `hypertension artérielle`, 'IASP': `Association internationale pour l’étude de la douleur`,
+    'EN': `échelle numérique`, 'EVA': `échelle visuelle analogique`,
+    'EVENDOL': `échelle d’hétéro-évaluation de la douleur de l’enfant`,
+    'FLACC': `échelle comportementale d’hétéro-évaluation de la douleur (Face, Legs, Activity, Cry, Consolability)`,
+    'FPS-R': `échelle des visages (Faces Pain Scale – Revised)`,
+    'IVA': `artère interventriculaire antérieure`, 'SCA': `syndrome coronarien aigu`, 'ECG': `électrocardiogramme`,
+    'IEC': `inhibiteur de l’enzyme de conversion`, 'AOMI': `artériopathie oblitérante des membres inférieurs`,
+    'IPS': `index de pression systolique`, 'IC': `insuffisance cardiaque`, 'NYHA': `New York Heart Association (classification de l’insuffisance cardiaque)`,
+    'FEVG': `fraction d’éjection du ventricule gauche`, 'ARA II': `antagoniste des récepteurs de l’angiotensine II`,
+    'AINS': `anti-inflammatoires non stéroïdiens`, 'BNP': `peptide natriurétique de type B`,
+    'NT-proBNP': `forme N-terminale du précurseur du BNP`, 'OAP': `œdème aigu du poumon`, 'OMI': `œdèmes des membres inférieurs`,
+    'TVP': `thrombose veineuse profonde`, 'EP': `embolie pulmonaire`, 'MTEV': `maladie thrombo-embolique veineuse`,
+    'FA': `fibrillation atriale`, 'QRS': `complexe ventriculaire de l’ECG`, 'AVK': `antivitamine K`,
+    'INR': `rapport international normalisé (surveillance des AVK)`, 'RAC': `rétrécissement aortique calcifié`,
+    'ETT': `échocardiographie transthoracique`, 'TAVI': `implantation d’une valve aortique par cathéter (Transcatheter Aortic Valve Implantation)`,
+    'PaO₂': `pression partielle artérielle en oxygène`, 'PaCO₂': `pression partielle artérielle en gaz carbonique`,
+    'PCO₂': `pression partielle en gaz carbonique`, 'SaO₂': `saturation artérielle en oxygène`, 'SpO₂': `saturation pulsée en oxygène (saturomètre)`,
+    'HCO₃⁻': `bicarbonates`, 'CO': `monoxyde de carbone`, 'Hb': `hémoglobine`,
+    'VEMS': `volume expiratoire maximal en 1 seconde`, 'DEP': `débit expiratoire de pointe`, 'FR': `fréquence respiratoire`,
+    'BPCO': `broncho-pneumopathie chronique obstructive`, 'SAHOS': `syndrome d’apnées-hypopnées obstructives du sommeil`,
+    'IAH': `index d’apnées-hypopnées`, 'PPC': `pression positive continue`, 'mMRC': `échelle de dyspnée (modified Medical Research Council)`,
+    'ACT': `Asthma Control Test (test de contrôle de l’asthme)`, 'VNI': `ventilation non invasive`,
+    'DTPCoq': `diphtérie, tétanos, poliomyélite, coqueluche`, 'VRS': `virus respiratoire syncytial`,
+    'RCP': `résumé des caractéristiques du produit`, 'ADME': `absorption, distribution, métabolisme, élimination`,
+    'RAA': `rhumatisme articulaire aigu`,
+    'IDE': `infirmier diplômé d’État`, 'ESI': `étudiant en soins infirmiers`, 'AS': `aide-soignant`, 'AP': `auxiliaire de puériculture`,
+    'AES': `accompagnant éducatif et social`, 'IPA': `infirmier en pratique avancée`, 'CSP': `Code de la santé publique`, 'CP': `Code pénal`,
+    'VIH': `virus de l’immunodéficience humaine`, 'IFSI': `institut de formation en soins infirmiers`,
+    'CRCI': `commission régionale de conciliation et d’indemnisation`, 'ONIAM': `Office national d’indemnisation des accidents médicaux`,
+    'CADA': `Commission d’accès aux documents administratifs`, 'CNIL': `Commission nationale de l’informatique et des libertés`,
+    'EHPAD': `établissement d’hébergement pour personnes âgées dépendantes`,
+    'EBM': `evidence-based medicine (médecine fondée sur les preuves)`, 'ENT': `environnement numérique de travail`,
+    'MeSH': `Medical Subject Headings (thésaurus de PubMed)`, 'SUDOC': `Système universitaire de documentation`,
+    'BU': `bibliothèque universitaire`, 'BDSP': `Banque de données en santé publique`,
+    'ST': `segment ST de l’ECG (sus- ou sous-décalage)`, 'AVC': `accident vasculaire cérébral`, 'VAS': `voies aériennes supérieures`,
+    'AG': `anesthésie générale`, 'PD': `pharmacodynamie`, 'PK': `pharmacocinétique`, 'NaCl': `chlorure de sodium`,
+    'PubMed': `base bibliographique biomédicale`, 'CAIRN': `portail de revues en sciences humaines et sociales`,
+    'DOI': `identifiant numérique unique d’un document (Digital Object Identifier)`, 'IA': `intelligence artificielle`
+  };
+
+  return { v: 1, sets, glossary, get: id => sets.find(s => s.id === id) };
 })();

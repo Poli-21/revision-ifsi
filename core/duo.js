@@ -10,7 +10,7 @@ App.Duo = (() => {
   const KEY = 'ifsi_duo_v1';
   const MAX_RUNS = 30;
   const DEF_NAMES = ['Moi', 'Mon pote'];
-  const DEF_CFG = { chapter: '', mode: 'duo', order: 'shuffle', n: 10, only: 'all', swap: true, hide: false, names: DEF_NAMES.slice() };
+  const DEF_CFG = { chapter: '', mode: 'duo', order: 'shuffle', n: 20, only: 'all', swap: true, every: 10, hide: false, names: DEF_NAMES.slice() };
 
   let P = { v: 1, q: {}, runs: [], pref: {} };   // progression
   let cfg = Object.assign({}, DEF_CFG, { names: DEF_NAMES.slice() });
@@ -36,6 +36,32 @@ App.Duo = (() => {
     for (const s of D().sets) { const it = s.items.find(x => x.id === id); if (it) return { it, set: s }; }
     return null;
   }
+  // ── Sigles (petit sous-texte) ──────────────────────────────
+  let ACRO = null;
+  function _acroList() {
+    if (ACRO) return ACRO;
+    ACRO = [];
+    try {
+      const G = D().glossary || {};
+      Object.keys(G).sort((a, b) => b.length - a.length).forEach(k => {
+        const e = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        ACRO.push({ k, def: G[k], re: new RegExp('(^|[^\\p{L}\\p{N}])' + e + '(?![\\p{L}\\p{N}])', 'u') });
+      });
+    } catch (e) { ACRO = []; }
+    return ACRO;
+  }
+  // Sigles du glossaire présents dans `text`, dans l'ordre d'apparition (sans ceux de `skip`).
+  function _acros(text, skip) {
+    const out = [];
+    _acroList().forEach(a => {
+      if (skip && skip.some(x => x.k === a.k)) return;
+      const m = a.re.exec(text);
+      if (m) out.push({ k: a.k, def: a.def, at: m.index + m[1].length });
+    });
+    return out.sort((x, y) => x.at - y.at);
+  }
+  const _acroHtml = list => list.length
+    ? `<div class="duo-acro">ℹ️ ${list.map(x => `<span><b>${_esc(x.k)}</b> : ${_esc(x.def)}</span>`).join(' · ')}</div>` : '';
   const _name = i => (String((cfg.names || [])[i] || '').trim() || DEF_NAMES[i]).slice(0, 20);
 
   // ── Stockage ───────────────────────────────────────────────
@@ -50,12 +76,13 @@ App.Duo = (() => {
     if (p.order === 'shuffle' || p.order === 'course') cfg.order = p.order;
     if ([10, 20, 0].includes(p.n)) cfg.n = p.n;
     if (typeof p.swap === 'boolean') cfg.swap = p.swap;
+    if ([1, 5, 10].includes(p.every)) cfg.every = p.every;
     if (typeof p.hide === 'boolean') cfg.hide = p.hide;
     if (Array.isArray(p.names)) cfg.names = [String(p.names[0] || ''), String(p.names[1] || '')].map(s => s.slice(0, 20));
   }
   function _save() {
     try {
-      P.pref = { mode: cfg.mode, order: cfg.order, n: cfg.n, swap: cfg.swap, hide: cfg.hide, names: cfg.names.slice() };
+      P.pref = { mode: cfg.mode, order: cfg.order, n: cfg.n, swap: cfg.swap, every: cfg.every, hide: cfg.hide, names: cfg.names.slice() };
       localStorage.setItem(KEY, JSON.stringify(P));
     } catch (e) {}
   }
@@ -116,7 +143,7 @@ App.Duo = (() => {
   function isTraining() { return screen === 'play' && !!run && !run.quitAsk; }
 
   function setCfg(k, v) {
-    if (k === 'n') v = Number(v);
+    if (k === 'n' || k === 'every') v = Number(v);
     if (!(k in cfg)) return;
     cfg[k] = (k === 'swap' || k === 'hide') ? !!v : v;
     _save();
@@ -143,10 +170,11 @@ App.Duo = (() => {
   }
   function again() { if (!run) return; setId = run.setKey === 'MIX' ? null : run.setKey; start(); }
   function _begin(ids, setKey) {
-    run = { setKey, ids, i: 0, results: [], revealed: false, quitAsk: false, startedAt: Date.now(), mode: cfg.mode, swap: cfg.swap, names: [_name(0), _name(1)] };
+    run = { setKey, ids, i: 0, results: [], revealed: false, quitAsk: false, startedAt: Date.now(), mode: cfg.mode, swap: cfg.swap, every: cfg.every, names: [_name(0), _name(1)] };
     screen = 'play'; render(); _top();
   }
-  const _asker = i => (run.mode === 'duo' && run.swap && i % 2 === 1) ? 1 : 0;
+  // Rôles : le 1er bloc de `every` questions, c'est « toi » qui interroges ; le bloc suivant, c'est l'autre, etc.
+  const _asker = i => (run.mode === 'duo' && run.swap && Math.floor(i / (run.every || 10)) % 2 === 1) ? 1 : 0;
 
   function reveal() { if (!run) return; run.revealed = true; render(); }
   function toggleAnswer() {
@@ -276,7 +304,9 @@ App.Duo = (() => {
             <label>Toi<input class="ph-in" maxlength="20" value="${_esc(cfg.names[0])}" placeholder="${DEF_NAMES[0]}" oninput="App.Duo.setName(0, this.value)"></label>
             <label>L’autre<input class="ph-in" maxlength="20" value="${_esc(cfg.names[1])}" placeholder="${DEF_NAMES[1]}" oninput="App.Duo.setName(1, this.value)"></label>
           </div>
-          <label class="duo-chk"><input type="checkbox" ${cfg.swap ? 'checked' : ''} onchange="App.Duo.setCfg('swap', this.checked)"> Alterner : à chaque question, c’est l’autre qui interroge</label>
+          <label class="duo-chk"><input type="checkbox" ${cfg.swap ? 'checked' : ''} onchange="App.Duo.setCfg('swap', this.checked)"> Changer de rôle : après un bloc de questions, c’est à l’autre d’interroger</label>
+          ${cfg.swap ? `<div class="duo-seg">${seg('every', 10, 'Toutes les 10 questions')}${seg('every', 5, 'Toutes les 5')}${seg('every', 1, 'À chaque question')}</div>
+            ${nRun <= cfg.every && cfg.every > 1 ? `<div class="duo-warn">⚠ Avec ${nRun} question${nRun > 1 ? 's' : ''}, l’autre n’interrogera pas (il faut dépasser ${cfg.every}). Choisis « 20 » ou « Toutes » plus bas.</div>` : ''}` : ''}
           <label class="duo-chk"><input type="checkbox" ${cfg.hide ? 'checked' : ''} onchange="App.Duo.setCfg('hide', this.checked)"> Masquer la réponse par défaut (si l’autre voit ton écran)</label>
           <div class="ph-muted ph-small">Ta liste « à revoir » ne compte que <b>tes propres réponses</b> : garde l’alternance pour t’interroger toi aussi.</div>` : ''}
       </div>
@@ -311,12 +341,14 @@ App.Duo = (() => {
     const showAns = duo ? true : run.revealed;
     const pts = it.pts.length ? `<div class="duo-pts">${it.pts.map(p => `<label class="duo-pt"><input type="checkbox"> <span>${_esc(p)}</span></label>`).join('')}</div>` : '';
     const rel = it.rel.length ? `<details class="duo-rel"><summary>💬 Pour relancer (${it.rel.length})</summary>${it.rel.map(r => `<div class="duo-relq"><b>${_esc(r[0])}</b><div>${_esc(r[1])}</div></div>`).join('')}</details>` : '';
+    const acQ = _acros(it.q);
+    const acA = _acros([it.a].concat(it.pts, ...it.rel).join(' \n '), acQ);
     const chk = it.chk ? `<div class="duo-chk-w">⚠ À valider : ${_esc(it.chk)}</div>` : '';
     const ansBlock = `<div id="duo-ans" class="duo-ans ${duo && cfg.hide ? 'is-hidden' : ''}">
         <div class="duo-ans-t">✅ Réponse attendue</div>
         <div class="duo-ans-a">${_esc(it.a)}</div>
         ${pts ? `<div class="duo-ans-t duo-ans-t2">À vérifier dans la réponse</div>${pts}` : ''}
-        ${chk}${rel}
+        ${_acroHtml(acA)}${chk}${rel}
       </div>`;
     const roles = duo
       ? `<div class="duo-roles"><span>🎤 <b>${_esc(run.names[asker])}</b> pose la question</span><span>💭 <b>${_esc(run.names[answerer])}</b> répond</span></div>`
@@ -326,6 +358,9 @@ App.Duo = (() => {
         <button class="duo-r duo-r-mid" onclick="App.Duo.rate(1)"><span class="duo-r-i">🟡</span>À moitié</button>
         <button class="duo-r duo-r-ok" onclick="App.Duo.rate(2)"><span class="duo-r-i">✅</span>Juste</button>
       </div>`;
+    const swapNow = duo && run.swap && run.i > 0 && run.i % (run.every || 10) === 0;
+    const swapBanner = swapNow
+      ? `<div class="duo-swap">🔄 <b>On change de rôle</b> : <b>${_esc(run.names[asker])}</b> interroge maintenant, <b>${_esc(run.names[answerer])}</b> répond.</div>` : '';
     const quit = run.quitAsk
       ? `<div class="duo-quit"><b>Terminer la série ?</b> Les questions déjà notées sont gardées.<div class="ph-row ph-gap ph-wrapr"><button class="btn btn-primary" onclick="App.Duo.quit()">Terminer et voir le bilan</button><button class="btn btn-ghost" onclick="App.Duo.keepGoing()">Continuer</button></div></div>`
       : '';
@@ -333,10 +368,12 @@ App.Duo = (() => {
         <div class="ph-prog"><div class="ph-muted ph-small">Question ${run.i + 1} sur ${total}</div>${_bar(run.i, total)}</div></div>
       <div class="duo-scores">${scoreTxt}</div>
       ${quit}
+      ${swapBanner}
       <div class="ph-card ph-q duo-q-card">
         <div class="ph-tag">${_esc(set.ue)} · ${_esc(set.chapters[it.c] || it.c)}</div>
         ${roles}
         <div class="ph-qtext duo-q">${_esc(it.q)}</div>
+        ${_acroHtml(acQ)}
         ${duo
           ? `<button id="duo-tog" class="btn btn-ghost btn-sm duo-tog" onclick="App.Duo.toggleAnswer()">${cfg.hide ? '👁 Voir la réponse' : '🙈 Masquer la réponse'}</button>${ansBlock}`
           : (showAns ? ansBlock : `<button class="btn btn-primary ph-big duo-show" onclick="App.Duo.reveal()">👁 Voir la réponse</button>`)}
