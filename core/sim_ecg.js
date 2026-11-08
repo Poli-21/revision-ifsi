@@ -14,6 +14,8 @@ App.SimECG = (() => {
   // Sans contexte (atelier ouvert depuis la liste), l'atelier se comporte exactement comme avant.
   let CTX = null;
   const PATIENT = new Proxy({}, { get: (_, k) => ((CTX && CTX.patient) || PATIENT0)[k] });
+  const PALP_MAX = 3;                 // mode expert : nombre de « palpations » (côtes révélées 3 s)
+  const modeLabel = m => m === 'auto' ? 'Autonome' : (m === 'expert' ? 'Expert' : 'Guidé');
   const LIMBS = ['RA', 'LA', 'LL', 'RL'];
   const VS = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
   const ZONE_NAME = { poignet_d: 'poignet droit', poignet_g: 'poignet gauche', cheville_g: 'cheville gauche', cheville_d: 'cheville droite' };
@@ -222,6 +224,17 @@ App.SimECG = (() => {
     if (V.V5 && V.V6 && V.V5.x > V.V6.x) extra.push("V5 et V6 sont inversés : V5 est plus en avant (ligne axillaire antérieure), V6 plus sur le côté.");
     return { items, nOk, extra };
   }
+  // Position exacte attendue de chaque précordiale sur le schéma (sert à la correction)
+  function targets() {
+    const a = Art(), M = a.MID, T = {};
+    T.V1 = { x: M - 24, y: a.icsCenter(4, 24) };
+    T.V2 = { x: M + 24, y: a.icsCenter(4, 24) };
+    T.V4 = { x: M + 85, y: a.icsCenter(5, 85) };
+    T.V3 = { x: (T.V2.x + T.V4.x) / 2, y: (T.V2.y + T.V4.y) / 2 };
+    T.V5 = { x: M + 140, y: T.V4.y };
+    T.V6 = { x: M + 160, y: T.V4.y };
+    return T;
+  }
   function evalPrep(sel) {
     let good = 0, bad = 0; const tags = { tremor: false, wander: false };
     PREP.forEach(p => {
@@ -259,7 +272,7 @@ App.SimECG = (() => {
   let hist = { v: 1, attempts: [] };
   function _loadH() { try { const r = JSON.parse(localStorage.getItem(KEY) || 'null'); if (r && Array.isArray(r.attempts)) hist = r; } catch (e) {} }
   function _saveH() { try { localStorage.setItem(KEY, JSON.stringify(hist)); } catch (e) {} }
-  let S = null, _timers = [];
+  let S = null, _timers = [], _palpT = null;
   const _el = id => document.getElementById(id);
   const _esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const _clr = () => { _timers.forEach(t => { clearInterval(t); clearTimeout(t); }); _timers = []; };
@@ -271,7 +284,7 @@ App.SimECG = (() => {
       prep: { sel: {}, done: false, res: null },
       limbs: { RA: null, LA: null, LL: null, RL: null }, limbsFirst: null, limbsChecked: false, limbsFinal: null,
       V: { V1: null, V2: null, V3: null, V4: null, V5: null, V6: null }, thFirst: null, thChecked: false, thFinal: null, louis: false, louisTries: 0,
-      sel: null, hint: '', verdictAt: null,
+      sel: null, hint: '', verdictAt: null, palp: 0,
       art: { tremor: false, wander: false },
       set: { speed: 50, gain: 20 }, identity: false, setFirst: null,
       rec: null, recProg: 0, recording: false,
@@ -289,7 +302,7 @@ App.SimECG = (() => {
         <div class="sim-scn-title">Atelier ECG : poser les électrodes <em class="sim-new">Nouveau</em></div>
         <div class="sim-chips"><span class="sim-chip">Geste technique</span><span class="sim-chip">Sur prescription médicale</span><span class="sim-chip">10 à 15 min</span></div>
       </div></div>
-      <p class="sim-scn-desc">Prépare la patiente, pose toi-même les 4 électrodes des membres et les 6 précordiales sur un schéma du thorax (espaces intercostaux, lignes de repère), règle l'appareil, puis contrôle le tracé. Une erreur de pose se voit sur le tracé.</p>
+      <p class="sim-scn-desc">Prépare la patiente, pose toi-même les 4 électrodes des membres et les 6 précordiales sur un schéma du thorax, règle l'appareil, puis contrôle le tracé. Trois niveaux : guidé, autonome (aucun indice : tu dois connaître les repères) et expert (côtes presque invisibles). Une erreur de pose se voit sur le tracé.</p>
       <div class="sim-row"><button class="btn btn-primary" onclick="App.SimECG.open()">Ouvrir l'atelier →</button>
       <span class="sim-muted sim-small">${hist.attempts.length ? hist.attempts.length + ' essai' + (hist.attempts.length > 1 ? 's' : '') + ' · meilleur score ' + best + '/100' : 'Fonctionne hors ligne'}</span></div>
     </div>`;
@@ -333,14 +346,15 @@ App.SimECG = (() => {
       <p class="sim-lead"><b>Situation.</b> ${CTX && CTX.situation ? _esc(CTX.situation) + ' ' : `${PATIENT.prenom} ${PATIENT.nom}, ${PATIENT.age} ans, est résidente en EHPAD. Le médecin traitant a prescrit un ECG de contrôle. `}Tu es l'étudiant(e) infirmier(ère) : tu prépares la résidente, tu poses les électrodes, tu règles l'appareil, tu enregistres puis tu vérifies que le tracé est exploitable avant de le transmettre. <i>(Patiente fictive.)</i></p>
       <h3 class="sim-h2">Choisis ton mode</h3>
       <div class="ecg-modes">
-        <button class="ecg-mode" onclick="App.SimECG.start('guide')"><b>🧭 Guidé</b><span>Repères visibles sur le schéma (lignes, numéros d'espaces), vérification de chaque étape avec explication.</span></button>
-        <button class="ecg-mode" onclick="App.SimECG.start('auto')"><b>🎯 Autonome</b><span>Schéma sans repères. Tes erreurs ne sont révélées que par le tracé et le bilan, comme sur le terrain.</span></button>
+        <button class="ecg-mode" onclick="App.SimECG.start('guide')"><b>🧭 Guidé</b><i>Niveau 1 · j'apprends</i><span>Repères visibles sur le schéma (lignes, numéros d'espaces, aide), vérification de chaque étape avec explication.</span></button>
+        <button class="ecg-mode" onclick="App.SimECG.start('auto')"><b>🎯 Autonome</b><i>Niveau 2 · je place de mémoire</i><span>Aucun indice : ni lignes, ni numéros, ni texte d'aide. Tu choisis chaque câble et tu le poses où ton cours le place. La correction (avec la bonne position) s'affiche à la validation.</span></button>
+        <button class="ecg-mode" onclick="App.SimECG.start('expert')"><b>🔬 Expert</b><i>Niveau 3 · côtes presque invisibles</i><span>Comme l'autonome, mais les côtes sont à peine visibles : repère-toi avec le sternum, la clavicule et l'angle de Louis. 3 « palpations » pour faire apparaître les côtes 3 secondes.</span></button>
       </div>
-      ${last.length ? '<h3 class="sim-h2">Mes derniers essais</h3><div class="sim-hist">' + last.map(a => `<div class="sim-hist-row"><span>${_esc(new Date(a.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }))}</span><span>${a.mode === 'auto' ? 'Autonome' : 'Guidé'}</span><span>${a.score}/100</span></div>`).join('') + '</div>' : ''}
+      ${last.length ? '<h3 class="sim-h2">Mes derniers essais</h3><div class="sim-hist">' + last.map(a => `<div class="sim-hist-row"><span>${_esc(new Date(a.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }))}</span><span>${modeLabel(a.mode)}</span><span>${a.score}/100</span></div>`).join('') + '</div>' : ''}
     </div>
     <div class="sim-note">✅ <b>Fonctionne hors ligne.</b> 🧪 <b>Tracé simulé</b> : il sert à voir l'effet d'une erreur de pose (câbles inversés, électrode oubliée, parasites). Ce n'est pas un vrai ECG et il ne sert pas à interpréter. Repères d'après les protocoles français (couleurs CEI, 25 mm/s, 10 mm/mV) ; vérifie toujours le protocole de ton service et de ton IFSI.</div>`, false);
   }
-  function start(mode) { _clr(); S = _fresh(mode === 'auto' ? 'auto' : 'guide'); _render(); }
+  function start(mode) { _clr(); clearTimeout(_palpT); S = _fresh(mode === 'auto' ? 'auto' : (mode === 'expert' ? 'expert' : 'guide')); _render(); }
 
   // ── Rendu par étape ──
   function _render() {
@@ -413,6 +427,7 @@ App.SimECG = (() => {
   const _cableName = k => LIMB_INFO[k] ? LIMB_INFO[k].color : Art().COLNAME[k];
   function pick(k) {
     if (!S) return;
+    if (S.step === 'thorax' && S.thChecked && S.mode !== 'guide') return;
     S.sel = S.sel === k ? null : k; S.hint = '';
     _render();
   }
@@ -433,43 +448,78 @@ App.SimECG = (() => {
     const ev = evalLimbs(S.limbs);
     if (S.limbsFirst == null) S.limbsFirst = ev.nOk;
     S.limbsFinal = ev.nOk; S.limbsChecked = true;
-    if (S.mode === 'auto') { S.step = 'thorax'; S.sel = null; S.hint = ''; }
+    if (S.mode !== 'guide') { S.step = 'thorax'; S.sel = null; S.hint = ''; }
     _render();
   }
 
   // 3 · Thorax
-  function _thPlaced() {
-    const ev = S.thChecked && S.mode === 'guide' ? evalThorax(S.V).items : null, o = {};
+  function _thPlaced(force) {
+    const ev = (S.thChecked || force) ? evalThorax(S.V).items : null, o = {};
     VS.forEach(k => { if (S.V[k]) o[k] = { x: S.V[k].x, y: S.V[k].y, state: ev ? (ev[k].ok ? 'ok' : 'bad') : '' }; });
     return o;
   }
+  // Électrodes mal posées → cercle vert pointillé à la bonne place
+  function _thTargets(force) {
+    if (!(S.thChecked || force)) return null;
+    const ev = evalThorax(S.V).items, T = targets(), o = {}; let any = false;
+    VS.forEach(k => { if (!ev[k].ok) { o[k] = T[k]; any = true; } });
+    return any ? o : null;
+  }
+  const _palpLabel = () => '🖐️ Palper les côtes (' + Math.max(0, PALP_MAX - S.palp) + ' restante' + (PALP_MAX - S.palp > 1 ? 's' : '') + ')';
   function _rThorax() {
     const n = VS.filter(k => S.V[k]).length, a = Art();
+    const guide = S.mode === 'guide', expert = S.mode === 'expert';
     if (!S.louis) {
       _shell(`<div class="sim-card"><h3 class="sim-h">3 · Électrodes précordiales : le repérage</h3>
-        <p class="sim-lead">Pour poser V1 et V2 dans le 4e espace intercostal, on <b>compte les côtes</b> à partir d'un repère facile à sentir : l'<b>angle sternal</b> (angle de Louis), la petite crête à la jonction du manubrium et du corps du sternum. La 2e côte s'y attache.</p>
-        <div class="ecg-fig ecg-fig-th">${a.thorax({ guide: S.mode === 'guide', louis: false, placed: {} })}</div>
+        ${guide
+          ? `<p class="sim-lead">Pour poser V1 et V2 dans le 4e espace intercostal, on <b>compte les côtes</b> à partir d'un repère facile à sentir : l'<b>angle sternal</b> (angle de Louis), la petite crête à la jonction du manubrium et du corps du sternum. La 2e côte s'y attache.</p>`
+          : `<p class="sim-lead">Pour poser les précordiales, il faut un point de départ pour compter les côtes : l'<b>angle sternal</b> (angle de Louis), la petite crête à la jonction du manubrium et du corps du sternum. <b>Touche-le sur le schéma.</b>${expert ? ' <b>Mode expert :</b> les côtes sont presque invisibles, repère-toi avec le sternum et la clavicule.' : ''}</p>`}
+        <div class="ecg-fig ecg-fig-th">${a.thorax({ guide, faint: expert, louis: false, placed: {} })}</div>
         <p class="sim-muted sim-small" id="ecg-hint">${S.hint ? _esc(S.hint) : '👉 Touche l\'angle sternal sur le schéma.'}</p></div>`, true);
       return;
     }
     const ev = S.thChecked ? evalThorax(S.V) : null;
     let fb = '';
-    if (ev && S.mode === 'guide') {
-      fb = '<div class="ecg-fb">' + VS.map(k => `<div class="ecg-fb-row ${ev.items[k].ok ? 'ok' : 'bad'}"><span class="ecg-fb-m">${ev.items[k].ok ? '✓' : '✗'}</span><span>${_esc(ev.items[k].msg)}</span></div>`).join('') +
+    if (ev) {
+      fb = (guide ? '' : `<div class="ecg-res ${ev.nOk === 6 ? 'ok' : 'warn'}"><b>${ev.nOk}/6 électrodes bien placées.</b> ${ev.nOk === 6 ? 'Tu connais tes repères.' : 'Les cercles verts en pointillé montrent où les autres devaient être ; les côtes et les numéros d\'espaces sont maintenant affichés. Retiens la position, puis réessaie de mémoire.'}</div>`) +
+        '<div class="ecg-fb">' + VS.map(k => `<div class="ecg-fb-row ${ev.items[k].ok ? 'ok' : 'bad'}"><span class="ecg-fb-m">${ev.items[k].ok ? '✓' : '✗'}</span><span>${_esc(ev.items[k].msg)}</span></div>`).join('') +
         ev.extra.map(t => `<div class="ecg-fb-row warn"><span class="ecg-fb-m">⚠</span><span>${_esc(t)}</span></div>`).join('') + '</div>';
     }
     const allOk = ev && ev.nOk === 6;
-    const btns = S.mode === 'guide'
-      ? (S.thChecked ? (allOk ? `<button class="btn btn-primary" onclick="App.SimECG.next()">Continuer : régler l'appareil →</button>` : `<button class="btn btn-ghost" onclick="App.SimECG.uncheck('th')">Corriger</button><button class="btn btn-ghost" onclick="App.SimECG.next()">Continuer quand même</button>`) : `<button class="btn btn-primary" ${n < 6 ? 'disabled' : ''} onclick="App.SimECG.checkThorax()">Vérifier mes électrodes</button>`)
-      : `<button class="btn btn-primary" ${n < 6 ? 'disabled' : ''} onclick="App.SimECG.checkThorax()">Valider les précordiales →</button>`;
+    let btns;
+    if (!S.thChecked) btns = `<button class="btn btn-primary" ${n < 6 ? 'disabled' : ''} onclick="App.SimECG.checkThorax()">${guide ? 'Vérifier mes électrodes' : 'Valider les précordiales'}</button>`;
+    else if (allOk) btns = `<button class="btn btn-primary" onclick="App.SimECG.next()">Continuer : régler l'appareil →</button>`;
+    else if (guide) btns = `<button class="btn btn-ghost" onclick="App.SimECG.uncheck('th')">Corriger</button><button class="btn btn-ghost" onclick="App.SimECG.next()">Continuer quand même</button>`;
+    else btns = `<button class="btn btn-primary" onclick="App.SimECG.retryTh()">🔁 Réessayer de mémoire</button><button class="btn btn-ghost" onclick="App.SimECG.next()">Continuer quand même</button>`;
+    const lead = guide
+      ? `Choisis une électrode, puis touche le thorax à l'endroit où tu la poses. <b>Astuce du terrain</b> : pose V1, V2 et V4 après avoir palpé les espaces, puis V3, V5 et V6 à vue. Pour déplacer une électrode, choisis-la de nouveau.`
+      : `Choisis une électrode, puis touche le thorax à l'endroit exact où elle se pose. <b>Aucun indice :</b> compte les côtes à partir de l'angle sternal et place chaque électrode de mémoire. Quand les 6 sont posées, tu valides et le simulateur te montre où elles devaient être.${expert ? ' <b>Côtes presque invisibles :</b> utilise le sternum, la clavicule et « Palper » (' + PALP_MAX + ' fois).' : ''}`;
     _shell(`<div class="sim-card"><h3 class="sim-h">3 · Électrodes précordiales V1 à V6</h3>
-      <p class="sim-lead">Choisis une électrode, puis touche le thorax à l'endroit où tu la poses. <b>Astuce du terrain</b> : pose V1, V2 et V4 après avoir palpé les espaces, puis V3, V5 et V6 à vue. Pour déplacer une électrode, choisis-la de nouveau.</p>
-      ${_chips(VS, k => !!S.V[k], S.sel)}
-      <div class="ecg-fig ecg-fig-th">${a.thorax({ guide: S.mode === 'guide', louis: true, placed: _thPlaced() })}</div>
-      <p class="sim-muted sim-small" id="ecg-hint">${S.hint ? _esc(S.hint) : (S.sel ? 'Touche le thorax pour poser ' + S.sel + ' (' + a.COLNAME[S.sel] + ').' : (n < 6 ? 'Choisis une électrode.' : 'Les 6 électrodes sont posées.'))}</p>
+      <p class="sim-lead">${lead}</p>
+      ${S.thChecked && !guide ? '' : _chips(VS, k => !!S.V[k], S.sel)}
+      <div class="ecg-fig ecg-fig-th">${a.thorax({ guide, faint: expert, louis: true, numbers: guide || !!ev, showLine: !!ev, reveal: !!ev, placed: _thPlaced(), targets: _thTargets() })}</div>
+      <p class="sim-muted sim-small" id="ecg-hint">${S.hint ? _esc(S.hint) : (S.thChecked && !guide ? 'Voici la correction : vert = bien placée, rouge = mal placée, cercle vert pointillé = bonne position.' : (S.sel ? 'Touche le thorax pour poser ' + S.sel + ' (' + a.COLNAME[S.sel] + ').' : (n < 6 ? 'Choisis une électrode.' : 'Les 6 électrodes sont posées.')))}</p>
+      ${expert && !S.thChecked ? `<div class="sim-row"><button class="btn btn-ghost" id="ecg-palp" ${S.palp >= PALP_MAX ? 'disabled' : ''} onclick="App.SimECG.palpate()">${_palpLabel()}</button></div>` : ''}
       <div class="sim-note">👩 <b>Chez la femme</b>, on soulève le sein : l'électrode se pose sur le thorax, pas sur le sein (la plupart des protocoles ; à vérifier avec ton cours).</div>
-      ${S.mode === 'guide' ? `<details class="ecg-help"><summary>💡 Aide : où poser chaque électrode ?</summary><ul class="sim-ul">${VS.map(k => '<li>' + _esc(V_HELP[k]) + '</li>').join('')}</ul></details>` : ''}
+      ${guide ? `<details class="ecg-help"><summary>💡 Aide : où poser chaque électrode ?</summary><ul class="sim-ul">${VS.map(k => '<li>' + _esc(V_HELP[k]) + '</li>').join('')}</ul></details>` : ''}
       ${fb}<div class="sim-row">${btns}</div></div>`, true);
+  }
+  // Mode expert : fait apparaître les côtes 3 secondes (nombre limité)
+  function palpate() {
+    if (!S || S.step !== 'thorax' || S.mode !== 'expert' || S.thChecked || S.palp >= PALP_MAX) return;
+    const svg = _el('ecg-thorax'); if (!svg) return;
+    S.palp++;
+    svg.classList.add('reveal');
+    clearTimeout(_palpT);
+    _palpT = setTimeout(() => { const s2 = _el('ecg-thorax'); if (s2) s2.classList.remove('reveal'); }, 3200);
+    const b = _el('ecg-palp'); if (b) { b.textContent = _palpLabel(); b.disabled = S.palp >= PALP_MAX; }
+  }
+  // Modes autonome / expert : on efface les 6 électrodes pour recommencer de mémoire
+  function retryTh() {
+    if (!S || S.step !== 'thorax') return;
+    S.V = { V1: null, V2: null, V3: null, V4: null, V5: null, V6: null };
+    S.thChecked = false; S.sel = null; S.hint = 'Les électrodes ont été retirées : repose-les de mémoire.';
+    _render();
   }
   function thoraxTap(ev) {
     if (!S || S.step !== 'thorax') return;
@@ -488,6 +538,7 @@ App.SimECG = (() => {
       }
       _render(); return;
     }
+    if (S.thChecked && S.mode !== 'guide') return;      // correction affichée : on ne déplace plus
     const cx = Math.max(24, Math.min(376, x)), cy = Math.max(70, Math.min(380, y));
     if (!S.sel) {
       let best = null, bd = 16;
@@ -504,8 +555,7 @@ App.SimECG = (() => {
     if (!S) return;
     const ev = evalThorax(S.V);
     if (S.thFirst == null) S.thFirst = ev.nOk;
-    S.thFinal = ev.nOk; S.thChecked = true;
-    if (S.mode === 'auto') { S.step = 'enreg'; S.sel = null; S.hint = ''; }
+    S.thFinal = ev.nOk; S.thChecked = true; S.sel = null; S.hint = '';
     _render();
   }
 
@@ -636,7 +686,7 @@ App.SimECG = (() => {
     S.bilan = { prep, limbs, thorax, settings, qc, total, lf, tf, first, thFirst, sFirst, sFinal };
     if (!S.saved) {
       S.saved = true;
-      hist.attempts.push({ date: Date.now(), mode: S.mode, score: total, secs: S.secs, tries: S.attempt });
+      hist.attempts.push({ date: Date.now(), mode: S.mode, score: total, secs: S.secs, tries: S.attempt, palp: S.palp || 0 });
       if (hist.attempts.length > 20) hist.attempts = hist.attempts.slice(-20);
       _saveH();
     }
@@ -655,12 +705,13 @@ App.SimECG = (() => {
     const noteT = b.thFirst === 6 ? 'tout juste du premier coup' : (b.tf.nOk === 6 ? '↺ juste après correction' : (6 - b.tf.nOk) + ' erreur(s) restante(s)');
     _shell(`<div class="sim-card ecg-bilan"><h2 class="sim-title">Bilan de l'atelier ECG</h2>
       <div class="ecg-score"><b>${b.total}</b><span>/100</span></div>
-      <p class="sim-muted sim-small">Mode ${S.mode === 'auto' ? 'autonome' : 'guidé'} · ${_hms(S.secs)} · ${S.attempt} enregistrement${S.attempt > 1 ? 's' : ''}</p>
+      <p class="sim-muted sim-small">Mode ${modeLabel(S.mode).toLowerCase()}${S.mode === 'expert' ? ' (' + S.palp + '/' + PALP_MAX + ' palpation' + (S.palp > 1 ? 's' : '') + ')' : ''} · ${_hms(S.secs)} · ${S.attempt} enregistrement${S.attempt > 1 ? 's' : ''}</p>
       ${row('Préparation', b.prep, 20, 'actions justes cochées, pièges évités')}
       ${row('Électrodes des membres', b.limbs, 20, noteL)}
       ${row('Électrodes précordiales', b.thorax, 30, noteT)}
       ${row('Réglages de l\'appareil', b.settings, 10, 'défilement 25 mm/s, sensibilité 10 mm/mV')}
       ${row('Contrôle du tracé', b.qc, 20, (S.qc.first == null ? 0 : S.qc.first) + '/' + QC.length + ' observations justes au premier contrôle')}
+      ${tfx && VS.some(k => !tfx[k].ok) ? '<h3 class="sim-h2">Mes précordiales et la bonne position</h3><div class="ecg-fig ecg-fig-th">' + a.thorax({ guide: false, louis: true, numbers: true, showLine: true, reveal: true, placed: _thPlaced(true), targets: _thTargets(true) }) + '</div><p class="sim-muted sim-small">Vert = bien placée · rouge = mal placée · cercle vert pointillé = où elle devait être.</p>' : ''}
       ${errs.length ? '<h3 class="sim-h2">Ce qu\'il faut corriger</h3><ul class="sim-ul">' + errs.map(t => '<li>' + _esc(t) + '</li>').join('') + '</ul>' : '<div class="ecg-res ok"><b>Toutes les électrodes étaient bien placées.</b></div>'}
       <h3 class="sim-h2">À retenir</h3>
       <ul class="sim-ul">
@@ -721,6 +772,6 @@ App.SimECG = (() => {
   }
 
   _loadH();
-  return { card, open, back, start, toggle, validatePrep, next, pick, uncheck, checkLimbs, checkThorax, setSpeed, setGain, setIdentity, goStep, record, answer, validateQC, redoRec, finish, done,
-    _t: { state: () => S, evalLimbs, evalThorax, buildRecording, truth, uOf, tick: _tick } };
+  return { card, open, back, start, toggle, validatePrep, next, pick, uncheck, checkLimbs, checkThorax, retryTh, palpate, modeLabel, setSpeed, setGain, setIdentity, goStep, record, answer, validateQC, redoRec, finish, done,
+    _t: { state: () => S, targets, evalLimbs, evalThorax, buildRecording, truth, uOf, tick: _tick } };
 })();

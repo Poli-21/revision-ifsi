@@ -1,4 +1,13 @@
 // core/sync.js — Synchronisation via GitHub Gist
+//
+// TEMPS DE TRAVAIL ET COMPTEURS DU JOUR : journal par appareil.
+//   Avant, la fusion gardait le PLUS GRAND des deux appareils (le temps de l'autre était perdu), la récupération n'avait lieu
+//   qu'au démarrage et le temps passé en entraînement n'était jamais envoyé. Maintenant :
+//   - chaque appareil écrit son propre fichier « ifsi-time-<id>.json » dans le Gist (jamais écrasé par un autre appareil) ;
+//   - ce fichier contient ses AJOUTS (le temps qu'il a réellement compté, y compris une correction manuelle, qui est un ajout négatif)
+//     et une « base » (l'historique d'avant ce système, commun aux appareils) ;
+//   - total d'un jour = plus grande base + somme des ajouts de tous les appareils ;
+//   - synchro au démarrage, au retour sur l'appli, à la reconnexion, toutes les 90 s et quelques secondes après chaque ajout.
 'use strict';
 window.App = window.App || {};
 
@@ -10,6 +19,15 @@ App.Sync = (() => {
   let config  = { token: '', gistId: '' };
   let _pushTimer = null;
   let _status = 'idle'; // idle | syncing | ok | error
+
+  // ── Journal de temps par appareil ──────────────────────────────
+  const DEV_KEY     = 'ifsi_device_id';
+  const LEDGER_KEY  = 'ifsi_time_ledger_v1';
+  const TIME_PREFIX = 'ifsi-time-';
+  const TIME_SUFFIX = '.json';
+  const _delays = { debounce: 15000, maxWait: 60000, periodic: 90000, minResume: 15000 };
+  let _busy = false, _again = false, _applying = false, _bound = false;
+  let _dirtyTimer = null, _dirtySince = 0, _lastSync = 0, _periodic = null;
 
   // ── Config ─────────────────────────────────────────────────────
   function loadConfig() {
@@ -47,9 +65,14 @@ App.Sync = (() => {
     return data.id;
   }
 
-  async function _updateGist() {
-    const payload = { files: { [FILENAME]: { content: _serialize() } } };
+  async function _updateGist(extraFiles) {
+    const payload = { files: { [FILENAME]: { content: _serialize() }, ...(extraFiles || {}) } };
     const res = await fetch(`${API}/gists/${config.gistId}`, { method: 'PATCH', headers: _headers(), body: JSON.stringify(payload) });
+    if (!res.ok) throw new Error(`Mise à jour Gist échouée (${res.status})`);
+  }
+  // Envoie UNIQUEMENT des fichiers précis (ex. le journal de temps de cet appareil) : les autres fichiers du Gist ne sont pas touchés.
+  async function _patchFiles(files, keepalive) {
+    const res = await fetch(`${API}/gists/${config.gistId}`, { method: 'PATCH', headers: _headers(), body: JSON.stringify({ files }), keepalive: !!keepalive });
     if (!res.ok) throw new Error(`Mise à jour Gist échouée (${res.status})`);
   }
 
@@ -59,12 +82,17 @@ App.Sync = (() => {
     const data = await res.json();
     const fileInfo = data.files?.[FILENAME];
     if (!fileInfo) throw new Error('Fichier introuvable dans le Gist');
+    // Journaux de temps des appareils (un fichier par appareil)
+    const files = {};
+    Object.entries(data.files || {}).forEach(([name, f]) => {
+      if (name.startsWith(TIME_PREFIX) && name.endsWith(TIME_SUFFIX) && f && !f.truncated) files[name] = f.content;
+    });
     // Si tronqué (ancien format lourd) → on écrase avec le nouveau format compact
     if (fileInfo.truncated) {
       await _updateGist();   // pousse le format léger
-      return { v: 2, progress: {}, studyLog: {}, catOrder: [] }; // repart de zéro côté merge
+      return { main: { v: 2, progress: {}, studyLog: {}, catOrder: [] }, files }; // repart de zéro côté merge
     }
-    return JSON.parse(fileInfo.content);
+    return { main: JSON.parse(fileInfo.content), files };
   }
 
   // ── Sérialisation ──────────────────────────────────────────────
@@ -110,6 +138,158 @@ App.Sync = (() => {
     };
   }
 
+  // ── Journal de temps par appareil : cœur de la fusion ──────────
+  function _deviceId() {
+    let id = '';
+    try { id = localStorage.getItem(DEV_KEY) || ''; } catch (e) {}
+    if (!id) {
+      id = Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
+      try { localStorage.setItem(DEV_KEY, id); } catch (e) {}
+    }
+    return id;
+  }
+  const _timeFile = () => TIME_PREFIX + _deviceId() + TIME_SUFFIX;
+  function _ledger() {
+    try { const l = JSON.parse(localStorage.getItem(LEDGER_KEY) || 'null'); if (l && l.v === 1 && l.own && l.base && l.applied) return l; } catch (e) {}
+    return null;
+  }
+  function _saveLedger(l) { try { localStorage.setItem(LEDGER_KEY, JSON.stringify(l)); } catch (e) {} }
+  const _isNum = v => typeof v === 'number' && isFinite(v);
+  function _numeric(entry) {      // tous les compteurs numériques d'un jour (temps, cartes, anglais…), sauf l'horodatage de correction
+    const o = {};
+    Object.keys(entry || {}).forEach(k => { if (k !== 'fixAt' && _isNum(entry[k])) o[k] = entry[k]; });
+    return o;
+  }
+  function _snapshot(log) { const o = {}; Object.keys(log || {}).forEach(d => { o[d] = _numeric(log[d]); }); return o; }
+
+  // Ajouts faits ICI depuis la dernière application : (valeur actuelle − valeur appliquée). Peut être négatif (correction manuelle).
+  function _foldOwn(L, log) {
+    const dates = new Set([...Object.keys(log || {}), ...Object.keys(L.applied)]);
+    dates.forEach(d => {
+      const cur = _numeric(log[d]), app = L.applied[d] || {};
+      new Set([...Object.keys(cur), ...Object.keys(app)]).forEach(f => {
+        const delta = (cur[f] || 0) - (app[f] || 0);
+        if (delta) { const o = L.own[d] || (L.own[d] = {}); o[f] = (o[f] || 0) + delta; }
+      });
+    });
+  }
+  function _payloadOf(L) {
+    const sig = JSON.stringify([L.base, L.own]);
+    return { sig, content: JSON.stringify({ v: 1, dev: _deviceId(), updatedAt: new Date().toISOString(), base: L.base, own: L.own }) };
+  }
+
+  // files : fichiers « temps » du Gist ; remoteMain : fichier principal (sert seulement à la toute première migration).
+  // Met à jour App.Store.state.studyLog en place. Retourne { changed, needUpload, sig, content }.
+  function _timeApply(files, remoteMain) {
+    const me = _deviceId(), log = App.Store.state.studyLog;
+    const others = [];
+    Object.keys(files || {}).forEach(name => {
+      if (!name.startsWith(TIME_PREFIX) || !name.endsWith(TIME_SUFFIX)) return;
+      if (name.slice(TIME_PREFIX.length, -TIME_SUFFIX.length) === me) return;
+      try { const j = JSON.parse(files[name]); if (j && j.v === 1 && j.own && j.base) others.push(j); } catch (e) {}
+    });
+    let L = _ledger();
+    if (!L) {
+      // Première synchro de cet appareil : son historique actuel devient la « base » (commune aux appareils).
+      const base = _snapshot(log);
+      if (!others.length && remoteMain && remoteMain.studyLog && typeof remoteMain.studyLog === 'object') {
+        // Aucun autre appareil n'a encore de journal : on garde le plus grand des deux historiques (ancien comportement, une seule fois).
+        Object.entries(remoteMain.studyLog).forEach(([d, e]) => {
+          const r = _numeric(e), b = base[d] || (base[d] = {});
+          Object.keys(r).forEach(f => { b[f] = Math.max(b[f] || 0, r[f]); });
+        });
+      }
+      L = { v: 1, base, own: {}, applied: _snapshot(log), uploaded: '' };
+    }
+    _foldOwn(L, log);
+    // Total d'un jour = plus grande base + somme des ajouts de tous les appareils.
+    const peers = others.concat([{ base: L.base, own: L.own }]);
+    const dates = new Set();
+    peers.forEach(p => { Object.keys(p.base).forEach(d => dates.add(d)); Object.keys(p.own).forEach(d => dates.add(d)); });
+    let changed = false;
+    dates.forEach(d => {
+      const fields = new Set();
+      peers.forEach(p => { Object.keys(p.base[d] || {}).forEach(f => fields.add(f)); Object.keys(p.own[d] || {}).forEach(f => fields.add(f)); });
+      const e = log[d] || (log[d] = { reviewed: 0, ok: 0, hard: 0, nope: 0 });
+      fields.forEach(f => {
+        let b = 0, sum = 0;
+        peers.forEach(p => { b = Math.max(b, (p.base[d] || {})[f] || 0); sum += (p.own[d] || {})[f] || 0; });
+        const tot = Math.max(0, Math.round(b + sum));
+        if (e[f] !== tot) { e[f] = tot; changed = true; }
+      });
+    });
+    L.applied = _snapshot(log);
+    _saveLedger(L);
+    const pl = _payloadOf(L);
+    return { changed, needUpload: pl.sig !== L.uploaded, sig: pl.sig, content: pl.content };
+  }
+  function _markUploaded(sig) { const L = _ledger(); if (L) { L.uploaded = sig; _saveLedger(L); } }
+
+  function _refreshUI() {
+    try { App.Render.todayStats(); } catch (e) {}
+    try { const sv = document.getElementById('stats-view'); if (sv && sv.style.display !== 'none') App.Render.stats(); } catch (e) {}
+  }
+  function _saveLogQuiet() { _applying = true; try { App.Store.saveLog(); } finally { _applying = false; } }
+
+  // Synchronisation légère du temps : lit le Gist, additionne les journaux, met à jour l'affichage, envoie SEULEMENT le journal de cet appareil.
+  async function syncTime() {
+    if (!isConfigured()) return false;
+    if (_busy) { _again = true; return false; }
+    _busy = true;
+    try {
+      const full = await _fetchGist();
+      const t = _timeApply(full.files, full.main);
+      if (t.changed) { _saveLogQuiet(); _refreshUI(); }
+      if (t.needUpload) { await _patchFiles({ [_timeFile()]: { content: t.content } }); _markUploaded(t.sig); }
+      _lastSync = Date.now();
+      return true;
+    } catch (e) {
+      if (navigator.onLine !== false) _setStatus('error', e.message);
+      return false;
+    } finally {
+      _busy = false;
+      if (_again) { _again = false; setTimeout(syncTime, 500); }
+    }
+  }
+
+  // Appelé à chaque écriture du journal du jour (temps, révisions) : envoi quelques secondes plus tard (au plus 60 s d'attente).
+  function markTimeDirty() {
+    if (_applying || !isConfigured()) return;
+    const now = Date.now();
+    if (!_dirtySince) _dirtySince = now;
+    clearTimeout(_dirtyTimer);
+    const wait = Math.min(_delays.debounce, Math.max(0, _dirtySince + _delays.maxWait - now));
+    _dirtyTimer = setTimeout(() => { _dirtySince = 0; syncTime(); }, wait);
+  }
+
+  // Au passage en arrière-plan / fermeture : envoi immédiat de ses propres ajouts (sans lecture), au mieux.
+  function _flushOnHide() {
+    if (!isConfigured() || _busy) return;
+    try {
+      const L = _ledger();
+      if (!L) return;            // pas encore migré : la synchro normale s'en chargera
+      _foldOwn(L, App.Store.state.studyLog);
+      L.applied = _snapshot(App.Store.state.studyLog);
+      _saveLedger(L);
+      const pl = _payloadOf(L);
+      if (pl.sig === L.uploaded) return;
+      _patchFiles({ [_timeFile()]: { content: pl.content } }, true)
+        .catch(() => _patchFiles({ [_timeFile()]: { content: pl.content } }, false))
+        .then(() => _markUploaded(pl.sig)).catch(() => {});
+    } catch (e) {}
+  }
+
+  function _bindLifecycle() {
+    if (_bound) return;
+    _bound = true;
+    const resume = () => { if (isConfigured() && Date.now() - _lastSync > _delays.minResume) syncTime(); };
+    document.addEventListener('visibilitychange', () => { if (document.hidden) _flushOnHide(); else resume(); });
+    window.addEventListener('focus', resume);
+    window.addEventListener('online', () => { if (isConfigured()) syncTime(); });
+    window.addEventListener('pagehide', _flushOnHide);
+    _periodic = setInterval(() => { if (!document.hidden && isConfigured()) syncTime(); }, _delays.periodic);
+  }
+
   // ── Connexion initiale ─────────────────────────────────────────
   async function connect(token) {
     config.token = token.trim();
@@ -130,12 +310,15 @@ App.Sync = (() => {
         saveConfig();
         // Récupère les données distantes
         await pullRemote();
+        _bindLifecycle();
         _setStatus('ok', `Connecté · ${user.login}`);
         return { ok: true, msg: `Gist existant trouvé · ${user.login}` };
       } else {
         // Crée un nouveau Gist avec les données locales
         config.gistId = await _createGist();
         saveConfig();
+        _bindLifecycle();
+        setTimeout(syncTime, 500);
         _setStatus('ok', `Connecté · ${user.login}`);
         return { ok: true, msg: `Nouveau Gist créé · ${user.login}` };
       }
@@ -149,12 +332,23 @@ App.Sync = (() => {
   // ── Envoi (push) ──────────────────────────────────────────────
   async function push() {
     if (!isConfigured()) return;
+    if (_busy) { _again = true; return; }
+    _busy = true;
     _setStatus('syncing');
     try {
-      await _updateGist();
+      // On relit d'abord le Gist pour ne jamais envoyer un temps périmé : on additionne les journaux des autres appareils.
+      const full = await _fetchGist();
+      const t = _timeApply(full.files, full.main);
+      if (t.changed) { _saveLogQuiet(); _refreshUI(); }
+      await _updateGist(t.needUpload ? { [_timeFile()]: { content: t.content } } : {});
+      if (t.needUpload) _markUploaded(t.sig);
+      _lastSync = Date.now();
       _setStatus('ok');
     } catch(e) {
       _setStatus('error', e.message);
+    } finally {
+      _busy = false;
+      if (_again) { _again = false; setTimeout(syncTime, 500); }
     }
   }
 
@@ -185,6 +379,20 @@ App.Sync = (() => {
       const f  = gd.files?.[FILENAME];
       out.push(f ? `✅ Fichier Gist OK (${(f.size/1024).toFixed(1)} Ko)` : `⚠️ Fichier ${FILENAME} absent du Gist`);
     } catch(e) { out.push('❌ Lecture Gist : ' + e.message); }
+    try {
+      const full = await _fetchGist(), me = _deviceId(), today = App.SRS.todayStr();
+      const mn = s => Math.round((s || 0) / 60) + ' min';
+      const L = _ledger();
+      out.push('⏱ Journal de temps (aujourd\'hui, ' + today + ') — cet appareil : ' + me + (L ? '' : ' (pas encore initialisé)'));
+      let own = L ? ((L.own[today] || {}).seconds || 0) : 0, tot = (L ? ((L.base[today] || {}).seconds || 0) : 0) + own;
+      out.push('   • ' + me + ' (cet appareil) : +' + mn(own));
+      Object.keys(full.files).forEach(name => {
+        const id = name.slice(TIME_PREFIX.length, -TIME_SUFFIX.length);
+        if (id === me) return;
+        try { const j = JSON.parse(full.files[name]); const o = ((j.own || {})[today] || {}).seconds || 0; tot += o; out.push('   • ' + id + ' : +' + mn(o) + ' (vu ' + (j.updatedAt || '?').slice(11, 16) + ' UTC)'); } catch (e) { out.push('   • ' + id + ' : illisible'); }
+      });
+      out.push('   Total affiché ici : ' + mn(App.Store.getDaySeconds(today)) + ' · dernière synchro : ' + (_lastSync ? new Date(_lastSync).toLocaleTimeString('fr-FR') : 'jamais'));
+    } catch(e) { out.push('⚠️ Journal de temps : ' + e.message); }
     return out.join('\n');
   }
 
@@ -195,7 +403,8 @@ App.Sync = (() => {
     _setStatus('syncing');
     try {
       prog(20, 'Récupération des données…');
-      const remote = _deserialize(await _fetchGist());
+      const full = await _fetchGist();
+      const remote = _deserialize(full.main);
       prog(50, 'Fusion des données…');
 
       // Applique les progrès distants sur les cartes locales
@@ -212,40 +421,9 @@ App.Sync = (() => {
         }
       });
 
-      // Merge log (union des jours, max des valeurs)
-      const mergedLog = { ...remote.studyLog };
-      Object.entries(App.Store.state.studyLog).forEach(([date, entry]) => {
-        if (!mergedLog[date]) mergedLog[date] = entry;
-        else mergedLog[date] = {
-          reviewed: Math.max(mergedLog[date].reviewed||0, entry.reviewed||0),
-          ok:       Math.max(mergedLog[date].ok||0,       entry.ok||0),
-          hard:     Math.max(mergedLog[date].hard||0,     entry.hard||0),
-          nope:     Math.max(mergedLog[date].nope||0,     entry.nope||0),
-          seconds:  Math.max(mergedLog[date].seconds||0,  entry.seconds||0),
-          english:  Math.max(mergedLog[date].english||0,  entry.english||0),
-          englishSecs: Math.max(mergedLog[date].englishSecs||0, entry.englishSecs||0),
-          simSecs:  Math.max(mergedLog[date].simSecs||0,  entry.simSecs||0),
-          trainSecs:  Math.max(mergedLog[date].trainSecs||0,  entry.trainSecs||0),
-          gameSecs:   Math.max(mergedLog[date].gameSecs||0,   entry.gameSecs||0),
-          orthoSecs:  Math.max(mergedLog[date].orthoSecs||0,  entry.orthoSecs||0),
-          pharmaSecs: Math.max(mergedLog[date].pharmaSecs||0, entry.pharmaSecs||0),
-          gazoSecs:   Math.max(mergedLog[date].gazoSecs||0,   entry.gazoSecs||0),
-          secoursSecs: Math.max(mergedLog[date].secoursSecs||0, entry.secoursSecs||0),
-          tpSecs: Math.max(mergedLog[date].tpSecs||0, entry.tpSecs||0),
-          doseSecs: Math.max(mergedLog[date].doseSecs||0, entry.doseSecs||0),
-          pathoSecs: Math.max(mergedLog[date].pathoSecs||0, entry.pathoSecs||0),
-          duoSecs: Math.max(mergedLog[date].duoSecs||0, entry.duoSecs||0),
-        };
-        // Correction manuelle du temps (fixAt) : la plus récente gagne sur le « max » (sinon l'ancienne valeur reviendrait)
-        const rem = remote.studyLog[date] || {}, la = rem.fixAt || 0, lb = entry.fixAt || 0;
-        if (la || lb) {
-          const win = la >= lb ? rem : entry, m = mergedLog[date];
-          ['seconds','englishSecs','simSecs','trainSecs','gameSecs','orthoSecs','pharmaSecs','gazoSecs','secoursSecs','tpSecs','doseSecs','pathoSecs','duoSecs'].forEach(f => { m[f] = win[f] || 0; });
-          m.fixAt = Math.max(la, lb);
-        }
-      });
+      // Temps et compteurs du jour : journal par appareil (les ajouts de chaque appareil s'additionnent ; plus de « max » qui perdait du temps)
+      _timeApply(full.files, remote);
 
-      App.Store.state.studyLog = mergedLog;
       if (remote.catOrder && remote.catOrder.length > 0)
         App.Store.state.catOrder = (App.Regroup && App.Regroup.remapOrder) ? App.Regroup.remapOrder(remote.catOrder) : remote.catOrder;
 
@@ -301,7 +479,7 @@ App.Sync = (() => {
 
       prog(80, 'Sauvegarde…');
       App.Store.save();
-      App.Store.saveLog();
+      _saveLogQuiet();
       App.Store.saveOrder();
       App.Render.all();
       // Rafraîchit l'historique Grand Oral si le module est visible
@@ -318,6 +496,7 @@ App.Sync = (() => {
         }
       }
       prog(100, 'Synchronisé !');
+      _lastSync = Date.now();
       _setStatus('ok');
       return true;
     } catch(e) {
@@ -362,10 +541,12 @@ App.Sync = (() => {
     _updateUI();
     if (isConfigured()) {
       _setStatus('ok');
+      _bindLifecycle();
       // Pull automatique au démarrage (avec délai pour laisser le DOM se charger)
       setTimeout(pullRemote, 1000);
     }
   }
 
-  return { init, connect, disconnect, push, pushDebounced, pullRemote, isConfigured, loadConfig, diagnose };
+  return { init, connect, disconnect, push, pushDebounced, pullRemote, isConfigured, loadConfig, diagnose, syncTime, markTimeDirty,
+           _t: { delays: _delays, config: () => config, setConfig: c => { config = Object.assign({ token: '', gistId: '' }, c); }, ledger: _ledger, deviceId: _deviceId, bind: _bindLifecycle, flush: _flushOnHide } };
 })();

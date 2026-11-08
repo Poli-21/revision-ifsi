@@ -168,6 +168,44 @@ App.Duo = (() => {
     if (!ids.length) { toMenu(); return; }
     _begin(_shuffle(ids), run.setKey);
   }
+  // ── « À revoir » → flashcards ───────────────────────────────
+  // Chaque question ratée devient une carte de ton paquet (matière « À revoir - <UE> ») : elle entre dans la répétition espacée.
+  function _cardFor(f) {
+    const it = f.it, set = f.set;
+    const pts = it.pts && it.pts.length ? '\n\nÀ retenir :\n' + it.pts.map(x => '• ' + x).join('\n') : '';
+    const ex = [it.chk ? '⚠ À valider : ' + it.chk : ''].concat((it.rel || []).map(r => 'Relance : ' + r[0] + ' → ' + r[1])).filter(Boolean).join('\n');
+    return { id: 'duo_' + it.id, cat: App.Store.normCat('À revoir - ' + set.ue), term: String(it.q).replace(/\s+/g, ' ').trim(),
+             def: it.a + pts, example: ex || null, ue: set.ue, type: null, customImage: null, suspended: false, progress: null, src: 'duo' };
+  }
+  function _haveCard(id) { return !!(App.Store && App.Store.state.cards.some(c => c.id === 'duo_' + id)); }
+  function _toast(msg) {
+    try { if (typeof window._showToast === 'function') return window._showToast(msg); } catch (e) {}
+    let t = _el('duo-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'duo-toast'; t.className = 'pb-toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 3200);
+  }
+  function _addCards(ids) {
+    if (!App.Store) return 0;
+    const have = new Set(App.Store.state.cards.map(c => c.id));
+    let n = 0;
+    Array.from(new Set(ids)).forEach(id => {
+      const f = _item(id); if (!f || have.has('duo_' + id)) return;
+      App.Store.state.cards.push(_cardFor(f)); n++;
+    });
+    if (n) { App.Store.save(); try { if (App.Render && App.Render.all) App.Render.all(); } catch (e) {} }
+    _toast(n ? '🧠 ' + n + ' carte' + (n > 1 ? 's' : '') + ' ajoutée' + (n > 1 ? 's' : '') + ' à tes flashcards (matière « À revoir - … »)' : 'Tout est déjà dans tes flashcards');
+    render();
+    return n;
+  }
+  const _runMissedIds = () => run ? run.results.filter(r => !r.skipped && r.ok < 2).map(r => r.id) : [];
+  const _allMissedIds = () => D().sets.flatMap(s => s.items.filter(it => _isMissed(it.id)).map(it => it.id));
+  function toCards() { _addCards(_runMissedIds()); }
+  function missedToCards() { _addCards(_allMissedIds()); }
+  function _cardsBtn(ids, fn, big) {
+    const todo = Array.from(new Set(ids)).filter(id => !_haveCard(id)).length, sz = big ? ' ph-big' : '';
+    return todo ? `<button class="btn btn-ghost${sz}" onclick="App.Duo.${fn}()">🧠 Ajouter à mes flashcards (${todo})</button>`
+                : `<button class="btn btn-ghost${sz}" disabled>✓ Déjà dans tes flashcards</button>`;
+  }
   function again() { if (!run) return; setId = run.setKey === 'MIX' ? null : run.setKey; start(); }
   function _begin(ids, setKey) {
     run = { setKey, ids, i: 0, results: [], revealed: false, quitAsk: false, startedAt: Date.now(), mode: cfg.mode, swap: cfg.swap, every: cfg.every, names: [_name(0), _name(1)] };
@@ -278,7 +316,7 @@ App.Duo = (() => {
       <h2 class="ph-title">🗣️ Questions à deux</h2>
       <p class="ph-lead">Tu <b>poses les questions à ton pote</b>, mais tu as la <b>question</b> et la <b>réponse attendue</b> sous les yeux, avec les points à vérifier et des relances. Chacun son tour, un score pour chacun. Ça marche aussi <b>tout seul</b> (réponse cachée jusqu’à ce que tu la demandes).</p>
       ${cards}
-      ${all.missed ? `<div class="ph-card"><div class="ph-th-name">🔁 À revoir : ${all.missed} question${all.missed > 1 ? 's' : ''}</div><div class="ph-muted ph-small">Celles que tu as ratées ou à moitié réussies (tes propres réponses), toutes UE confondues.</div><div class="ph-row ph-gap"><button class="btn btn-primary" onclick="App.Duo.startReview()">▶ Série des à revoir</button></div></div>` : ''}
+      ${all.missed ? `<div class="ph-card"><div class="ph-th-name">🔁 À revoir : ${all.missed} question${all.missed > 1 ? 's' : ''}</div><div class="ph-muted ph-small">Celles que tu as ratées ou à moitié réussies (tes propres réponses), toutes UE confondues.</div><div class="ph-row ph-gap ph-wrapr"><button class="btn btn-primary" onclick="App.Duo.startReview()">▶ Série des à revoir</button> ${_cardsBtn(_allMissedIds(), 'missedToCards')}</div></div>` : ''}
       ${last ? `<h3 class="ph-h">Dernières séries</h3>${last}` : ''}
       <div class="ph-note">Questions et réponses écrites à partir de <b>tes notes Notion</b>, pas d’un corrigé officiel : en cas de doute, c’est ton cours (et ton formateur) qui font foi. Un avertissement ⚠ s’affiche quand tes notes sont incomplètes ou « à valider ». D.1 est laissé de côté ; A.1 viendra quand tes notes seront plus complètes. Ta liste « à revoir » reste sur cet appareil.</div>`;
   }
@@ -410,6 +448,7 @@ App.Duo = (() => {
       ${duo ? `<div class="ph-note">Ta liste « à revoir » n’a pris en compte que les questions auxquelles <b>${_esc(run.names[0])}</b> a répondu.</div>` : ''}
       <div class="ph-row ph-gap ph-wrapr duo-end">
         ${missed.length ? `<button class="btn btn-primary ph-big" onclick="App.Duo.retryMissed()">🔁 Refaire les ${missed.length} à revoir</button>` : ''}
+        ${missed.length ? _cardsBtn(_runMissedIds(), 'toCards', true) : ''}
         <button class="btn ${missed.length ? 'btn-ghost' : 'btn-primary'} ph-big" onclick="App.Duo.again()">▶ Nouvelle série</button>
         <button class="btn btn-ghost ph-big" onclick="App.Duo.toMenu()">Menu</button>
       </div>`;
@@ -417,7 +456,7 @@ App.Duo = (() => {
 
   return {
     open, close, toMenu, chooseSet, backToSetup, setCfg, setName, start, startReview, retryMissed, again,
-    reveal, toggleAnswer, rate, skip, undo, askQuit, keepGoing, quit, isTraining,
+    reveal, toggleAnswer, rate, skip, undo, askQuit, keepGoing, quit, isTraining, toCards, missedToCards,
     _t: { state: () => ({ screen, setId, cfg, run, P }) }
   };
 })();

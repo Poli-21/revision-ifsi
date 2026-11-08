@@ -2022,10 +2022,11 @@ body.dark .sim-tapbtn { color: #0f172a; }
 
 /* ══ ATELIER ECG (dans la simulation) ═══════════════════════════ */
 .ecg-wrap { max-width: 760px; }
-.ecg-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 6px 0 14px; }
-@media (max-width: 560px) { .ecg-modes { grid-template-columns: 1fr; } }
+.ecg-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 6px 0 14px; }
+@media (max-width: 720px) { .ecg-modes { grid-template-columns: 1fr; } }
 .ecg-mode { text-align: left; font-family: inherit; cursor: pointer; background: var(--sim-soft); border: 2px solid var(--sim-line); border-radius: 12px; padding: 12px 14px; color: var(--gray-900); display: flex; flex-direction: column; gap: 4px; }
 .ecg-mode b { font-size: .98rem; }
+.ecg-mode i { font-style: normal; font-size: .72rem; font-weight: 800; letter-spacing: .02em; color: var(--primary); }
 .ecg-mode span { font-size: .8rem; color: var(--gray-600); line-height: 1.45; }
 .ecg-mode:hover { border-color: var(--primary); }
 .ecg-opts { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 14px; }
@@ -2054,6 +2055,10 @@ body.dark .sim-tapbtn { color: #0f172a; }
 .ecg-fig-body { max-width: 340px; }
 .ecg-svg { width: 100%; height: auto; display: block; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .ecg-thorax { cursor: crosshair; }
+.ecg-ribs { transition: opacity .3s ease; }
+.ecg-thorax.ribs-faint .ecg-ribs { opacity: .12; }
+.ecg-thorax.ribs-faint.reveal .ecg-ribs { opacity: 1; }
+.ecg-tgt { pointer-events: none; }
 .ecg-zone, .ecg-mk { cursor: pointer; }
 .ecg-pulse { transform-origin: center; transform-box: fill-box; animation: ecgPulse 1.4s ease-out infinite; }
 @keyframes ecgPulse { 0% { opacity: 1; transform: scale(.9); } 100% { opacity: 0; transform: scale(1.5); } }
@@ -3038,6 +3043,20 @@ body.dark .rg-box { --rg-bg:#1e293b; --rg-line:#334155; --rg-soft:#162032; --rg-
 .pb-qroc-r p { font-size: .84rem; margin: 2px 0 8px; white-space: pre-wrap; }
 .pb-kw span { display: inline-block; background: var(--primary-light); color: var(--primary); border-radius: 999px; padding: 1px 8px; margin: 2px 3px 0 0; font-size: .72rem; font-weight: 700; }
 .pb-end { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; justify-content: center; }
+
+/* Situation clinique (A.2) et « à revoir → flashcards » */
+.pb-ctx { background: var(--primary-light); border-left: 4px solid var(--primary); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: .86rem; line-height: 1.5; color: var(--gray-900); overflow-wrap: anywhere; }
+.pb-ctx-t { font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--primary); margin-bottom: 4px; }
+.pb-ctx-d { margin-bottom: 8px; font-size: .82rem; line-height: 1.5; color: var(--gray-700); }
+.pb-ctx-d summary { cursor: pointer; font-weight: 700; color: var(--primary); padding: 4px 0; }
+.pb-ctx-d > div { background: var(--primary-light); border-radius: 9px; padding: 8px 10px; color: var(--gray-900); overflow-wrap: anywhere; }
+.pb-fc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: var(--primary-light); border: 1px solid var(--primary); border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; }
+.pb-fc-t { font-weight: 800; font-size: .88rem; color: var(--primary); }
+.pb-fc-s { flex: 1 1 200px; font-size: .8rem; line-height: 1.4; color: var(--gray-700); }
+.pb-fc-row { margin-top: 8px; display: flex; justify-content: flex-end; }
+.pb-fc-row .btn[disabled], .pb-fc-bar .btn[disabled] { opacity: .65; cursor: default; }
+.pb-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: .85rem; z-index: 9999; pointer-events: none; opacity: 0; transition: opacity .2s; max-width: calc(100vw - 32px); text-align: center; }
+.pb-toast.on { opacity: 1; }
 
 @media (max-width: 700px) {
   .pb-vers { grid-template-columns: 1fr; }

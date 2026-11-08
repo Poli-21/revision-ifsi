@@ -63,12 +63,13 @@ App.SimECGArt = (() => {
   }
 
   // ── Schéma du thorax (vue de face) ──
-  // o = { guide, louis, placed:{V1:{x,y,state}}, selected, flash }
+  // o = { guide, louis, placed:{V1:{x,y,state}}, faint (côtes quasi invisibles), reveal (côtes visibles),
+  //       numbers (n° d'espaces), showLine (horizontale de V4), targets:{V1:{x,y}} (où elles devaient être) }
   function thorax(o) {
     o = o || {};
-    const guide = !!o.guide, louis = !!o.louis;
+    const guide = !!o.guide, louis = !!o.louis, faint = !!o.faint;
     const s = [];
-    s.push(`<svg class="ecg-svg ecg-thorax" id="ecg-thorax" viewBox="0 0 400 396" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schéma du thorax vu de face">`);
+    s.push(`<svg class="ecg-svg ecg-thorax${faint ? ' ribs-faint' : ''}${o.reveal ? ' reveal' : ''}" id="ecg-thorax" viewBox="0 0 400 396" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schéma du thorax vu de face">`);
     s.push(`<defs>
       <linearGradient id="ecgSkin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6d3b8"/><stop offset="1" stop-color="#efbf9f"/></linearGradient>
       <linearGradient id="ecgBone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#f1e3c6"/></linearGradient>
@@ -81,6 +82,7 @@ App.SimECGArt = (() => {
     s.push(`<path d="M ${MID - 24} 44 C ${MID - 12} 62 ${MID + 12} 62 ${MID + 24} 44" fill="none" stroke="#e0b190" stroke-width="2" stroke-linecap="round" opacity=".7"/>`);
 
     // côtes : cartilage costal (bleuté) puis côte osseuse (ivoire)
+    s.push('<g class="ecg-ribs">');
     for (let k = 1; k <= 9; k++) {
       [-1, 1].forEach(side => {
         const hot = (louis && k === 2) ? '#f59e0b' : null;
@@ -91,6 +93,11 @@ App.SimECGArt = (() => {
         s.push(`<polyline points="${ribPoints(k, side, dCart - 6, dEnd)}" fill="none" stroke="#fffaf0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>`);
       });
     }
+    s.push('</g>');
+    // version difficile : seule l'attache de la 2e côte au sternum reste visible une fois l'angle de Louis trouvé
+    if (faint && louis && !o.reveal) [-1, 1].forEach(side => {
+      s.push(`<polyline points="${ribPoints(2, side, D0, 60)}" fill="none" stroke="#f59e0b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`);
+    });
     // clavicules
     [-1, 1].forEach(side => {
       const x0 = MID + side * 16, x1 = MID + side * 152;
@@ -124,8 +131,8 @@ App.SimECGArt = (() => {
       s.push(lab(MID, 272, 'xiphoïde'));
       s.push(lab(MID + 100, 58, 'clavicule', 'middle'));
     }
-    // numéros des espaces intercostaux (guidé, ou après avoir repéré l'angle de Louis)
-    if (guide || louis) {
+    // numéros des espaces intercostaux (guidé, ou une fois la pose validée)
+    if (guide || o.numbers) {
       for (let k = 2; k <= 6; k++) {
         const x = MID - 124, y = icsCenter(k, 124);
         s.push(`<circle cx="${x}" cy="${r1(y)}" r="11" fill="#fff" stroke="#9aa5b1" stroke-width="1.6"/><text x="${x}" y="${r1(y + 3.8)}" text-anchor="middle" font-size="11" font-weight="800" fill="#475569" font-family="inherit">${k}</text>`);
@@ -137,7 +144,14 @@ App.SimECGArt = (() => {
     s.push(`<text x="24" y="24" font-size="16" font-weight="800" fill="#7a5a34" font-family="inherit">D</text><text x="376" y="24" text-anchor="end" font-size="16" font-weight="800" fill="#7a5a34" font-family="inherit">G</text>`);
     // horizontale de V4 (guidé)
     const P = o.placed || {};
-    if (guide && P.V4) s.push(`<line x1="${r1(P.V4.x)}" y1="${r1(P.V4.y)}" x2="${MID + 180}" y2="${r1(P.V4.y)}" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="2 5" stroke-linecap="round" opacity=".9"/>`);
+    if ((guide || o.showLine) && P.V4) s.push(`<line x1="${r1(P.V4.x)}" y1="${r1(P.V4.y)}" x2="${MID + 180}" y2="${r1(P.V4.y)}" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="2 5" stroke-linecap="round" opacity=".9"/>`);
+    // correction : où chaque électrode mal posée devait se trouver
+    const T = o.targets || {};
+    Object.keys(T).forEach(k => {
+      const t = T[k], p = P[k];
+      if (p) s.push(`<line x1="${r1(p.x)}" y1="${r1(p.y)}" x2="${r1(t.x)}" y2="${r1(t.y)}" stroke="#dc2626" stroke-width="1.6" stroke-dasharray="3 4" stroke-linecap="round" opacity=".85"/>`);
+      s.push(`<g class="ecg-tgt"><circle cx="${r1(t.x)}" cy="${r1(t.y)}" r="11.5" fill="rgba(34,197,94,.16)" stroke="#16a34a" stroke-width="2.2" stroke-dasharray="4 3"/><text x="${r1(t.x)}" y="${r1(t.y + 3.4)}" text-anchor="middle" font-size="9" font-weight="800" fill="#15803d" font-family="inherit">${k}</text></g>`);
+    });
     // électrodes posées
     Object.keys(P).forEach(k => { if (P[k]) s.push(marker(k, P[k].x, P[k].y, P[k].state)); });
     s.push('</svg>');

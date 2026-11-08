@@ -111,7 +111,7 @@ App.Store = (() => {
 
   // ── Sauvegarde ────────────────────────────────────────────────
   function save()      { _set(KEY,       state.cards);    _notifyStorage(); if (window.App?.Sync) App.Sync.pushDebounced(); }
-  function saveLog()   { _set(KEY_LOG,   state.studyLog); }
+  function saveLog()   { _set(KEY_LOG,   state.studyLog); if (window.App?.Sync && App.Sync.markTimeDirty) App.Sync.markTimeDirty(); }
   function saveOrder() { _set(KEY_ORDER, state.catOrder); }
 
   // ── Indicateur de stockage ─────────────────────────────────────

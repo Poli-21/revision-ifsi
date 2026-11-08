@@ -73,10 +73,10 @@ App.PartielBlanc = (() => {
     const v = b && b.versions.find(x => x.id === vid);
     if (!v) return;
     _stopTimer();
-    const qs = v.questions.map(q => {
-      if (q.t === 'qroc') return { t: 'qroc', q: q.q, r: q.r, kw: q.kw || [], e: q.e || '', c: q.c };
+    const qs = (b.mix ? _shuffle(v.questions) : v.questions).map(q => {
+      if (q.t === 'qroc') return { t: 'qroc', q: q.q, r: q.r, kw: q.kw || [], e: q.e || '', c: q.c, ctx: q.ctx || '' };
       const opts = _shuffle([...q.ok.map(t => ({ t, ok: 1 })), ...q.ko.map(t => ({ t, ok: 0 }))]);
-      return { t: q.t, q: q.q, o: opts, e: q.e, c: q.c, chk: !!q.chk };
+      return { t: q.t, q: q.q, o: opts, e: q.e, c: q.c, chk: !!q.chk, ctx: q.ctx || '' };
     });
     _run = { ue, vid, qs, ans: qs.map(q => q.t === 'qroc' ? '' : []), flags: qs.map(() => 0), cur: 0,
              endsAt: Date.now() + b.minutes * 60000, total: b.minutes * 60000, startedAt: Date.now() };
@@ -165,6 +165,7 @@ App.PartielBlanc = (() => {
     area.innerHTML = `
       <div class="pb-card">
         <div class="pb-qmeta"><span>Question ${i + 1} / ${n}</span><span class="pb-kind ${q.t}">${kind}</span></div>
+        ${q.ctx ? `<div class="pb-ctx"><div class="pb-ctx-t">📋 Situation clinique</div><div>${_esc(q.ctx)}</div></div>` : ''}
         <div class="pb-q">${_esc(q.q)}</div>
         ${body}
       </div>
@@ -286,7 +287,7 @@ App.PartielBlanc = (() => {
       return `<div class="pb-ch"><div class="pb-ch-l">${_esc(lbl)}</div><div class="pb-ch-bar"><div style="width:${p}%;background:${col}"></div></div><div class="pb-ch-v">${x.pts % 1 ? x.pts.toFixed(1) : x.pts}/${x.n}</div></div>`;
     }).join('');
     const items = r.qs.map((q, i) => ({ q, i, s: _res.per[i] }))
-      .filter(x => _filter === 'all' || x.q.t === 'qroc' || (x.s || 0) < 1);
+      .filter(x => _filter === 'all' || x.q.t === 'qroc' || (x.s || 0) < 1 || (r.flags && r.flags[x.i]));
     const list = items.map(x => _reviewItem(x.q, x.i, x.s)).join('') || '<p class="partiel-empty">🎉 Aucune erreur sur cette copie.</p>';
     root.innerHTML = `
       <div class="pb-res">
@@ -295,9 +296,10 @@ App.PartielBlanc = (() => {
         <p class="pb-sub">${pending ? 'Auto-évalue les questions rédigées pour obtenir la note finale.' : _esc(verdict)}</p>
         <div class="pb-chs"><h4>Résultat par chapitre</h4>${chRows}</div>
         <div class="pb-filter">
-          <button class="btn btn-sm ${_filter === 'errors' ? 'btn-primary' : 'btn-ghost'}" onclick="App.PartielBlanc.setFilter('errors')">Mes erreurs</button>
+          <button class="btn btn-sm ${_filter === 'errors' ? 'btn-primary' : 'btn-ghost'}" onclick="App.PartielBlanc.setFilter('errors')">Mes erreurs et 🚩</button>
           <button class="btn btn-sm ${_filter === 'all' ? 'btn-primary' : 'btn-ghost'}" onclick="App.PartielBlanc.setFilter('all')">Toutes les questions</button>
         </div>
+        <div id="pb-fc-bar" class="pb-fc-bar">${_fcBarHTML()}</div>
         <div class="pb-review">${list}</div>
         <div class="pb-end">
           ${r.qs.some(q => q.t === 'qroc') && !_res.saved ? `<button class="btn btn-primary" onclick="App.PartielBlanc.saveSelf()">Enregistrer la note</button>` : ''}
@@ -327,11 +329,90 @@ App.PartielBlanc = (() => {
     }
     const src = App.PartielBank.CH[q.c] || q.c;
     return `<div class="pb-ri">
-      <div class="pb-ri-h"><span>Question ${i + 1} · ${q.t.toUpperCase()}</span>${st}</div>
+      <div class="pb-ri-h"><span>Question ${i + 1} · ${q.t.toUpperCase()}${r.flags && r.flags[i] ? ' · 🚩 à revoir' : ''}</span>${st}</div>
+      ${q.ctx ? `<details class="pb-ctx-d"><summary>📋 Situation clinique</summary><div>${_esc(q.ctx)}</div></details>` : ''}
       <div class="pb-q">${_esc(q.q)}</div>${body}
       <div class="pb-expl"><strong>Explication :</strong> ${_esc(q.e)}${q.chk ? ' <em>(point issu des compléments de tes notes : à valider avec ton cours)</em>' : ''}
         <div class="pb-src">Source : ${_esc(src)}</div></div>
+      <div class="pb-fc-row"><button class="btn btn-ghost btn-sm" data-fc="${i}" onclick="App.PartielBlanc.addCard(${i})" ${_hasCard(q) ? 'disabled' : ''}>${_hasCard(q) ? '✓ Dans tes flashcards' : '🧠 Ajouter aux flashcards'}</button></div>
     </div>`;
+  }
+
+  // ── « À revoir » → flashcards ────────────────────────────────────
+  // Une question du partiel devient une carte de ton paquet (matière « À revoir - <UE> », tag UE conservé) :
+  // elle entre alors dans la répétition espacée. Identifiant stable → jamais de doublon.
+  function _hash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+  function _cardId(q) { return 'pbr_' + String(_res.run.ue).replace(/[^A-Za-z0-9]/g, '') + '_' + _hash(String(q.q)); }
+  function _hasCard(q) { return !!(App.Store && App.Store.state.cards.some(c => c.id === _cardId(q))); }
+  function _revisionSet() {
+    const r = _res.run;
+    return r.qs.map((q, i) => i).filter(i => (r.flags && r.flags[i]) || (_res.per[i] != null && _res.per[i] < 1));
+  }
+  function _cardFromQ(q) {
+    const one = s => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    let term = one(q.q), def, ex;
+    if (q.t === 'qroc') {
+      def = q.r;
+      ex = [q.kw && q.kw.length ? 'Mots-clés : ' + q.kw.join(' · ') : '', q.e].filter(Boolean).join('\n');
+    } else {
+      const good = q.o.filter(o => o.ok).map(o => '• ' + o.t), bad = q.o.filter(o => !o.ok).map(o => '• ' + o.t);
+      if (q.t === 'qrm') term += ' (plusieurs réponses possibles)';
+      if (/propositions|affirmation|lesquel|laquelle|ci-dessous|suivant/i.test(q.q)) term += ' [' + q.o.map((o, k) => LETTERS[k] + '. ' + o.t).join(' ; ') + ']';
+      def = (good.length > 1 ? '✔ Bonnes réponses :\n' : '✔ Bonne réponse :\n') + good.join('\n') + '\n\n✖ Fausses :\n' + bad.join('\n');
+      ex = one(q.e) + (q.chk ? ' (à valider avec ton cours)' : '');
+    }
+    if (q.ctx) ex = (ex ? ex + '\n\n' : '') + 'Situation : ' + one(q.ctx);
+    return { id: _cardId(q), cat: App.Store.normCat('À revoir - ' + _res.run.ue), term, def, example: ex || null,
+             ue: _res.run.ue, type: null, customImage: null, suspended: false, progress: null, src: 'partiel-blanc' };
+  }
+  function _toast(msg) {
+    try { if (typeof window._showToast === 'function') return window._showToast(msg); } catch (e) {}
+    let t = document.getElementById('pb-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'pb-toast'; t.className = 'pb-toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.classList.add('on');
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 3200);
+  }
+  function _addMany(idxs) {
+    if (!_res || !App.Store) return 0;
+    const have = new Set(App.Store.state.cards.map(c => c.id));
+    let n = 0;
+    idxs.forEach(i => {
+      const q = _res.run.qs[i];
+      if (!q || have.has(_cardId(q))) return;
+      App.Store.state.cards.push(_cardFromQ(q)); have.add(_cardId(q)); n++;
+    });
+    if (n) {
+      App.Store.save();
+      try { if (App.Render && App.Render.all) App.Render.all(); } catch (e) {}
+    }
+    _refreshFc();
+    return n;
+  }
+  function addCard(i) {
+    const n = _addMany([i]);
+    _toast(n ? '🧠 Question ajoutée à tes flashcards (matière « À revoir - ' + _res.run.ue + ' »)' : 'Cette question est déjà dans tes flashcards');
+  }
+  function addAll() {
+    if (!_res) return;
+    const n = _addMany(_revisionSet());
+    _toast(n ? '🧠 ' + n + ' carte' + (n > 1 ? 's' : '') + ' ajoutée' + (n > 1 ? 's' : '') + ' à tes flashcards (« À revoir - ' + _res.run.ue + ' »)' : 'Tout est déjà dans tes flashcards');
+  }
+  function _fcBarHTML() {
+    if (!_res) return '';
+    const r = _res.run, set = _revisionSet();
+    if (!set.length) return `<span class="pb-fc-t">🧠 Flashcards</span><span class="pb-fc-s">Aucune erreur ni question marquée : rien à ajouter. Tu peux quand même ajouter une question précise avec son bouton.</span>`;
+    const errs = set.filter(i => _res.per[i] != null && _res.per[i] < 1).length, flg = set.filter(i => r.flags && r.flags[i]).length;
+    const todo = set.filter(i => !_hasCard(r.qs[i])).length;
+    return `<span class="pb-fc-t">🧠 Flashcards</span>
+      <span class="pb-fc-s">${set.length} question${set.length > 1 ? 's' : ''} à revoir (${errs} erreur${errs > 1 ? 's' : ''}, ${flg} marquée${flg > 1 ? 's' : ''} 🚩) : en faire des cartes de révision espacée.</span>
+      <button class="btn btn-primary btn-sm" onclick="App.PartielBlanc.addAll()" ${todo ? '' : 'disabled'}>${todo ? 'Ajouter à mes flashcards (' + todo + ')' : '✓ Déjà dans tes flashcards'}</button>`;
+  }
+  function _refreshFc() {
+    const bar = _el('pb-fc-bar'); if (bar) bar.innerHTML = _fcBarHTML();
+    document.querySelectorAll('[data-fc]').forEach(b => {
+      const q = _res && _res.run.qs[+b.dataset.fc]; if (!q) return;
+      const has = _hasCard(q); b.disabled = has; b.textContent = has ? '✓ Dans tes flashcards' : '🧠 Ajouter aux flashcards';
+    });
   }
 
   function leave() {
@@ -343,7 +424,7 @@ App.PartielBlanc = (() => {
   return {
     blockHTML, start, resume, discard, pick, typeQroc, go, flag,
     askFinish, askQuit, cancelConfirm, finish, quit,
-    setFilter, selfMark, saveSelf, leave,
+    setFilter, selfMark, saveSelf, leave, addCard, addAll,
     _scoreQ   // exposé pour les tests
   };
 })();
