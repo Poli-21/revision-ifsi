@@ -968,5 +968,10 @@ App.Render = (() => {
 
   function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  return { all, todayStats, browse, browseDebounced, stats, heatmap, cardItemHTML, orderedCats };
+  // Rafraîchit seulement le bandeau « Série en cours » et la case « par séries de 10 » (après une synchro)
+  function resume() {
+    _renderResume();
+    const s10 = document.getElementById('series10-chk'); if (s10 && typeof getSeries10 === 'function') s10.checked = getSeries10();
+  }
+  return { all, todayStats, resume, browse, browseDebounced, stats, heatmap, cardItemHTML, orderedCats };
 })();

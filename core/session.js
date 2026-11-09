@@ -209,7 +209,20 @@ App.Session = (() => {
     } catch (e) { return []; }
   }
   function _writeSlots(slots) { try { if (slots.length) localStorage.setItem(RESUME_KEY2, JSON.stringify({ v: 2, slots })); else localStorage.removeItem(RESUME_KEY2); } catch (e) {} }
-  function _removeSlot(sid) { if (!sid) return; _writeSlots(_readSlots().filter(r => r.sid !== sid)); }
+  // Synchro entre appareils : une série terminée ou abandonnée laisse une « trace » (sid → heure) pour qu'elle disparaisse aussi des autres appareils.
+  const DONE_KEY = 'ifsi_session_done_v1';
+  const DONE_KEEP_MS = 60 * 86400000;
+  function _readDone() { try { const o = JSON.parse(localStorage.getItem(DONE_KEY) || '{}'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; } }
+  function _writeDone(o) { try { localStorage.setItem(DONE_KEY, JSON.stringify(o)); } catch (e) {} }
+  function _tomb(sid) {
+    if (!sid) return;
+    const d = _readDone(), lim = Date.now() - DONE_KEEP_MS;
+    d[sid] = Date.now(); Object.keys(d).forEach(k => { if (!(d[k] >= lim)) delete d[k]; });
+    _writeDone(d);
+  }
+  function _seriesDirty() { try { if (window.App && App.Sync && App.Sync.markSeriesDirty) App.Sync.markSeriesDirty(); } catch (e) {} }
+  // silent = retrait « technique » (cartes absentes de cet appareil) : pas de trace, la série reste vivante sur les autres appareils.
+  function _removeSlot(sid, silent) { if (!sid) return; _writeSlots(_readSlots().filter(r => r.sid !== sid)); if (!silent) { _tomb(sid); _seriesDirty(); } }
   function _clearResume() { if (current && current.sid) _removeSlot(current.sid); }      // la série qu'on vient de terminer
   function _saveResume() {
     try {
@@ -224,7 +237,9 @@ App.Session = (() => {
       };
       const slots = _readSlots().filter(r => r.sid !== slot.sid); slots.push(slot);
       slots.sort((x, y) => (y.at || 0) - (x.at || 0));
+      slots.slice(MAX_SLOTS).forEach(r => _tomb(r.sid));
       _writeSlots(slots.slice(0, MAX_SLOTS));
+      _seriesDirty();
     } catch (e) {}
   }
   function _slotInfo(r, have) {
@@ -236,7 +251,7 @@ App.Session = (() => {
   function resumeList() {
     const have = new Set(App.Store.state.cards.map(c => c.id));
     const out = [];
-    _readSlots().forEach(r => { const i = _slotInfo(r, have); if (i.left < 1) _removeSlot(r.sid); else out.push(i); });
+    _readSlots().forEach(r => { const i = _slotInfo(r, have); if (i.left < 1) _removeSlot(r.sid, true); else out.push(i); });
     return out.sort((x, y) => (y.at || 0) - (x.at || 0));
   }
   // Compatibilité : la plus récente (ou null)
@@ -247,7 +262,7 @@ App.Session = (() => {
     let idx = 0; const queue = [];
     r.queue.forEach((id, i) => { const c = byId.get(id); if (c) { if (i < r.idx) idx++; queue.push({ ...c }); } });
     const pool = r.tryhard ? r.tryhard.pool.map(id => byId.get(id)).filter(Boolean).map(c => ({ ...c })) : [];
-    if (!queue.length && !pool.length) { _removeSlot(r.sid); alert('Cette série n\'existe plus (les cartes ont été supprimées).'); App.Render.all(); return; }
+    if (!queue.length && !pool.length) { _removeSlot(r.sid, true); alert('Cette série n\'existe plus (les cartes ont été supprimées).'); App.Render.all(); return; }
     current = { queue, idx, stats: Object.assign({ ok: 0, hard: 0, nope: 0, again: 0 }, r.stats || {}), startTime: Date.now(), afkPausedMs: 0, afkStart: null, cat: r.cat || '', sid: r.sid };
     if (r.tryhard) current.tryhard = Object.assign({}, r.tryhard, { pool });
     // Choix de la façon de reprendre : « tryhard » = 10 par 10, « classic » = série classique
@@ -843,7 +858,10 @@ App.Session = (() => {
     show();
   }
 
-  return { resumeInfo, resumeList, resume, askResume, dropResume, start, ectsPlan, _queue: () => (current ? [...current.queue] : []), startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
+  // ── Synchro des séries en pause (utilisé par App.Sync) ──
+  function seriesState() { return { slots: _readSlots(), done: _readDone(), max: MAX_SLOTS }; }
+  function seriesApply(slots, done) { _writeSlots((slots || []).slice(0, MAX_SLOTS)); _writeDone(done || {}); }
+  return { seriesState, seriesApply, resumeInfo, resumeList, resume, askResume, dropResume, start, ectsPlan, _queue: () => (current ? [...current.queue] : []), startChrono, startWithCards, show, end, setMode, answer, flip, verifyWrite, resumeAfk, pendingSecs, nextTryhard, zoomImage, closeZoom, _photoLoaded,
   // matière de la série en cours (pour "Recommencer") : '' = toutes les cartes à réviser
   getCurrentCat: () => { const k = current && current.cat; return (k && App.Store.state.cards.some(c => c.cat === k)) ? k : ''; } };
 })();

@@ -25,6 +25,10 @@ App.Sync = (() => {
   const LEDGER_KEY  = 'ifsi_time_ledger_v1';
   const TIME_PREFIX = 'ifsi-time-';
   const TIME_SUFFIX = '.json';
+  // ── Séries en pause + réglage « par séries de 10 » : un fichier par appareil, lui aussi ──
+  const SERIES_PREFIX = 'ifsi-series-', SERIES_SUFFIX = '.json';
+  const SERIES_SIG_KEY = 'ifsi_series_sig_v1', SERIES10_KEY = 'ifsi_series10';
+  const SERIES_REMOTE_MAX_AGE = 60 * 86400000;      // une série restée 60 jours sans bouger sur un autre appareil est ignorée
   const _delays = { debounce: 15000, maxWait: 60000, periodic: 90000, minResume: 15000 };
   let _busy = false, _again = false, _applying = false, _bound = false;
   let _dirtyTimer = null, _dirtySince = 0, _lastSync = 0, _periodic = null;
@@ -83,16 +87,17 @@ App.Sync = (() => {
     const fileInfo = data.files?.[FILENAME];
     if (!fileInfo) throw new Error('Fichier introuvable dans le Gist');
     // Journaux de temps des appareils (un fichier par appareil)
-    const files = {};
+    const files = {}, series = {};
     Object.entries(data.files || {}).forEach(([name, f]) => {
       if (name.startsWith(TIME_PREFIX) && name.endsWith(TIME_SUFFIX) && f && !f.truncated) files[name] = f.content;
+      else if (name.startsWith(SERIES_PREFIX) && name.endsWith(SERIES_SUFFIX) && f && !f.truncated) series[name] = f.content;
     });
     // Si tronqué (ancien format lourd) → on écrase avec le nouveau format compact
     if (fileInfo.truncated) {
       await _updateGist();   // pousse le format léger
-      return { main: { v: 2, progress: {}, studyLog: {}, catOrder: [] }, files }; // repart de zéro côté merge
+      return { main: { v: 2, progress: {}, studyLog: {}, catOrder: [] }, files, series }; // repart de zéro côté merge
     }
-    return { main: JSON.parse(fileInfo.content), files };
+    return { main: JSON.parse(fileInfo.content), files, series };
   }
 
   // ── Sérialisation ──────────────────────────────────────────────
@@ -225,6 +230,69 @@ App.Sync = (() => {
   }
   function _markUploaded(sig) { const L = _ledger(); if (L) { L.uploaded = sig; _saveLedger(L); } }
 
+  // ── Séries en pause : fusion entre appareils ───────────────────
+  // Chaque appareil n'écrit QUE son fichier. Pour une même série (identifiant sid), la version la plus récente gagne ;
+  // une série terminée ou abandonnée laisse une « trace » plus récente que sa dernière version : elle disparaît partout.
+  const _seriesFile = () => SERIES_PREFIX + _deviceId() + SERIES_SUFFIX;
+  function _pref10() {
+    let v = null, at = 0;
+    try { v = localStorage.getItem(SERIES10_KEY); at = parseInt(localStorage.getItem(SERIES10_KEY + '_at') || '0', 10) || 0; } catch (e) {}
+    return { v: v === '0' || v === '1' ? v : null, at };
+  }
+  function _seriesPayload(slots, done, pv, pat) {
+    const empty = !slots.length && !Object.keys(done).length && !pat;
+    const sig = JSON.stringify([slots.map(r => [r.sid, r.at, r.idx]), done, pv, pat]);
+    return { empty, sig, content: JSON.stringify({ v: 1, dev: _deviceId(), updatedAt: new Date().toISOString(), slots, done, pref: pat ? { v: pv, at: pat } : null }) };
+  }
+  const _seriesUploadedSig = () => { try { return localStorage.getItem(SERIES_SIG_KEY) || ''; } catch (e) { return ''; } };
+  function _markSeriesUploaded(sig) { try { localStorage.setItem(SERIES_SIG_KEY, sig); } catch (e) {} }
+
+  // files : fichiers « séries » du Gist. Met à jour les séries en pause et le réglage de CET appareil.
+  // Retourne { changed, needUpload, sig, content }.
+  function _seriesApply(files) {
+    const S = window.App && App.Session;
+    if (!S || !S.seriesState || !S.seriesApply) return { changed: false, needUpload: false };
+    const me = _deviceId(), now = Date.now(), local = S.seriesState(), max = local.max || 2;
+    const remotes = [];
+    Object.keys(files || {}).forEach(name => {
+      if (!name.startsWith(SERIES_PREFIX) || !name.endsWith(SERIES_SUFFIX)) return;
+      if (name.slice(SERIES_PREFIX.length, -SERIES_SUFFIX.length) === me) return;
+      try { const j = JSON.parse(files[name]); if (j && j.v === 1) remotes.push(j); } catch (e) {}
+    });
+    // Traces (séries terminées / abandonnées) : la plus récente l'emporte ; on oublie celles de plus de 60 jours.
+    const done = Object.assign({}, local.done);
+    remotes.forEach(j => { const d = j.done && typeof j.done === 'object' ? j.done : {}; Object.keys(d).forEach(sid => { if (_isNum(d[sid]) && d[sid] > (done[sid] || 0)) done[sid] = d[sid]; }); });
+    Object.keys(done).forEach(sid => { if (!(done[sid] >= now - SERIES_REMOTE_MAX_AGE)) delete done[sid]; });
+    // Séries : pour chaque identifiant, la version la plus récente (locale ou distante).
+    const best = {};
+    const take = (r, remote) => {
+      if (!r || !r.sid || !Array.isArray(r.queue) || !r.queue.length) return;
+      if (remote && !(r.at > now - SERIES_REMOTE_MAX_AGE)) return;
+      if (!best[r.sid] || (r.at || 0) > (best[r.sid].at || 0)) best[r.sid] = r;
+    };
+    local.slots.forEach(r => take(r, false));
+    remotes.forEach(j => (Array.isArray(j.slots) ? j.slots : []).forEach(r => take(r, true)));
+    let list = Object.keys(best).map(k => best[k]).filter(r => !((done[r.sid] || 0) >= (r.at || 0)));
+    list.sort((x, y) => (y.at || 0) - (x.at || 0));
+    list.slice(max).forEach(r => { done[r.sid] = now; });      // au-delà de 2 séries en pause : la plus ancienne est écartée (partout)
+    list = list.slice(0, max);
+    const key = (sl, dn) => JSON.stringify([sl.map(r => [r.sid, r.at, r.idx]), dn]);
+    let changed = key(list, done) !== key(local.slots, local.done);
+    if (changed) S.seriesApply(list, done);
+    // Réglage « par séries de 10 » : le plus récent l'emporte. Un choix fait avant cette mise à jour (sans heure) est daté d'aujourd'hui.
+    let pref = _pref10();
+    if (pref.v !== null && !pref.at) { pref.at = now; try { localStorage.setItem(SERIES10_KEY + '_at', String(now)); } catch (e) {} }
+    const before = _pref10();
+    remotes.forEach(j => { const p = j.pref; if (p && _isNum(p.at) && (p.v === '0' || p.v === '1') && p.at > pref.at) pref = { v: p.v, at: p.at }; });
+    if (pref.at !== before.at || pref.v !== before.v) {
+      try { localStorage.setItem(SERIES10_KEY, pref.v); localStorage.setItem(SERIES10_KEY + '_at', String(pref.at)); } catch (e) {}
+      changed = true;
+    }
+    const pl = _seriesPayload(list, done, pref.v, pref.at);
+    return { changed, needUpload: !pl.empty && pl.sig !== _seriesUploadedSig(), sig: pl.sig, content: pl.content };
+  }
+  function _refreshSeriesUI() { try { App.Render.resume && App.Render.resume(); } catch (e) {} }
+
   function _refreshUI() {
     try { App.Render.todayStats(); } catch (e) {}
     try { const sv = document.getElementById('stats-view'); if (sv && sv.style.display !== 'none') App.Render.stats(); } catch (e) {}
@@ -240,7 +308,16 @@ App.Sync = (() => {
       const full = await _fetchGist();
       const t = _timeApply(full.files, full.main);
       if (t.changed) { _saveLogQuiet(); _refreshUI(); }
-      if (t.needUpload) { await _patchFiles({ [_timeFile()]: { content: t.content } }); _markUploaded(t.sig); }
+      const sr = _seriesApply(full.series);
+      if (sr.changed) _refreshSeriesUI();
+      const up = {};
+      if (t.needUpload) up[_timeFile()] = { content: t.content };
+      if (sr.needUpload) up[_seriesFile()] = { content: sr.content };
+      if (Object.keys(up).length) {
+        await _patchFiles(up);
+        if (t.needUpload) _markUploaded(t.sig);
+        if (sr.needUpload) _markSeriesUploaded(sr.sig);
+      }
       _lastSync = Date.now();
       return true;
     } catch (e) {
@@ -262,20 +339,31 @@ App.Sync = (() => {
     _dirtyTimer = setTimeout(() => { _dirtySince = 0; syncTime(); }, wait);
   }
 
+  // Série en pause ou réglage « par 10 » modifié : même envoi différé que pour le temps.
+  const markSeriesDirty = markTimeDirty;
+
   // Au passage en arrière-plan / fermeture : envoi immédiat de ses propres ajouts (sans lecture), au mieux.
   function _flushOnHide() {
     if (!isConfigured() || _busy) return;
     try {
+      const files = {}, marks = [];
       const L = _ledger();
-      if (!L) return;            // pas encore migré : la synchro normale s'en chargera
-      _foldOwn(L, App.Store.state.studyLog);
-      L.applied = _snapshot(App.Store.state.studyLog);
-      _saveLedger(L);
-      const pl = _payloadOf(L);
-      if (pl.sig === L.uploaded) return;
-      _patchFiles({ [_timeFile()]: { content: pl.content } }, true)
-        .catch(() => _patchFiles({ [_timeFile()]: { content: pl.content } }, false))
-        .then(() => _markUploaded(pl.sig)).catch(() => {});
+      if (L) {                    // sinon : pas encore migré, la synchro normale s'en chargera
+        _foldOwn(L, App.Store.state.studyLog);
+        L.applied = _snapshot(App.Store.state.studyLog);
+        _saveLedger(L);
+        const pl = _payloadOf(L);
+        if (pl.sig !== L.uploaded) { files[_timeFile()] = { content: pl.content }; marks.push(() => _markUploaded(pl.sig)); }
+      }
+      const S = window.App && App.Session;
+      if (S && S.seriesState) {
+        const st = S.seriesState(), pf = _pref10(), sp = _seriesPayload(st.slots, st.done, pf.v, pf.at);
+        if (!sp.empty && sp.sig !== _seriesUploadedSig()) { files[_seriesFile()] = { content: sp.content }; marks.push(() => _markSeriesUploaded(sp.sig)); }
+      }
+      if (!Object.keys(files).length) return;
+      _patchFiles(files, true)
+        .catch(() => _patchFiles(files, false))
+        .then(() => marks.forEach(m => m())).catch(() => {});
     } catch (e) {}
   }
 
@@ -340,8 +428,14 @@ App.Sync = (() => {
       const full = await _fetchGist();
       const t = _timeApply(full.files, full.main);
       if (t.changed) { _saveLogQuiet(); _refreshUI(); }
-      await _updateGist(t.needUpload ? { [_timeFile()]: { content: t.content } } : {});
+      const sr = _seriesApply(full.series);
+      if (sr.changed) _refreshSeriesUI();
+      const extra = {};
+      if (t.needUpload) extra[_timeFile()] = { content: t.content };
+      if (sr.needUpload) extra[_seriesFile()] = { content: sr.content };
+      await _updateGist(extra);
       if (t.needUpload) _markUploaded(t.sig);
+      if (sr.needUpload) _markSeriesUploaded(sr.sig);
       _lastSync = Date.now();
       _setStatus('ok');
     } catch(e) {
@@ -391,6 +485,11 @@ App.Sync = (() => {
         if (id === me) return;
         try { const j = JSON.parse(full.files[name]); const o = ((j.own || {})[today] || {}).seconds || 0; tot += o; out.push('   • ' + id + ' : +' + mn(o) + ' (vu ' + (j.updatedAt || '?').slice(11, 16) + ' UTC)'); } catch (e) { out.push('   • ' + id + ' : illisible'); }
       });
+      try {
+        const S = window.App && App.Session, st = S && S.seriesState ? S.seriesState() : { slots: [] };
+        let other = 0; Object.keys(full.series || {}).forEach(n => { if (n.slice(SERIES_PREFIX.length, -SERIES_SUFFIX.length) === me) return; try { other += ((JSON.parse(full.series[n]).slots) || []).length; } catch (e) {} });
+        out.push('▶ Séries en pause : ' + st.slots.length + ' ici · ' + other + ' vue(s) chez les autres appareils (réglage « par 10 » : ' + (_pref10().v === '0' ? 'non' : 'oui') + ')');
+      } catch (e) {}
       out.push('   Total affiché ici : ' + mn(App.Store.getDaySeconds(today)) + ' · dernière synchro : ' + (_lastSync ? new Date(_lastSync).toLocaleTimeString('fr-FR') : 'jamais'));
     } catch(e) { out.push('⚠️ Journal de temps : ' + e.message); }
     return out.join('\n');
@@ -423,6 +522,8 @@ App.Sync = (() => {
 
       // Temps et compteurs du jour : journal par appareil (les ajouts de chaque appareil s'additionnent ; plus de « max » qui perdait du temps)
       _timeApply(full.files, remote);
+      // Séries en pause et réglage « par séries de 10 » des autres appareils
+      _seriesApply(full.series);
 
       if (remote.catOrder && remote.catOrder.length > 0)
         App.Store.state.catOrder = (App.Regroup && App.Regroup.remapOrder) ? App.Regroup.remapOrder(remote.catOrder) : remote.catOrder;
@@ -547,6 +648,6 @@ App.Sync = (() => {
     }
   }
 
-  return { init, connect, disconnect, push, pushDebounced, pullRemote, isConfigured, loadConfig, diagnose, syncTime, markTimeDirty,
+  return { init, connect, disconnect, push, pushDebounced, pullRemote, isConfigured, loadConfig, diagnose, syncTime, markTimeDirty, markSeriesDirty,
            _t: { delays: _delays, config: () => config, setConfig: c => { config = Object.assign({ token: '', gistId: '' }, c); }, ledger: _ledger, deviceId: _deviceId, bind: _bindLifecycle, flush: _flushOnHide } };
 })();

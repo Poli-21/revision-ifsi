@@ -651,10 +651,14 @@ function startTryhard(idx) {
 
 // ── Objectif du jour ───────────────────────────────────────────
 // « Par séries de 10 » (comme Quizlet) : les cartes de l'objectif sont données par blocs de 10 ; les cartes ratées ou difficiles
-// reviennent dans le même bloc, et le bloc suivant ne démarre que quand les 10 sont sues. Choix mémorisé sur cet appareil (activé par défaut).
+// reviennent dans le même bloc, et le bloc suivant ne démarre que quand les 10 sont sues. Choix synchronisé entre tes appareils (activé par défaut) :
+// l'heure du dernier changement est mémorisée pour que le réglage le plus récent l'emporte.
 const SERIES10_KEY = 'ifsi_series10';
 function getSeries10() { try { return localStorage.getItem(SERIES10_KEY) !== '0'; } catch (e) { return true; } }
-function setSeries10(on) { try { localStorage.setItem(SERIES10_KEY, on ? '1' : '0'); } catch (e) {} }
+function setSeries10(on) {
+  try { localStorage.setItem(SERIES10_KEY, on ? '1' : '0'); localStorage.setItem(SERIES10_KEY + '_at', String(Date.now())); } catch (e) {}
+  try { if (window.App && App.Sync && App.Sync.markSeriesDirty) App.Sync.markSeriesDirty(); } catch (e) {}
+}
 function startDailyGoal() {
   const goal = App.Store.getDailyGoal();
   const left = Math.max(0, goal - App.Store.reviewedToday());
