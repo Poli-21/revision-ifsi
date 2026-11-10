@@ -245,7 +245,7 @@ App.Render = (() => {
     // Prochaines révisions
     const upcoming = state.cards
       .filter(c => c.progress && !SRS.isDue(c) && !c.suspended)
-      .sort((a, b) => a.progress.nextReview.localeCompare(b.progress.nextReview))
+      .sort((a, b) => String(a.progress.nextReview || '').localeCompare(String(b.progress.nextReview || '')))
       .slice(0, 9);
     const upGrid = document.getElementById('upcoming-grid');
     if (upGrid) upGrid.innerHTML = upcoming.length

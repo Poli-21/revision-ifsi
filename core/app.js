@@ -904,7 +904,7 @@ function _syncProgressHide() {
 }
 
 async function doSyncPush() {
-  await App.Sync.push();
+  await App.Sync.push(true);
 }
 
 async function doSyncDiagnose() {
