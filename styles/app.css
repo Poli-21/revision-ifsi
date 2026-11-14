@@ -3135,3 +3135,63 @@ body.dark .rg-box { --rg-bg:#1e293b; --rg-line:#334155; --rg-soft:#162032; --rg-
   .duo-end .btn { flex: 1 1 100%; }
   .duo-seg-b { padding: 9px 8px; font-size: .84rem; }
 }
+
+
+/* ══ iPhone / iPad : zone sûre ═══════════════════════════════════════════════
+   L'appli installée sur l'écran d'accueil (barre d'état « translucide ») est dessinée JUSQU'EN HAUT de l'écran : sans ces marges,
+   l'heure, le réseau et la batterie passent par-dessus l'en-tête, et la barre de gestes du bas masque les boutons.
+   --sat/--sab/--sal/--sar = marges du haut / bas / gauche / droite (0 sur ordinateur et dans le navigateur classique). */
+:root{--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+
+/* En-tête : la zone de la barre d'état est colorée (texte blanc de l'heure lisible, même en mode clair) */
+header{
+  height:calc(58px + var(--sat));
+  padding-top:var(--sat);
+  padding-left:max(20px,var(--sal));
+  padding-right:max(20px,var(--sar));
+  background-color:#fff;
+  background-image:linear-gradient(to bottom,#2563eb var(--sat),rgba(255,255,255,0) var(--sat));
+}
+body.dark header{background-image:linear-gradient(to bottom,#0b1220 var(--sat),rgba(11,18,32,0) var(--sat)) !important;}
+.app{height:calc(100vh - 58px - var(--sat));}
+.more-menu{top:calc(56px + var(--sat));right:max(8px,var(--sar));max-height:calc(100dvh - 72px - var(--sat) - var(--sab));width:min(300px,calc(100vw - 16px - var(--sar) - var(--sal)));}
+.eng-feedback{padding-bottom:calc(1rem + var(--sab));padding-left:max(1.4rem,var(--sal));padding-right:max(1.4rem,var(--sar));}
+#bulk-bar{padding-bottom:calc(12px + var(--sab));padding-left:max(24px,var(--sal));padding-right:max(24px,var(--sar));}
+#_app_toast{bottom:calc(24px + var(--sab)) !important;}
+.overlay{padding:var(--sat) var(--sar) var(--sab) var(--sal);}
+#img-zoom-overlay,#th-picker{padding-top:max(12px,var(--sat));padding-bottom:max(12px,var(--sab));padding-left:max(12px,var(--sal));padding-right:max(12px,var(--sar));}
+
+@media (max-width:700px){
+  header{height:calc(52px + var(--sat));padding-left:max(10px,var(--sal));padding-right:max(10px,var(--sar));}
+  .app{height:calc(100dvh - 52px - var(--sat));}
+  .main{padding-left:max(12px,var(--sal));padding-right:max(12px,var(--sar));padding-bottom:calc(80px + var(--sab));}
+  .sidebar{top:calc(52px + var(--sat));padding-bottom:calc(18px + var(--sab));padding-left:max(14px,var(--sal));}
+  .more-menu{top:calc(54px + var(--sat));}
+  #bulk-bar{padding-bottom:calc(10px + var(--sab));padding-left:max(12px,var(--sal));padding-right:max(12px,var(--sar));}
+  .eng-feedback{padding-bottom:calc(.85rem + var(--sab));padding-left:max(1rem,var(--sal));padding-right:max(1rem,var(--sar));}
+  .overlay .modal,.modal{max-height:calc(100dvh - 12px - var(--sat) - var(--sab));}
+  /* iPhone zoome automatiquement sur un champ dont le texte fait moins de 16 px : on l'évite */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]),select,textarea{font-size:16px !important;}
+}
+@media (max-width:700px){
+  /* tiroir fermé : plus d'ombre qui déborde sur le bord gauche de l'écran */
+  .sidebar:not(.open){box-shadow:none;visibility:hidden;transition:transform .25s ease,visibility 0s linear .25s;}
+  .sidebar.open{visibility:visible;transition:transform .25s ease,visibility 0s;}
+}
+
+/* Mode sombre : les boutons de mode de la séance (Flip / Écrire / QCM) n'ont plus de fond blanc */
+body.dark .mode-btn:not(.active){background:#1e293b;color:var(--gray-500);}
+
+/* Tablette / iPhone en paysage (701 à 1100 px) : l'en-tête gardait ses 9 boutons et passait sur 2 lignes. On garde l'essentiel, le reste est dans le menu ⋮ */
+@media (min-width:701px) and (max-width:1100px){
+  .kbd-hint{display:none;}
+  .header-right{flex-wrap:nowrap;flex-shrink:0;}
+  .header-right .btn-ghost:not(.btn-keep-mobile){display:none;}
+  .more-btn{display:flex;}
+  header{overflow:hidden;}
+}
+@media (min-width:701px){
+  /* iPhone en paysage : le panneau de gauche ne passe plus sous l'encoche */
+  .sidebar{width:calc(230px + var(--sal));min-width:calc(230px + var(--sal));padding-left:max(14px,var(--sal));}
+}

@@ -239,7 +239,8 @@ function _warnDesktopSiteOnPhone() {
   const phoneUA  = /Mobi/i.test(navigator.userAgent);
   const smallScr = Math.min(screen.width, screen.height) <= 600;
   const wide     = window.innerWidth >= 700;
-  if (!(touch && wide && (phoneUA || smallScr))) return;
+  const landscape = window.innerWidth > window.innerHeight;     // iPhone tourné en paysage : la fenêtre est large normalement
+  if (landscape || !(touch && wide && (phoneUA || smallScr))) return;
   try { if (sessionStorage.getItem('ifsi_desktop_warn_seen')) return; } catch (e) {}
   const vv   = window.visualViewport;
   const diag = `fenêtre ${window.innerWidth}px · écran ${screen.width}×${screen.height} · dpr ${window.devicePixelRatio}`
@@ -784,7 +785,7 @@ function _showToast(msg) {
   if (!t) {
     t = document.createElement('div');
     t.id = '_app_toast';
-    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);'
+    t.style.cssText = 'position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);'
       + 'background:#1e293b;color:#fff;padding:10px 20px;border-radius:10px;font-size:.85rem;'
       + 'z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s';
     document.body.appendChild(t);
@@ -1701,7 +1702,7 @@ async function downloadBackup(key) {
 
 function _showBackupToast(dateStr) {
   const toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f8fafc;padding:10px 20px;border-radius:99px;font-size:.82rem;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:fadeInUp .3s ease';
+  toast.style.cssText = 'position:fixed;bottom:calc(80px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:#1e293b;color:#f8fafc;padding:10px 20px;border-radius:99px;font-size:.82rem;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:fadeInUp .3s ease';
   toast.textContent = `💾 Sauvegarde locale du ${dateStr}`;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3500);

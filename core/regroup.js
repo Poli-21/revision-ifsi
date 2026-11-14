@@ -378,7 +378,7 @@ App.Regroup = (() => {
 
   function _toast(msg) {
     let t = _el('_app_toast');
-    if (!t) { t = document.createElement('div'); t.id = '_app_toast'; t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 20px;border-radius:10px;font-size:.85rem;z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s;max-width:90vw;text-align:center'; document.body.appendChild(t); }
+    if (!t) { t = document.createElement('div'); t.id = '_app_toast'; t.style.cssText = 'position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 20px;border-radius:10px;font-size:.85rem;z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s;max-width:90vw;text-align:center'; document.body.appendChild(t); }
     clearTimeout(t._hide); t.textContent = msg; t.style.opacity = '1'; t._hide = setTimeout(() => { t.style.opacity = '0'; }, 5000);
   }
 
